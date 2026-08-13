@@ -1,0 +1,37 @@
+{
+  "name": "my-app",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "check-types": "turbo check-types",
+    "dev:native": "turbo -F native dev",
+    "dev:server": "turbo -F server dev",
+    "db:push": "turbo -F @my-app/db db:push",
+    "db:studio": "turbo -F @my-app/db db:studio",
+    "db:generate": "turbo -F @my-app/db db:generate",
+    "db:migrate": "turbo -F @my-app/db db:migrate",
+    "knip": "knip",
+    "knip:production": "knip --production"
+  },
+  "dependencies": {
+    "@my-app/env": "*",
+    "dotenv": "^17.4.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@my-app/config": "*",
+    "knip": "^6.32.0",
+    "turbo": "^2.10.0",
+    "typescript": "^6.0.3"
+  },
+  "overrides": {
+    "@vitejs/devtools": "0.4.1"
+  },
+  "packageManager": "npm@11.7.0"
+}
