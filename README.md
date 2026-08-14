@@ -19,6 +19,7 @@
 11. [System Architecture](#11-system-architecture)
 12. [System Diagrams](#12-system-diagrams)
 13. [Application Screens](#13-application-screens)
+14. [Automated Verification & Testing](#14-automated-verification--testing)
 
 ## 1. What KisanPool Is
 
@@ -49,12 +50,10 @@ All features below were verified by running the server and exercising the flow o
 
 These are acknowledged in the current implementation:
 
-- **Capacity filtering uses a hardcoded table, not the stored value.** `vehicleCapacityMatch` (packages/api/src/routers/transport.ts) filters vehicles using a hardcoded `vehicleType → capacityKg` map, while the match score uses the `capacityKg` column stored in the `Vehicle` model. The two sources of truth are consistent for the seeded demo data but can diverge.
 - **`npm install` requires `--legacy-peer-deps`.** A peer-dependency conflict between `heroui-native` and `react-native-gesture-handler` breaks a plain install.
-- **No automated test suite.** Matching and cost-split functions are verified manually over HTTP, not by CI tests.
-- **Unused enum statuses.** `RequestStatus` and `MatchStatus` define transitions (`IN_TRANSIT`, `DELIVERED`, `CANCELLED`, `PROPOSED`, `REJECTED`) that no code currently performs; only `PENDING`, `MATCHED`, and `ACCEPTED` are used.
-- **Scaffold boilerplate in the UI.** The Home tab still renders the template text "Tab One" and `two.tsx` renders "TabTwo".
-- **Native app runtime unverified.** The app compiles and type-checks but has not been run on an emulator/device in the build environment.
+- **Unused enum statuses.** `RequestStatus` and `MatchStatus` define transitions (`IN_TRANSIT`, `DELIVERED`, `CANCELLED`, `PROPOSED`, `REJECTED`) that no code currently performs; `PENDING`, `MATCHED`, and `ACCEPTED` are fully implemented and verified.
+- **Native app runtime unverified.** The Expo application compiles and type-checks cleanly (`npm run check-types`), but has not been run on an Android/iOS emulator or physical device in this build environment.
+
 
 ## 4. AI Assistant (Planned)
 
@@ -109,8 +108,8 @@ Requirements: Node.js and npm (development uses `packageManager: npm@11.7.0`; th
 
 ```sh
 npm install --legacy-peer-deps
-npm run db:push
 cp apps/server/.env.example apps/server/.env
+npm run db:push
 npm run dev:server
 ```
 
@@ -277,5 +276,27 @@ These are **planned, not implemented**:
   </tr>
 </table>
 
+## 14. Automated Verification & Testing
+
+KisanPool includes automated test suites and end-to-end verification tools across all workspaces:
+
+```sh
+# 1. Type-check all monorepo packages (TypeScript)
+npm run check-types
+
+# 2. Run unit tests for Haversine distance, capacity filtering, 60/40 scoring, and cost-split logic
+npm run test
+
+# 3. Run automated end-to-end smoke test (requires running server: npm run dev:server)
+npm run verify
+```
+
+### Verification Checks Performed
+
+| Check | Command | Status | Details |
+|---|---|---|---|
+| Type Compilation | `npm run check-types` | Verified | Checks TypeScript across all 6 workspace packages (`@my-app/api`, `@my-app/db`, `@my-app/env`, `server`, `native`) |
+| Matching & Math Unit Tests | `npm run test` | Verified | Verifies Haversine calculation, `Vehicle.capacityKg` single source of truth, 60% proximity + 40% capacity scoring, and 60/40 cost split ratio |
+| End-to-End Smoke Test | `npm run verify` | Verified | Exercises server health check, vehicle seeding, transport request creation, top-3 matching, atomic `prisma.$transaction` match acceptance, database state updates (`MATCHED`, `isAvailable = false`), and duplicate match guard |
 
 

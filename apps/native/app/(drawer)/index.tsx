@@ -18,9 +18,9 @@ export default function Home() {
     <Container className="p-4">
       <View className="py-6 mb-4">
         <Text className="text-3xl font-semibold text-foreground tracking-tight">
-          Better Fullstack
+          KisanPool
         </Text>
-        <Text className="text-muted text-sm mt-1">Full-stack TypeScript starter</Text>
+        <Text className="text-muted text-sm mt-1">Farmer Transport & Trip Cost-Sharing Platform</Text>
       </View>
 
       <Surface variant="secondary" className="p-4 rounded-lg">

@@ -10,7 +10,8 @@
     }
   },
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "test": "tsx --test src/routers/transport.test.ts"
   },
   "dependencies": {
     "@my-app/db": "*",

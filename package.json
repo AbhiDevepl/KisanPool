@@ -12,6 +12,8 @@
     "check-types": "turbo check-types",
     "dev:native": "turbo -F native dev",
     "dev:server": "turbo -F server dev",
+    "test": "turbo test",
+    "verify": "node scripts/verify-flow.mjs",
     "pool": "node pool-server.mjs",
     "db:push": "turbo -F @my-app/db db:push",
     "db:studio": "turbo -F @my-app/db db:studio",

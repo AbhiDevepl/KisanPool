@@ -7,8 +7,11 @@ export default function Home() {
   return (
     <Container className="p-6">
       <View className="flex-1 justify-center items-center">
-        <Card variant="secondary" className="p-8 items-center">
-          <Card.Title className="text-3xl mb-2">Tab One</Card.Title>
+        <Card variant="secondary" className="p-8 items-center w-full">
+          <Card.Title className="text-2xl mb-2 text-center">KisanPool Logistics</Card.Title>
+          <Text className="text-muted text-sm text-center">
+            Connect farmer produce with available nearby transport vehicles. Use the Request tab to initiate a new harvest booking.
+          </Text>
         </Card>
       </View>
     </Container>

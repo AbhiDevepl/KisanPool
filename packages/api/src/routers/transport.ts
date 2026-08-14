@@ -2,7 +2,7 @@ import { z } from "zod";
 import { publicProcedure, router } from "../index";
 import prisma from "@my-app/db";
 
-const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+export const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
@@ -14,18 +14,7 @@ const haversineKm = (lat1: number, lng1: number, lat2: number, lng2: number): nu
   return 2 * R * Math.asin(Math.sqrt(a));
 };
 
-const vehicleCapacityMatch = (vehicleType: string, quantityKg: number): boolean => {
-  const capacities: Record<string, number> = {
-    TRUCK_SMALL: 1000,
-    TRUCK_MEDIUM: 5000,
-    TRUCK_LARGE: 15000,
-    TEMPO: 750,
-    TRACTOR_TROLLEY: 2000,
-  };
-  return (capacities[vehicleType] ?? 0) >= quantityKg;
-};
-
-const calculateMatchScore = (
+export const calculateMatchScore = (
   vehicleLat: number,
   vehicleLng: number,
   pickupLat: number,
@@ -81,7 +70,7 @@ export const transportRouter = router({
       });
 
       const matches = vehicles
-        .filter((v) => vehicleCapacityMatch(v.vehicleType, request.quantityKg))
+        .filter((v) => v.capacityKg >= request.quantityKg)
         .map((vehicle) => {
           const tripDistance = haversineKm(
             request.pickupLat,
@@ -130,11 +119,13 @@ export const transportRouter = router({
         where: { id: input.requestId },
       });
       if (!request) throw new Error("Request not found");
+      if (request.status !== "PENDING") throw new Error("Request is already matched or cancelled");
 
       const vehicle = await prisma.vehicle.findUnique({
         where: { id: input.vehicleId },
       });
       if (!vehicle) throw new Error("Vehicle not found");
+      if (!vehicle.isAvailable) throw new Error("Vehicle is not available");
 
       const tripDistance = haversineKm(
         request.pickupLat,
@@ -156,29 +147,29 @@ export const transportRouter = router({
         request.quantityKg
       );
 
-      const match = await prisma.match.create({
-        data: {
-          requestId: input.requestId,
-          vehicleId: input.vehicleId,
-          matchScore,
-          distanceKm: Math.round(tripDistance * 100) / 100,
-          totalCost,
-          farmerShare,
-          driverShare,
-          status: "ACCEPTED",
-        },
-        include: { request: true, vehicle: true },
-      });
-
-      await prisma.transportRequest.update({
-        where: { id: input.requestId },
-        data: { status: "MATCHED" },
-      });
-
-      await prisma.vehicle.update({
-        where: { id: input.vehicleId },
-        data: { isAvailable: false },
-      });
+      const [match] = await prisma.$transaction([
+        prisma.match.create({
+          data: {
+            requestId: input.requestId,
+            vehicleId: input.vehicleId,
+            matchScore,
+            distanceKm: Math.round(tripDistance * 100) / 100,
+            totalCost,
+            farmerShare,
+            driverShare,
+            status: "ACCEPTED",
+          },
+          include: { request: true, vehicle: true },
+        }),
+        prisma.transportRequest.update({
+          where: { id: input.requestId },
+          data: { status: "MATCHED" },
+        }),
+        prisma.vehicle.update({
+          where: { id: input.vehicleId },
+          data: { isAvailable: false },
+        }),
+      ]);
 
       return match;
     }),
