@@ -210,7 +210,7 @@ These are **planned, not implemented**:
 ## 11. System Architecture
 
 <p align="center">
-  <img src="docs/architecture/system-architecture.png" alt="KisanPool System Architecture" width="900">
+  <img src="docs/architecture/system-architecture.png" alt="KisanPool System Architecture" width="800">
 </p>
 
 ## 12. System Diagrams
@@ -218,38 +218,39 @@ These are **planned, not implemented**:
 ### Data Flow Diagram - Level 0
 
 <p align="center">
-  <img src="docs/diagrams/DFD%20Level-0.png" alt="DFD Level 0" width="900">
+  <img src="docs/diagrams/DFD%20Level-0.png" alt="DFD Level 0" width="800">
 </p>
 
 ### Data Flow Diagram - Level 1
 
 <p align="center">
-  <img src="docs/diagrams/DFD%20Level%20-%201.png" alt="DFD Level 1" width="900">
+  <img src="docs/diagrams/DFD%20Level%20-%201.png" alt="DFD Level 1" width="800">
 </p>
 
 ### Data Flow Diagram - Level 2
 
 <p align="center">
-  <img src="docs/diagrams/DFD%20Level%20-%202.png" alt="DFD Level 2" width="900">
+  <img src="docs/diagrams/DFD%20Level%20-%202.png" alt="DFD Level 2" width="800">
 </p>
 
 ### Entity Relationship Diagram
 
 <p align="center">
-  <img src="docs/diagrams/er-diagram.png.png" alt="Entity Relationship Diagram" width="900">
+  <img src="docs/diagrams/er-diagram.png.png" alt="Entity Relationship Diagram" width="800">
 </p>
 
 ### Technical Flowchart
 
 <p align="center">
-  <img src="docs/diagrams/technical-flowchart.png.png" alt="Technical Flowchart" width="900">
+  <img src="docs/diagrams/technical-flowchart.png.png" alt="Technical Flowchart" width="500">
 </p>
 
 ### Workflow
 
 <p align="center">
-  <img src="docs/diagrams/workflow.png.png" alt="KisanPool Workflow" width="900">
+  <img src="docs/diagrams/workflow.png.png" alt="KisanPool Workflow" width="800">
 </p>
+
 
 ## 13. Application Screens
 
