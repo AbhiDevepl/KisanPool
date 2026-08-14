@@ -18,16 +18,15 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@libsql/client": "^0.14.0",
     "@my-app/env": "*",
-    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/adapter-libsql": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "dotenv": "^17.4.2",
-    "pg": "^8.22.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@my-app/config": "*",
-    "@types/pg": "^8.21.0",
     "prisma": "^7.9.1",
     "typescript": "^6.0.3"
   }

@@ -1,9 +1,10 @@
 import { env } from "@my-app/env/server";
-import { PrismaPg } from "@prisma/adapter-pg";
-
+import { PrismaLibSQL } from "@prisma/adapter-libsql";
+import { createClient } from "@libsql/client";
 import { PrismaClient } from "../prisma/generated/client";
 
-const adapter = new PrismaPg({ connectionString: env.DATABASE_URL });
+const libsql = createClient({ url: env.DATABASE_URL });
+const adapter = new PrismaLibSQL(libsql);
 const prisma = new PrismaClient({ adapter });
 
 export default prisma;

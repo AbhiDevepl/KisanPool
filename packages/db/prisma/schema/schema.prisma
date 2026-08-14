@@ -5,5 +5,81 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
+}
+
+model TransportRequest {
+  id            String    @id @default(cuid())
+  farmerId      String
+  cropType      String
+  quantityKg    Int
+  pickupLat     Float
+  pickupLng     Float
+  dropoffLat    Float
+  dropoffLng    Float
+  pickupAddress String
+  dropoffAddress String
+  preferredDate DateTime
+  status        RequestStatus @default(PENDING)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  matches       Match[]
+}
+
+model Vehicle {
+  id            String    @id @default(cuid())
+  driverId      String
+  driverName    String
+  vehicleType   VehicleType
+  capacityKg    Int
+  currentLat    Float
+  currentLng    Float
+  baseLat       Float
+  baseLng       Float
+  ratePerKm     Float
+  isAvailable   Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  matches       Match[]
+}
+
+model Match {
+  id                 String   @id @default(cuid())
+  requestId          String
+  vehicleId          String
+  request            TransportRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  vehicle            Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  matchScore         Float
+  distanceKm         Float
+  farmerShare        Float
+  driverShare        Float
+  totalCost          Float
+  status             MatchStatus @default(PROPOSED)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([requestId, vehicleId])
+}
+
+enum RequestStatus {
+  PENDING
+  MATCHED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum VehicleType {
+  TRUCK_SMALL
+  TRUCK_MEDIUM
+  TRUCK_LARGE
+  TEMPO
+  TRACTOR_TROLLEY
+}
+
+enum MatchStatus {
+  PROPOSED
+  ACCEPTED
+  REJECTED
+  COMPLETED
 }
