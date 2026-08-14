@@ -254,7 +254,7 @@ These are **planned, not implemented**:
 ## 13. Application Screens
 
 <p align="center">
-  <img src="docs/ui/screen.png" alt="KisanPool Main Screen" width="800">
+  <img src="docs/ui/screen%20%287%29.png" alt="KisanPool Screen 7" width="250">
 </p>
 
 <table>
@@ -268,7 +268,8 @@ These are **planned, not implemented**:
   </tr>
   <tr>
     <td><img src="docs/ui/screen%20%286%29.png" alt="KisanPool Screen 6" width="250"></td>
-    <td><img src="docs/ui/screen%20%287%29.png" alt="KisanPool Screen 7" width="250"></td>
+    <td><img src="docs/ui/screen.png" alt="KisanPool Main Screen" width="800"></td>
+
   </tr>
   <tr>
     <td><img src="docs/ui/screen%20%288%29.png" alt="KisanPool Screen 8" width="250"></td>
@@ -283,4 +284,3 @@ These are **planned, not implemented**:
     <td></td>
   </tr>
 </table>
-
