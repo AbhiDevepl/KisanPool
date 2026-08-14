@@ -193,3 +193,4 @@ These are **planned, not implemented**:
 - **Real-time tracking**.
 - **Production database (PostgreSQL + Supabase)**, **Supabase Auth**, **Upstash Redis**, **Meilisearch**, **Docker Compose**, **payments**, **notifications**, and **deployment infrastructure**.
 - **Fixes** — resolve the `heroui-native` peer-dependency conflict so a plain `npm install` works; add a test suite for matching and cost-split functions.
+docs/architecture/system-architecture.png
