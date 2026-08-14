@@ -1,10 +1,18 @@
-import { env } from "@my-app/env/server";
-import { PrismaLibSQL } from "@prisma/adapter-libsql";
-import { createClient } from "@libsql/client";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { PrismaLibSql } from "@prisma/adapter-libsql";
 import { PrismaClient } from "../prisma/generated/client";
 
-const libsql = createClient({ url: env.DATABASE_URL });
-const adapter = new PrismaLibSQL(libsql);
+const dbPath = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "prisma",
+  "dev.db",
+);
+
+const adapter = new PrismaLibSql({ url: `file:${dbPath}` });
 const prisma = new PrismaClient({ adapter });
 
 export default prisma;
+
+export type * from "../prisma/generated/client";

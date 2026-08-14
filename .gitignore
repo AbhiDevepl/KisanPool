@@ -33,6 +33,14 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
+# SQLite databases
+*.db
+*.db-journal
+prisma/dev.db
+
+# Pooling demo data file
+pool-store.json
+
 # Turbo
 .turbo
 

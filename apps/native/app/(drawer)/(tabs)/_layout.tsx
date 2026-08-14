@@ -31,6 +31,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="new-request"
+        options={{
+          title: "Request",
+          tabBarIcon: ({ color, size }) => <Ionicons name="add-circle" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="matches"
+        options={{
+          title: "Matches",
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="two"
         options={{
           title: "Explore",

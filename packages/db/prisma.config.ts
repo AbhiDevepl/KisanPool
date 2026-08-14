@@ -1,17 +1,15 @@
-import dotenv from "dotenv";
 import path from "node:path";
-import { defineConfig, env } from "prisma/config";
+import { fileURLToPath } from "node:url";
+import { defineConfig } from "prisma/config";
 
-dotenv.config({
-  path: "../../apps/server/.env",
-});
+const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  schema: path.join("prisma", "schema"),
+  schema: path.join(dirname, "prisma", "schema"),
   migrations: {
-    path: path.join("prisma", "migrations"),
+    path: path.join(dirname, "prisma", "migrations"),
   },
   datasource: {
-    url: env("DATABASE_URL"),
+    url: `file:${path.join(dirname, "prisma", "dev.db")}`,
   },
 });

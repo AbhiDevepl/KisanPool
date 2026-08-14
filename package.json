@@ -12,6 +12,7 @@
     "check-types": "turbo check-types",
     "dev:native": "turbo -F native dev",
     "dev:server": "turbo -F server dev",
+    "pool": "node pool-server.mjs",
     "db:push": "turbo -F @my-app/db db:push",
     "db:studio": "turbo -F @my-app/db db:studio",
     "db:generate": "turbo -F @my-app/db db:generate",
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@my-app/config": "*",
+    "@types/node": "^26.2.0",
     "knip": "^6.32.0",
     "turbo": "^2.10.0",
     "typescript": "^6.0.3"

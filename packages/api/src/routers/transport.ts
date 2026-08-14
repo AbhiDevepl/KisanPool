@@ -30,13 +30,12 @@ const calculateMatchScore = (
   vehicleLng: number,
   pickupLat: number,
   pickupLng: number,
-  dropoffLat: number,
-  dropoffLng: number,
+  _dropoffLat: number,
+  _dropoffLng: number,
   vehicleCapacity: number,
   requestQuantity: number
 ): number => {
   const pickupDistance = haversineKm(vehicleLat, vehicleLng, pickupLat, pickupLng);
-  const tripDistance = haversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
   const capacityUtilization = requestQuantity / vehicleCapacity;
   const distanceScore = Math.max(0, 100 - pickupDistance * 2);
   const capacityScore = capacityUtilization * 100;
