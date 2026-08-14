@@ -254,49 +254,33 @@ These are **planned, not implemented**:
 ## 13. Application Screens
 
 <p align="center">
-  <img src="docs/ui/screen.png" alt="KisanPool Application" width="800">
+  <img src="docs/ui/screen.png" alt="KisanPool Main Screen" width="800">
 </p>
 
-<p align="center">
-  <img src="docs/ui/screen%20%282%29.png" alt="KisanPool Screen 2" width="800">
-</p>
+<table>
+  <tr>
+    <td><img src="docs/ui/screen%20%282%29.png" alt="KisanPool Screen 2" width="250"></td>
+    <td><img src="docs/ui/screen%20%283%29.png" alt="KisanPool Screen 3" width="250"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/ui/screen%20%284%29.png" alt="KisanPool Screen 4" width="250"></td>
+    <td><img src="docs/ui/screen%20%285%29.png" alt="KisanPool Screen 5" width="250"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/ui/screen%20%286%29.png" alt="KisanPool Screen 6" width="250"></td>
+    <td><img src="docs/ui/screen%20%287%29.png" alt="KisanPool Screen 7" width="250"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/ui/screen%20%288%29.png" alt="KisanPool Screen 8" width="250"></td>
+    <td><img src="docs/ui/screen%20%289%29.png" alt="KisanPool Screen 9" width="250"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/ui/screen%20%2810%29.png" alt="KisanPool Screen 10" width="250"></td>
+    <td><img src="docs/ui/screen%20%2811%29.png" alt="KisanPool Screen 11" width="250"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/ui/screen%20%2812%29.png" alt="KisanPool Screen 12" width="250"></td>
+    <td></td>
+  </tr>
+</table>
 
-<p align="center">
-  <img src="docs/ui/screen%20%283%29.png" alt="KisanPool Screen 3" width="800">
-</p>
-
-<p align="center">
-  <img src="docs/ui/screen%20%284%29.png" alt="KisanPool Screen 4" width="800">
-</p>
-
-<p align="center">
-  <img src="docs/ui/screen%20%285%29.png" alt="KisanPool Screen 5" width="800">
-</p>
-
-<p align="center">
-  <img src="docs/ui/screen%20%286%29.png" alt="KisanPool Screen 6" width="800">
-</p>
-
-<p align="center">
-  <img src="docs/ui/screen%20%287%29.png" alt="KisanPool Screen 7" width="800">
-</p>
-
-<p align="center">
-  <img src="docs/ui/screen%20%288%29.png" alt="KisanPool Screen 8" width="800">
-</p>
-
-<p align="center">
-  <img src="docs/ui/screen%20%289%29.png" alt="KisanPool Screen 9" width="800">
-</p>
-
-<p align="center">
-  <img src="docs/ui/screen%20%2810%29.png" alt="KisanPool Screen 10" width="800">
-</p>
-
-<p align="center">
-  <img src="docs/ui/screen%20%2811%29.png" alt="KisanPool Screen 11" width="800">
-</p>
-
-<p align="center">
-  <img src="docs/ui/screen%20%2812%29.png" alt="KisanPool Screen 12" width="800">
-</p>
