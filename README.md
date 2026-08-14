@@ -16,12 +16,11 @@ All features below were verified by running the server and exercising the flow o
   3. Each compatible vehicle gets a **match score**: 60% proximity (vehicle-to-pickup distance, haversine formula) and 40% capacity utilization (request quantity / vehicle capacity).
   4. The top 3 matches are returned with computed trip distance, total cost (`distanceKm × ratePerKm`), and the split: **60% farmer / 40% driver**.
   5. Accepting a match creates a `Match` record (`ACCEPTED`), marks the request `MATCHED`, and sets the vehicle unavailable.
-
 - **API server** (`apps/server`): Express 5 + tRPC v11 on `http://localhost:3000`. Procedures: `healthCheck`, `transport.createRequest`, `transport.findMatches`, `transport.acceptMatch`, `transport.getMatch`, `transport.seedVehicles`.
-
 - **Data layer** (`packages/db`): Prisma ORM on a local SQLite file via the libsql driver adapter. Models: `TransportRequest`, `Vehicle`, `Match`; enums `RequestStatus`, `VehicleType`, `MatchStatus`. Data persists on disk across restarts.
-
 - **Mobile app** (`apps/native`): Expo / React Native app with a "New Request" form and a "Matches" screen that lists each vehicle's score, distance, and cost split and lets the farmer accept a match. It talks to the server through a tRPC batch link. The app type-checks; its runtime was **not verified** here (no emulator/device in the build environment).
+
+
 
 ### AI Interaction Currently Implemented
 
@@ -40,6 +39,8 @@ The following AI capabilities are part of the project concept and roadmap but ar
 - Pickup scheduling
 - Natural-language transport request creation
 - Multilingual confirmations and status updates
+
+
 
 ## 3. Multilingual AI Assistant
 
@@ -60,33 +61,39 @@ The following AI capabilities are part of the project concept and roadmap but ar
 
 ## 4. What's Implemented vs Planned
 
-| Feature | Status | Details |
-| --- | --- | --- |
-| Transport request | Implemented | `transport.createRequest` with Zod validation; persisted to SQLite |
-| Pool matching | Implemented | Request matched to a compatible vehicle (capacity check + haversine distance) |
-| Cost splitting | Implemented | `distanceKm × ratePerKm`, split 60% farmer / 40% driver, computed server-side |
-| AI assistant | Planned | No code exists in the repository |
-| Servom AI integration | Planned | No code or configuration exists in the repository |
-| Indian language support | Planned | No i18n/translation/language code exists |
-| Voice interaction | Planned | No speech/audio/NLP code exists |
-| Automatic pickup extraction | Planned | Not implemented |
-| Automatic drop extraction | Planned | Not implemented |
-| Pickup scheduling | Planned | Not implemented (user supplies `preferredDate` explicitly in the form) |
+
+| Feature                     | Status      | Details                                                                       |
+| --------------------------- | ----------- | ----------------------------------------------------------------------------- |
+| Transport request           | Implemented | `transport.createRequest` with Zod validation; persisted to SQLite            |
+| Pool matching               | Implemented | Request matched to a compatible vehicle (capacity check + haversine distance) |
+| Cost splitting              | Implemented | `distanceKm × ratePerKm`, split 60% farmer / 40% driver, computed server-side |
+| AI assistant                | Planned     | No code exists in the repository                                              |
+| Servom AI integration       | Planned     | No code or configuration exists in the repository                             |
+| Indian language support     | Planned     | No i18n/translation/language code exists                                      |
+| Voice interaction           | Planned     | No speech/audio/NLP code exists                                               |
+| Automatic pickup extraction | Planned     | Not implemented                                                               |
+| Automatic drop extraction   | Planned     | Not implemented                                                               |
+| Pickup scheduling           | Planned     | Not implemented (user supplies `preferredDate` explicitly in the form)        |
+
+
+
 
 ## 5. Tech Stack Actually Used
 
-| Technology | Purpose | Status |
-| --- | --- | --- |
-| Node.js | Runtime for API server | Implemented |
-| Express 5 | HTTP server hosting tRPC middleware | Implemented |
-| tRPC v11 | Type-safe RPC layer between app and server | Implemented |
-| TypeScript | Shared language across all packages | Implemented |
-| Zod | Input validation on tRPC procedures | Implemented |
-| Prisma ORM | Data modeling and queries | Implemented |
-| SQLite (libsql driver adapter) | Local database (single file) | Implemented |
-| Expo / React Native | Mobile client | Implemented (runtime unverified here) |
-| Tailwind CSS v4 (via `uniwind`) | Mobile UI styling | Implemented |
-| npm workspaces + Turborepo | Monorepo tooling | Implemented |
+
+| Technology                      | Purpose                                    | Status                                |
+| ------------------------------- | ------------------------------------------ | ------------------------------------- |
+| Node.js                         | Runtime for API server                     | Implemented                           |
+| Express 5                       | HTTP server hosting tRPC middleware        | Implemented                           |
+| tRPC v11                        | Type-safe RPC layer between app and server | Implemented                           |
+| TypeScript                      | Shared language across all packages        | Implemented                           |
+| Zod                             | Input validation on tRPC procedures        | Implemented                           |
+| Prisma ORM                      | Data modeling and queries                  | Implemented                           |
+| SQLite (libsql driver adapter)  | Local database (single file)               | Implemented                           |
+| Expo / React Native             | Mobile client                              | Implemented (runtime unverified here) |
+| Tailwind CSS v4 (via `uniwind`) | Mobile UI styling                          | Implemented                           |
+| npm workspaces + Turborepo      | Monorepo tooling                           | Implemented                           |
+
 
 **Servom AI:** not present in the repository. There is no integration method, no API client, no code location, and no functionality — it exists only as a documented concept. PostgreSQL, Supabase (DB + Auth), Upstash Redis, Meilisearch, Docker, Next.js, and shadcn/ui are likewise **not** used in this repo.
 
@@ -114,12 +121,14 @@ curl http://localhost:3000/
 
 **Environment variables.** No secrets or API keys are required. There are no AI/Servom AI credentials to configure because no AI integration exists.
 
-| Variable | Where | Value | Notes |
-| --- | --- | --- | --- |
-| `DATABASE_URL` | `apps/server/.env` | `file:./dev.db` | Required by env validation; the Prisma client actually connects to a fixed file `packages/db/prisma/dev.db` |
-| `CORS_ORIGIN` | `apps/server/.env` | `http://localhost:8081` | Allowed origin (Expo/Metro default); must be a valid URL |
-| `NODE_ENV` | `apps/server/.env` | `development` | Optional; defaults to `development` |
-| `EXPO_PUBLIC_SERVER_URL` | `apps/native/.env` | `http://localhost:3000` | API base URL used by the mobile app; optional |
+
+| Variable                 | Where              | Value                   | Notes                                                                                                       |
+| ------------------------ | ------------------ | ----------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`           | `apps/server/.env` | `file:./dev.db`         | Required by env validation; the Prisma client actually connects to a fixed file `packages/db/prisma/dev.db` |
+| `CORS_ORIGIN`            | `apps/server/.env` | `http://localhost:8081` | Allowed origin (Expo/Metro default); must be a valid URL                                                    |
+| `NODE_ENV`               | `apps/server/.env` | `development`           | Optional; defaults to `development`                                                                         |
+| `EXPO_PUBLIC_SERVER_URL` | `apps/native/.env` | `http://localhost:3000` | API base URL used by the mobile app; optional                                                               |
+
 
 **Test the main flow over HTTP** (these exact commands verified the implementation):
 
@@ -193,4 +202,68 @@ These are **planned, not implemented**:
 - **Real-time tracking**.
 - **Production database (PostgreSQL + Supabase)**, **Supabase Auth**, **Upstash Redis**, **Meilisearch**, **Docker Compose**, **payments**, **notifications**, and **deployment infrastructure**.
 - **Fixes** — resolve the `heroui-native` peer-dependency conflict so a plain `npm install` works; add a test suite for matching and cost-split functions.
-docs/architecture/system-architecture.png
+
+
+
+## System Architecture
+
+
+
+## System Diagrams
+
+
+
+### Data Flow Diagram - Level 0
+
+
+
+### Data Flow Diagram - Level 1
+
+
+
+### Data Flow Diagram - Level 2
+
+
+
+### Entity Relationship Diagram
+
+
+
+### Technical Flowchart
+
+
+
+### Workflow
+
+
+
+## Application Screens
+
+
+
+### Main Application
+
+
+
+### Application Screenshots
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
