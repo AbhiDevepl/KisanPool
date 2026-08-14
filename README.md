@@ -1,10 +1,30 @@
-# KisanPool
+# KisanPool - Agricultural Logistics Platform
 
-## 1. What KisanPool AI Powered
+![KisanPool Logo](docs/ui/kisan-logo.png)
+
+**KisanPool** is a comprehensive agricultural logistics platform designed to connect farmers with vehicle owners, optimizing the transportation of agricultural produce. The platform facilitates seamless transport requests, intelligent vehicle matching, and fair cost-sharing mechanisms.
+
+## Table of Contents
+
+1. [What KisanPool Is](#1-what-kisanpool-is)
+2. [What's Implemented in This Repo Right Now](#2-whats-implemented-in-this-repo-right-now)
+3. [Known Limitations](#3-known-limitations)
+4. [AI Assistant (Planned)](#4-ai-assistant-planned)
+5. [What's Implemented vs Planned](#5-whats-implemented-vs-planned)
+6. [Tech Stack Actually Used](#6-tech-stack-actually-used)
+7. [How to Run It Locally](#7-how-to-run-it-locally)
+8. [Project Structure](#8-project-structure)
+9. [Main End-to-End Flow](#9-main-end-to-end-flow)
+10. [What's Planned Next](#10-whats-planned-next)
+11. [System Architecture](#11-system-architecture)
+12. [System Diagrams](#12-system-diagrams)
+13. [Application Screens](#13-application-screens)
+
+## 1. What KisanPool Is
 
 Small and marginal farmers in India often struggle to arrange transport for their harvest: trucks are scarce at harvest time, and individual loads rarely fill a vehicle, so farmers overpay for half-empty trips. KisanPool is a prototype that matches a farmer's transport request with a nearby available vehicle that has the capacity to carry the load, and splits the trip cost between the farmer and the driver.
 
-Beyond the core matching flow, the project includes a planned AI-assisted interaction concept, "Servom AI", intended to let farmers create and manage transport requests by speaking or typing in Indian regional languages instead of navigating conventional application screens. **The AI integration is not implemented in this repository yet** — it is a design concept and roadmap item, not working functionality.
+An AI-assisted interface ("Servom AI") is part of the project concept — intended to let farmers create and manage transport requests by speaking or typing in Indian regional languages. It is **planned, not implemented** (see [Section 4](#4-ai-assistant-planned)).
 
 ## 2. What's Implemented in This Repo Right Now
 
@@ -16,88 +36,74 @@ All features below were verified by running the server and exercising the flow o
   3. Each compatible vehicle gets a **match score**: 60% proximity (vehicle-to-pickup distance, haversine formula) and 40% capacity utilization (request quantity / vehicle capacity).
   4. The top 3 matches are returned with computed trip distance, total cost (`distanceKm × ratePerKm`), and the split: **60% farmer / 40% driver**.
   5. Accepting a match creates a `Match` record (`ACCEPTED`), marks the request `MATCHED`, and sets the vehicle unavailable.
+
 - **API server** (`apps/server`): Express 5 + tRPC v11 on `http://localhost:3000`. Procedures: `healthCheck`, `transport.createRequest`, `transport.findMatches`, `transport.acceptMatch`, `transport.getMatch`, `transport.seedVehicles`.
+
 - **Data layer** (`packages/db`): Prisma ORM on a local SQLite file via the libsql driver adapter. Models: `TransportRequest`, `Vehicle`, `Match`; enums `RequestStatus`, `VehicleType`, `MatchStatus`. Data persists on disk across restarts.
+
 - **Mobile app** (`apps/native`): Expo / React Native app with a "New Request" form and a "Matches" screen that lists each vehicle's score, distance, and cost split and lets the farmer accept a match. It talks to the server through a tRPC batch link. The app type-checks; its runtime was **not verified** here (no emulator/device in the build environment).
 
+**AI interaction implemented: none.** There is no Servom AI integration, no LLM/voice/speech library, no translation or language-detection code, and no AI-related API keys in the repository. All AI capability is planned.
 
+## 3. Known Limitations
 
-### AI Interaction Currently Implemented
+These are acknowledged in the current implementation:
 
-None. A repository-wide search found no Servom AI integration, no LLM/voice/speech library, no translation or language-detection code, and no AI-related API keys or configuration. There are no AI capabilities in the codebase today.
+- **Capacity filtering uses a hardcoded table, not the stored value.** `vehicleCapacityMatch` (packages/api/src/routers/transport.ts) filters vehicles using a hardcoded `vehicleType → capacityKg` map, while the match score uses the `capacityKg` column stored in the `Vehicle` model. The two sources of truth are consistent for the seeded demo data but can diverge.
+- **`npm install` requires `--legacy-peer-deps`.** A peer-dependency conflict between `heroui-native` and `react-native-gesture-handler` breaks a plain install.
+- **No automated test suite.** Matching and cost-split functions are verified manually over HTTP, not by CI tests.
+- **Unused enum statuses.** `RequestStatus` and `MatchStatus` define transitions (`IN_TRANSIT`, `DELIVERED`, `CANCELLED`, `PROPOSED`, `REJECTED`) that no code currently performs; only `PENDING`, `MATCHED`, and `ACCEPTED` are used.
+- **Scaffold boilerplate in the UI.** The Home tab still renders the template text "Tab One" and `two.tsx` renders "TabTwo".
+- **Native app runtime unverified.** The app compiles and type-checks but has not been run on an emulator/device in the build environment.
 
-### AI Interaction Planned
+## 4. AI Assistant (Planned)
 
-The following AI capabilities are part of the project concept and roadmap but are **not implemented**:
+**The problem.** Many farmers are more comfortable speaking or communicating in their regional language than navigating conventional application menus and forms.
 
-- Servom AI integration (natural-language/voice assistant)
-- Full multilingual support across India's 22 scheduled languages
-- Voice-based interaction
-- Automatic extraction of pickup location
-- Automatic extraction of drop location
-- Transport requirement extraction (crop, quantity, timing)
-- Pickup scheduling
-- Natural-language transport request creation
-- Multilingual confirmations and status updates
+**The concept.** As described in the project brief, KisanPool intends to offer an AI-assisted interface ("Servom AI") that lets a farmer interact with the application in Indian regional languages — including the 22 scheduled Indian languages (e.g., Marathi, Hindi, Telugu, Tamil, Bengali, Gujarati, Kannada, Malayalam, Punjabi, Odia, Assamese, Urdu).
 
-
-
-## 3. Multilingual AI Assistant
-
-**The problem.** Many farmers are more comfortable speaking or communicating in their regional language than navigating a conventional application interface with menus and forms.
-
-**The intended solution.** KisanPool's concept includes an AI-assisted interface ("Servom AI") that would let a farmer interact with the application in Indian regional languages — including the 22 scheduled Indian languages (e.g., Marathi, Hindi, Telugu, Tamil, Bengali, Gujarati, Kannada, Malayalam, Punjabi, Odia, Assamese, Urdu) — reducing dependence on complex screens.
-
-**Intended workflow (design concept, not implemented):**
+**Intended workflow (design only):**
 
 1. Farmer speaks or types naturally in a supported language.
 2. AI interprets the language and intent.
-3. Relevant transport information (pickup, drop-off, crop, quantity, timing) is extracted.
-4. The application converts the extracted information into a structured transport request.
-5. The system runs matching and cost-splitting.
-6. The farmer receives the result in an understandable language.
+3. Transport details (pickup, drop-off, crop, quantity, timing) are extracted.
+4. The application converts that into a structured request, runs matching and cost-splitting, and returns the result in the farmer's language.
 
-**Current status.** This entire section describes a **planned design**. There is no Servom AI integration, no language support, no voice or text NLP, and no automatic extraction in the repository. No specific languages are currently supported; all language support is planned. Nothing about the AI interface is operational, so it cannot yet create or update transport requests.
+**Current status.** No code exists for any of this. "Servom AI" appears in the project brief, not in the repository: no integration, no API client, no language support, no voice/text NLP, no automatic extraction. Nothing about the AI interface can create or update transport requests today.
 
-## 4. What's Implemented vs Planned
+## 5. What's Implemented vs Planned
 
+| Feature | Status | Details |
+| --- | --- | --- |
+| Transport request | Implemented | `transport.createRequest` with Zod validation; persisted to SQLite |
+| Pool matching | Implemented | Request matched to a compatible vehicle (capacity check + haversine distance) |
+| Cost splitting | Implemented | `distanceKm × ratePerKm`, split 60% farmer / 40% driver, computed server-side |
+| AI assistant | Planned | No code exists in the repository |
+| Servom AI integration | Planned | No code or configuration exists in the repository |
+| Indian language support | Planned | No i18n/translation/language code exists |
+| Voice interaction | Planned | No speech/audio/NLP code exists |
+| Automatic pickup extraction | Planned | Not implemented |
+| Automatic drop extraction | Planned | Not implemented |
+| Pickup scheduling | Planned | Not implemented (user supplies `preferredDate` explicitly in the form) |
 
-| Feature                     | Status      | Details                                                                       |
-| --------------------------- | ----------- | ----------------------------------------------------------------------------- |
-| Transport request           | Implemented | `transport.createRequest` with Zod validation; persisted to SQLite            |
-| Pool matching               | Implemented | Request matched to a compatible vehicle (capacity check + haversine distance) |
-| Cost splitting              | Implemented | `distanceKm × ratePerKm`, split 60% farmer / 40% driver, computed server-side |
-| AI assistant                | Planned     | No code exists in the repository                                              |
-| Servom AI integration       | Planned     | No code or configuration exists in the repository                             |
-| Indian language support     | Planned     | No i18n/translation/language code exists                                      |
-| Voice interaction           | Planned     | No speech/audio/NLP code exists                                               |
-| Automatic pickup extraction | Planned     | Not implemented                                                               |
-| Automatic drop extraction   | Planned     | Not implemented                                                               |
-| Pickup scheduling           | Planned     | Not implemented (user supplies `preferredDate` explicitly in the form)        |
+## 6. Tech Stack Actually Used
 
+| Technology | Purpose | Status |
+| --- | --- | --- |
+| Node.js | Runtime for API server | Implemented |
+| Express 5 | HTTP server hosting tRPC middleware | Implemented |
+| tRPC v11 | Type-safe RPC layer between app and server | Implemented |
+| TypeScript | Shared language across all packages | Implemented |
+| Zod | Input validation on tRPC procedures | Implemented |
+| Prisma ORM | Data modeling and queries | Implemented |
+| SQLite (libsql driver adapter) | Local database (single file) | Implemented |
+| Expo / React Native | Mobile client | Implemented (runtime unverified here) |
+| Tailwind CSS v4 (via `uniwind`) | Mobile UI styling | Implemented |
+| npm workspaces + Turborepo | Monorepo tooling | Implemented |
 
+**Not used in this repo:** Servom AI, PostgreSQL, Supabase (DB + Auth), Upstash Redis, Meilisearch, Docker, Next.js, shadcn/ui — none appear in code or configuration.
 
-
-## 5. Tech Stack Actually Used
-
-
-| Technology                      | Purpose                                    | Status                                |
-| ------------------------------- | ------------------------------------------ | ------------------------------------- |
-| Node.js                         | Runtime for API server                     | Implemented                           |
-| Express 5                       | HTTP server hosting tRPC middleware        | Implemented                           |
-| tRPC v11                        | Type-safe RPC layer between app and server | Implemented                           |
-| TypeScript                      | Shared language across all packages        | Implemented                           |
-| Zod                             | Input validation on tRPC procedures        | Implemented                           |
-| Prisma ORM                      | Data modeling and queries                  | Implemented                           |
-| SQLite (libsql driver adapter)  | Local database (single file)               | Implemented                           |
-| Expo / React Native             | Mobile client                              | Implemented (runtime unverified here) |
-| Tailwind CSS v4 (via `uniwind`) | Mobile UI styling                          | Implemented                           |
-| npm workspaces + Turborepo      | Monorepo tooling                           | Implemented                           |
-
-
-**Servom AI:** not present in the repository. There is no integration method, no API client, no code location, and no functionality — it exists only as a documented concept. PostgreSQL, Supabase (DB + Auth), Upstash Redis, Meilisearch, Docker, Next.js, and shadcn/ui are likewise **not** used in this repo.
-
-## 6. How to Run It Locally
+## 7. How to Run It Locally
 
 Requirements: Node.js and npm (development uses `packageManager: npm@11.7.0`; the server runs with `tsx`, verified on Node 22). Run from the repository root:
 
@@ -121,14 +127,12 @@ curl http://localhost:3000/
 
 **Environment variables.** No secrets or API keys are required. There are no AI/Servom AI credentials to configure because no AI integration exists.
 
-
-| Variable                 | Where              | Value                   | Notes                                                                                                       |
-| ------------------------ | ------------------ | ----------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`           | `apps/server/.env` | `file:./dev.db`         | Required by env validation; the Prisma client actually connects to a fixed file `packages/db/prisma/dev.db` |
-| `CORS_ORIGIN`            | `apps/server/.env` | `http://localhost:8081` | Allowed origin (Expo/Metro default); must be a valid URL                                                    |
-| `NODE_ENV`               | `apps/server/.env` | `development`           | Optional; defaults to `development`                                                                         |
-| `EXPO_PUBLIC_SERVER_URL` | `apps/native/.env` | `http://localhost:3000` | API base URL used by the mobile app; optional                                                               |
-
+| Variable | Where | Value | Notes |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | `apps/server/.env` | `file:./dev.db` | Required by env validation; the Prisma client actually connects to a fixed file `packages/db/prisma/dev.db` |
+| `CORS_ORIGIN` | `apps/server/.env` | `http://localhost:8081` | Allowed origin (Expo/Metro default); must be a valid URL |
+| `NODE_ENV` | `apps/server/.env` | `development` | Optional; defaults to `development` |
+| `EXPO_PUBLIC_SERVER_URL` | `apps/native/.env` | `http://localhost:3000` | API base URL used by the mobile app; optional |
 
 **Test the main flow over HTTP** (these exact commands verified the implementation):
 
@@ -152,7 +156,7 @@ curl -X POST http://localhost:3000/trpc/transport.acceptMatch -H "Content-Type: 
 
 **Typecheck:** `npm run check-types` runs TypeScript across all workspaces.
 
-## 7. Project Structure
+## 8. Project Structure
 
 ```text
 KisanPool/
@@ -172,7 +176,7 @@ KisanPool/
 
 Key folders: `apps/server` is the HTTP entry point; `packages/api` contains the business logic (matching and cost split); `packages/db` owns the schema and database client; `apps/native` is the mobile client.
 
-## 8. Main End-to-End Flow
+## 9. Main End-to-End Flow
 
 This is the implemented, verified journey:
 
@@ -184,9 +188,9 @@ This is the implemented, verified journey:
 6. Farmer accepts a match (`transport.acceptMatch`), which persists the `Match`, marks the request `MATCHED`, and makes the vehicle unavailable.
 7. The farmer sees the result on the Matches screen.
 
-The AI-assisted variant (speaking/typing in a regional language, AI extracting the request fields, AI creating/updating the request) is **planned, not implemented** — see Sections 3 and 9.
+The AI-assisted variant (speaking/typing in a regional language, AI extracting the request fields, AI creating/updating the request) is **planned, not implemented** — see [Section 4](#4-ai-assistant-planned).
 
-## 9. What's Planned Next
+## 10. What's Planned Next
 
 These are **planned, not implemented**:
 
@@ -203,15 +207,13 @@ These are **planned, not implemented**:
 - **Production database (PostgreSQL + Supabase)**, **Supabase Auth**, **Upstash Redis**, **Meilisearch**, **Docker Compose**, **payments**, **notifications**, and **deployment infrastructure**.
 - **Fixes** — resolve the `heroui-native` peer-dependency conflict so a plain `npm install` works; add a test suite for matching and cost-split functions.
 
-
-
-## System Architecture
+## 11. System Architecture
 
 <p align="center">
   <img src="docs/architecture/system-architecture.png" alt="KisanPool System Architecture" width="900">
 </p>
 
-## System Diagrams
+## 12. System Diagrams
 
 ### Data Flow Diagram - Level 0
 
@@ -249,68 +251,52 @@ These are **planned, not implemented**:
   <img src="docs/diagrams/workflow.png.png" alt="KisanPool Workflow" width="900">
 </p>
 
-## Application Screens
+## 13. Application Screens
 
 <p align="center">
-  <img src="docs/ui/screen%20%282%29.png" alt="KisanPool Screen 2" width="250">
+  <img src="docs/ui/screen.png" alt="KisanPool Application" width="800">
 </p>
 
 <p align="center">
-  <img src="docs/ui/screen%20%283%29.png" alt="KisanPool Screen 3" width="250">
+  <img src="docs/ui/screen%20%282%29.png" alt="KisanPool Screen 2" width="800">
 </p>
 
 <p align="center">
-  <img src="docs/ui/screen%20%284%29.png" alt="KisanPool Screen 4" width="250">
+  <img src="docs/ui/screen%20%283%29.png" alt="KisanPool Screen 3" width="800">
 </p>
 
 <p align="center">
-  <img src="docs/ui/screen%20%285%29.png" alt="KisanPool Screen 5" width="250">
+  <img src="docs/ui/screen%20%284%29.png" alt="KisanPool Screen 4" width="800">
 </p>
 
 <p align="center">
-  <img src="docs/ui/screen%20%286%29.png" alt="KisanPool Screen 6" width="250">
+  <img src="docs/ui/screen%20%285%29.png" alt="KisanPool Screen 5" width="800">
 </p>
 
 <p align="center">
-  <img src="docs/ui/screen%20%287%29.png" alt="KisanPool Screen 7" width="250">
+  <img src="docs/ui/screen%20%286%29.png" alt="KisanPool Screen 6" width="800">
 </p>
 
 <p align="center">
-  <img src="docs/ui/screen%20%288%29.png" alt="KisanPool Screen 8" width="250">
+  <img src="docs/ui/screen%20%287%29.png" alt="KisanPool Screen 7" width="800">
 </p>
 
 <p align="center">
-  <img src="docs/ui/screen%20%289%29.png" alt="KisanPool Screen 9" width="250">
+  <img src="docs/ui/screen%20%288%29.png" alt="KisanPool Screen 8" width="800">
 </p>
 
 <p align="center">
-  <img src="docs/ui/screen%20%2810%29.png" alt="KisanPool Screen 10" width="250">
+  <img src="docs/ui/screen%20%289%29.png" alt="KisanPool Screen 9" width="800">
 </p>
 
 <p align="center">
-  <img src="docs/ui/screen%20%2811%29.png" alt="KisanPool Screen 11" width="250">
+  <img src="docs/ui/screen%20%2810%29.png" alt="KisanPool Screen 10" width="800">
 </p>
 
 <p align="center">
-  <img src="docs/ui/screen%20%2812%29.png" alt="KisanPool Screen 12" width="250">
+  <img src="docs/ui/screen%20%2811%29.png" alt="KisanPool Screen 11" width="800">
 </p>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+<p align="center">
+  <img src="docs/ui/screen%20%2812%29.png" alt="KisanPool Screen 12" width="800">
+</p>
