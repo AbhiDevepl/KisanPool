@@ -207,45 +207,99 @@ These are **planned, not implemented**:
 
 ## System Architecture
 
-
+<p align="center">
+  <img src="docs/architecture/system-architecture.png" alt="KisanPool System Architecture" width="900">
+</p>
 
 ## System Diagrams
 
-
-
 ### Data Flow Diagram - Level 0
 
-
+<p align="center">
+  <img src="docs/diagrams/DFD%20Level-0.png" alt="DFD Level 0" width="900">
+</p>
 
 ### Data Flow Diagram - Level 1
 
-
+<p align="center">
+  <img src="docs/diagrams/DFD%20Level%20-%201.png" alt="DFD Level 1" width="900">
+</p>
 
 ### Data Flow Diagram - Level 2
 
-
+<p align="center">
+  <img src="docs/diagrams/DFD%20Level%20-%202.png" alt="DFD Level 2" width="900">
+</p>
 
 ### Entity Relationship Diagram
 
-
+<p align="center">
+  <img src="docs/diagrams/er-diagram.png.png" alt="Entity Relationship Diagram" width="900">
+</p>
 
 ### Technical Flowchart
 
-
+<p align="center">
+  <img src="docs/diagrams/technical-flowchart.png.png" alt="Technical Flowchart" width="900">
+</p>
 
 ### Workflow
 
-
+<p align="center">
+  <img src="docs/diagrams/workflow.png.png" alt="KisanPool Workflow" width="900">
+</p>
 
 ## Application Screens
 
-
+<p align="center">
+  <img src="docs/ui/screen.png" alt="KisanPool Application" width="800">
+</p>
 
 ### Main Application
 
+<p align="center">
+  <img src="docs/ui/screen%20%282%29.png" alt="KisanPool Screen 2" width="800">
+</p>
 
+<p align="center">
+  <img src="docs/ui/screen%20%283%29.png" alt="KisanPool Screen 3" width="800">
+</p>
 
-### Application Screenshots
+<p align="center">
+  <img src="docs/ui/screen%20%284%29.png" alt="KisanPool Screen 4" width="800">
+</p>
+
+<p align="center">
+  <img src="docs/ui/screen%20%285%29.png" alt="KisanPool Screen 5" width="800">
+</p>
+
+<p align="center">
+  <img src="docs/ui/screen%20%286%29.png" alt="KisanPool Screen 6" width="800">
+</p>
+
+<p align="center">
+  <img src="docs/ui/screen%20%287%29.png" alt="KisanPool Screen 7" width="800">
+</p>
+
+<p align="center">
+  <img src="docs/ui/screen%20%288%29.png" alt="KisanPool Screen 8" width="800">
+</p>
+
+<p align="center">
+  <img src="docs/ui/screen%20%289%29.png" alt="KisanPool Screen 9" width="800">
+</p>
+
+<p align="center">
+  <img src="docs/ui/screen%20%2810%29.png" alt="KisanPool Screen 10" width="800">
+</p>
+
+<p align="center">
+  <img src="docs/ui/screen%20%2811%29.png" alt="KisanPool Screen 11" width="800">
+</p>
+
+<p align="center">
+  <img src="docs/ui/screen%20%2812%29.png" alt="KisanPool Screen 12" width="800">
+</p>
 
 
 
