@@ -18,6 +18,12 @@ echo "########## 1. pooled flow: accept vs confirm, capacity, concurrency, settl
 python3 tests/05_pooled_flow.py
 
 echo
+echo "########## 2. pooled pricing: one backend number, no equal split, dynamic re-splitting ##########"
+# each suite assumes a clean pool, and 05 fills the 4t truck it also uses
+npm run seed --silent -- --reset
+python3 tests/06_pooled_pricing.py
+
+echo
 echo "########## STALE (pre-pooling API) — see note above ##########"
 echo "########## 1b. core flow: auth, KYC gate, matching, payment, booking ##########"
 python3 tests/01_core_flow.py || echo "  (STALE SUITE — targets the pre-pooling API, see note above)"

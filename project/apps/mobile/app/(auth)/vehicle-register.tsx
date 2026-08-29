@@ -1,4 +1,12 @@
-/** onboarding_registration — vehicle type, capacity and rate. Starts PENDING. */
+/**
+ * onboarding_registration — who the driver is, then the vehicle. Starts PENDING.
+ *
+ * The name is collected HERE because there is no other transporter onboarding
+ * step that asks for it. Farmers get /(auth)/farmer-details; drivers went
+ * straight from the OTP screen to this one, so `User.name` was never written and
+ * every screen that shows a driver — their own profile, the farmer's comparison
+ * list, the trip roster — fell back to the phone number.
+ */
 import { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -20,6 +28,7 @@ const LABELS: Record<VehicleType, string> = {
 
 export default function VehicleRegister() {
   const router = useRouter();
+  const [name, setName] = useState('');
   const [vehicleType, setVehicleType] = useState<VehicleType>('MINI_TRUCK');
   const [registrationNumber, setRegistrationNumber] = useState('');
   const [capacityKg, setCapacityKg] = useState('');
@@ -42,6 +51,13 @@ export default function VehicleRegister() {
         // matching falls back to a wide radius without a location
       }
 
+      // identity first: a vehicle with no driver behind it is what the profile,
+      // the offer list and the trip roster were all rendering before
+      await api.updateMe({
+        name: name.trim(),
+        ...(currentLocation ? { defaultLocation: { name: 'My base', ...currentLocation } } : {}),
+      });
+
       await api.registerVehicle({
         vehicleType,
         registrationNumber: registrationNumber.toUpperCase(),
@@ -58,7 +74,10 @@ export default function VehicleRegister() {
   };
 
   const valid =
-    registrationNumber.trim().length >= 4 && Number(capacityKg) > 0 && Number(ratePerKm) > 0;
+    name.trim().length >= 2 &&
+    registrationNumber.trim().length >= 4 &&
+    Number(capacityKg) > 0 &&
+    Number(ratePerKm) > 0;
 
   return (
     <Screen
@@ -71,7 +90,18 @@ export default function VehicleRegister() {
         />
       }
     >
-      <Header title="Your vehicle" subtitle="तुमचे वाहन" />
+      <Header title="You and your vehicle" subtitle="तुम्ही आणि तुमचे वाहन" />
+
+      <Field
+        label="Your name"
+        value={name}
+        onChangeText={setName}
+        autoCapitalize="words"
+        placeholder="e.g. Mahesh Jadhav"
+      />
+      <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ marginBottom: space.md }}>
+        Farmers see this name when they choose who carries their produce.
+      </Txt>
 
       <Txt variant="labelLg" color={colors.onSurfaceVariant} style={{ marginBottom: space.sm }}>
         Vehicle type

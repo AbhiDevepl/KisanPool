@@ -47,7 +47,7 @@ type Sort = 'fit' | 'distance' | 'earning';
 const SORTS: Array<{ key: Sort; label: string }> = [
   { key: 'fit', label: 'Best match' },
   { key: 'distance', label: 'Nearest' },
-  { key: 'earning', label: 'Highest paying' },
+  { key: 'earning', label: 'Adds the most' },
 ];
 
 const compare: Record<Sort, (a: PoolEntry, b: PoolEntry) => number> = {
@@ -287,8 +287,8 @@ export default function Requests() {
                       <MetricCell icon="scale" label="Load" value={kg(request.quantityKg)} />
                       <MetricCell
                         icon="payments"
-                        label="You earn"
-                        value={rupees(entry.transporterEarning)}
+                        label="Adds to your pay"
+                        value={`+ ${rupees(entry.transporterEarning)}`}
                         highlight
                       />
                     </View>
@@ -300,6 +300,14 @@ export default function Requests() {
                       value={entry.detourKm > 0 ? `+${km(entry.detourKm)}` : 'On your route'}
                     />
                     <Row label="Reaching pickup" value={`~${entry.etaMinutes} min`} />
+                    <Row label="Farmer would pay" value={rupees(entry.quotedPrice)} />
+                    {/* the honest headline: your whole trip's worth after taking it,
+                        not this load's fare counted as if the truck drove twice */}
+                    <Row
+                      label="Your trip would be worth"
+                      value={rupees(entry.tripEarningAfter)}
+                      bold
+                    />
 
                     {rowError?.requestId === request._id ? (
                       <Banner tone="error" style={{ marginTop: space.gutter, marginBottom: 0 }}>

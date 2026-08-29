@@ -21,7 +21,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import type { TripCapacity, UserDTO, VehicleDTO } from '@kisanpool/shared';
 import { api } from '../../lib/api';
 import { useSocket } from '../../lib/socket';
-import { getUser } from '../../lib/session';
+import { getUser, setUser as persistUser } from '../../lib/session';
 import { useLoader } from '../../lib/useLoader';
 import { toAppError } from '../../lib/errors';
 import {
@@ -74,15 +74,22 @@ export default function TransporterDashboard() {
 
   const dash = useLoader(
     useCallback(async () => {
+      // paint from the cache immediately, then correct it from the server. The
+      // cached user is written once at sign-in, so reading only that showed a
+      // blank name and a 0.0 rating for the whole life of the session.
       setUserState(await getUser());
-      const [myVehicle, trips, offers, payouts] = await Promise.all([
+
+      const [me, myVehicle, trips, offers, payouts] = await Promise.all([
+        api.me(),
         api.myVehicle(),
         api.myTrips(),
         api.myOffers(),
         api.payouts(),
       ]);
+      setUserState(me);
+      await persistUser(me);
       setVehicle(myVehicle);
-      return { vehicle: myVehicle, trips, offers, payouts };
+      return { me, vehicle: myVehicle, trips, offers, payouts };
     }, []),
   );
 
@@ -147,7 +154,7 @@ export default function TransporterDashboard() {
         onRefresh={dash.refresh}
         header={
           <AppBar
-            title="Dashboard"
+            title={user?.name?.trim() ? `Hello, ${user.name.split(' ')[0]}` : 'Dashboard'}
             unread={awaitingFarmer}
             onNotifications={() => router.push('/(transporter)/trips')}
           />
@@ -163,6 +170,31 @@ export default function TransporterDashboard() {
           <ErrorView error={dash.error} onRetry={dash.refresh} />
         ) : (
           <>
+            {/* no vehicle at all — a real state with a way out, not a blank screen */}
+            {!vehicle ? (
+              <Banner tone="warning">
+                <View style={{ flexDirection: 'row', gap: space.sm }}>
+                  <MaterialIcons name="local-shipping" size={22} color={colors.onWarningContainer} />
+                  <View style={{ flex: 1 }}>
+                    <Txt variant="labelLg" color={colors.onWarningContainer}>
+                      No vehicle registered yet
+                    </Txt>
+                    <Txt variant="bodyMd" color={colors.onWarningContainer}>
+                      Register your vehicle and get it verified — loads can only be offered to a
+                      verified vehicle.
+                    </Txt>
+                    <Button
+                      label="Register my vehicle"
+                      variant="secondary"
+                      icon="add"
+                      onPress={() => router.push('/(auth)/vehicle-register')}
+                      style={{ marginTop: space.gutter }}
+                    />
+                  </View>
+                </View>
+              </Banner>
+            ) : null}
+
             {/* why no loads are arriving, when that is the case */}
             {vehicle && !verified ? (
               <Banner tone="warning">
@@ -350,6 +382,33 @@ export default function TransporterDashboard() {
                   {openTrip.poolSize} {openTrip.poolSize === 1 ? 'farmer' : 'farmers'} aboard ·{' '}
                   {kg(openTrip.capacity.availableKg)} still free
                 </Txt>
+
+                {/* the trip's money, computed once on the backend. Every farmer
+                    aboard is looking at their slice of exactly these numbers. */}
+                {openTrip.pricing ? (
+                  <>
+                    <Divider />
+                    <Row
+                      label="Route"
+                      value={`${openTrip.pricing.effectiveRouteKm.toFixed(0)} km @ ${rupees(
+                        openTrip.pricing.ratePerKm,
+                      )}/km`}
+                    />
+                    <Row label="Total trip value" value={rupees(openTrip.pricing.totalCost)} />
+                    <Row label="Pooled load" value={kg(openTrip.pricing.totalQuantityKg)} />
+                    <Row
+                      label="You earn"
+                      value={rupees(openTrip.pricing.transporterEarning)}
+                      bold
+                    />
+                    <Txt variant="labelSm" color={colors.outline} style={{ marginTop: space.xs }}>
+                      After the {Math.round(
+                        (openTrip.pricing.platformFee / (openTrip.pricing.totalCost || 1)) * 100,
+                      )}% platform fee. It grows every time another farmer joins.
+                    </Txt>
+                  </>
+                ) : null}
+
                 <Button
                   label="Open trip"
                   icon="navigation"

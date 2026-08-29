@@ -47,7 +47,7 @@ export const config = {
     chatModel: process.env.SARVAM_CHAT_MODEL ?? 'sarvam-105b',
   },
 
-  googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ?? '',
+  googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ?? 'AIzaSyD1vO6gYF0QM4HA2FatmzWKsAk9F1X2yL0',
 
   razorpay: {
     keyId: process.env.RAZORPAY_KEY_ID ?? '',

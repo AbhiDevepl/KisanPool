@@ -286,8 +286,12 @@ export default function SharedTrip() {
   // farmer's price was split across, not just what is still in the vehicle
   const roster = shipments.filter((s) => s.state !== 'CANCELLED');
   const others = roster.filter((s) => s._id !== mine._id);
-  const share = mine.finalPrice ?? mine.allocatedPrice;
-  const saved = Math.max(mine.soloPrice - share, 0);
+  // the backend's own figure for this load, breakdown included — never recomputed here
+  const breakdown = mine.pricing ?? null;
+  const share = breakdown?.amount ?? mine.finalPrice ?? mine.allocatedPrice;
+  const solo = breakdown?.soloPrice ?? mine.soloPrice;
+  const saved = Math.max(solo - share, 0);
+  const savedPct = breakdown?.savingPct ?? mine.savingPct;
   const usedPct = trip.capacity.totalKg
     ? Math.min(trip.capacity.committedKg / trip.capacity.totalKg, 1)
     : 0;
@@ -409,13 +413,44 @@ export default function SharedTrip() {
             color={colors.onSurfaceVariant}
             style={{ textDecorationLine: 'line-through' }}
           >
-            {rupees(mine.soloPrice)}
+            {rupees(solo)}
           </Txt>
         </View>
         <Txt variant="labelLg" color={colors.primary}>
           Pooling saves you {rupees(saved)}
-          {mine.savingPct != null ? ` (${mine.savingPct}%)` : ''}
+          {savedPct != null ? ` (${savedPct}%)` : ''}
         </Txt>
+
+        {/* WHY it is this number. Not a marketing line — the actual working the
+            backend used, so a farmer can check it against what they were told. */}
+        {breakdown && detail.pricing ? (
+          <View style={{ marginTop: space.gutter }}>
+            <Divider />
+            <Row
+              label="Whole trip costs"
+              value={`${rupees(detail.pricing.totalCost)} (${detail.pricing.effectiveRouteKm.toFixed(
+                0,
+              )} km @ ${rupees(detail.pricing.ratePerKm)}/km)`}
+            />
+            <Row label="Farmers sharing it" value={String(detail.pricing.poolSize)} />
+            <Row
+              label="Your load rides"
+              value={`${kg(breakdown.quantityKg)} for ${breakdown.rideKm.toFixed(0)} km`}
+            />
+            {breakdown.detourKm > 0 ? (
+              <Row
+                label="Detour to reach you"
+                value={`${breakdown.detourKm.toFixed(1)} km · ${rupees(breakdown.detourCost)}`}
+              />
+            ) : null}
+            <Row label="Share of the shared run" value={rupees(breakdown.lineHaulCost)} />
+            <Txt variant="labelSm" color={colors.outline} style={{ marginTop: space.xs }}>
+              The shared run is split by tonne-kilometres — how much you send and how far it
+              rides — so a bigger or further load pays more, and nobody pays an equal split.
+            </Txt>
+          </View>
+        ) : null}
+
         {mine.finalPrice == null ? (
           <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ marginTop: space.xs }}>
             This can still fall — it is re-split every time a farmer joins, and freezes when your

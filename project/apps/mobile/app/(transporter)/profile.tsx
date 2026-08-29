@@ -21,6 +21,7 @@ import {
   Card,
   ConfirmDialog,
   Divider,
+  Field,
   RatingStars,
   Row,
   Screen,
@@ -54,6 +55,8 @@ export default function TransporterProfile() {
   const [user, setUserState] = useState<UserDTO | null>(null);
   const [vehicle, setVehicle] = useState<VehicleDTO | null>(null);
   const [languageOpen, setLanguageOpen] = useState(false);
+  const [nameOpen, setNameOpen] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -74,6 +77,30 @@ export default function TransporterProfile() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * Drivers who registered before the onboarding step asked for a name have an
+   * empty one on record. This is the repair path — they set it themselves and it
+   * is written to the user document, rather than a screen inventing a label.
+   */
+  const saveName = async (): Promise<void> => {
+    const next = nameDraft.trim();
+    if (next.length < 2) return;
+    setSaving(true);
+    try {
+      const updated = await api.updateMe({ name: next });
+      await persistUser(updated);
+      setUserState(updated);
+      setNameOpen(false);
+      setToastTone('success');
+      setToast('Name updated');
+    } catch (err) {
+      setToastTone('error');
+      setToast(toAppError(err).message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const changeLanguage = async (language: Language): Promise<void> => {
     setSaving(true);
@@ -106,9 +133,24 @@ export default function TransporterProfile() {
           <Avatar name={user?.name} size={80} />
           {user ? (
             <>
-              <Txt variant="headlineLg" style={{ marginTop: space.gutter }}>
-                {user.name}
-              </Txt>
+              {user.name?.trim() ? (
+                <Txt variant="headlineLg" style={{ marginTop: space.gutter }}>
+                  {user.name}
+                </Txt>
+              ) : (
+                // no name on record — say so and offer the fix, rather than
+                // silently showing the phone number where a name belongs
+                <Button
+                  label="Add your name"
+                  variant="secondary"
+                  icon="person-add"
+                  onPress={() => {
+                    setNameDraft('');
+                    setNameOpen(true);
+                  }}
+                  style={{ marginTop: space.gutter }}
+                />
+              )}
               <Txt variant="bodyMd" color={colors.onSurfaceVariant}>
                 {user.phone}
               </Txt>
@@ -195,6 +237,15 @@ export default function TransporterProfile() {
           </Txt>
           <Divider />
           <SettingRow
+            icon="badge"
+            label="Your name"
+            value={user?.name?.trim() || 'Not set'}
+            onPress={() => {
+              setNameDraft(user?.name ?? '');
+              setNameOpen(true);
+            }}
+          />
+          <SettingRow
             icon="translate"
             label="Language"
             value={languageLabel}
@@ -227,6 +278,28 @@ export default function TransporterProfile() {
           KisanPool · v0.1.0
         </Txt>
       </Screen>
+
+      <Sheet
+        visible={nameOpen}
+        onClose={() => setNameOpen(false)}
+        title="Your name"
+        subtitle="Farmers see this when they choose who carries their produce."
+      >
+        <Field
+          label="Full name"
+          value={nameDraft}
+          onChangeText={setNameDraft}
+          autoCapitalize="words"
+          placeholder="e.g. Mahesh Jadhav"
+        />
+        <Button
+          label="Save"
+          icon="check"
+          loading={saving}
+          disabled={nameDraft.trim().length < 2}
+          onPress={() => void saveName()}
+        />
+      </Sheet>
 
       <Sheet
         visible={languageOpen}

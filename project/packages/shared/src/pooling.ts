@@ -269,14 +269,74 @@ export interface ShipmentStateEvent {
 }
 
 // ---------------------------------------------------------------------------
+// pricing — the shape the one backend engine returns
+// ---------------------------------------------------------------------------
+
+/**
+ * One farmer's bill, with the reasoning attached.
+ *
+ * The engine is deliberately explainable: a farmer pays for the detour the truck
+ * made for them (theirs alone, nobody else caused it) plus a share of the shared
+ * line-haul in proportion to the tonne-kilometres their produce actually consumes.
+ * Both numbers travel with the price so any screen — or a support agent — can say
+ * exactly why it is what it is (ADR-031).
+ */
+export interface ShipmentShareDTO {
+  shipmentId: string;
+  farmerId: string;
+  quantityKg: number;
+  /** km this produce rides on the vehicle: its pickup → the mandi, along the route */
+  rideKm: number;
+  /** extra km the route grew to collect this pickup — 0 for the load that set the route */
+  detourKm: number;
+  /** quantity in tonnes × rideKm; the freight unit the shared leg is split by */
+  tonneKm: number;
+  /** detourKm × the vehicle's rate — charged whole to the farmer who caused it */
+  detourCost: number;
+  /** this load's slice of the shared line-haul */
+  lineHaulCost: number;
+  /** detourCost + lineHaulCost, or the frozen bill once delivered */
+  amount: number;
+  /** what this farmer would pay running the vehicle alone — the savings baseline */
+  soloPrice: number;
+  savingPct: number;
+  /** true once delivered: the bill no longer moves when the pool changes */
+  frozen: boolean;
+}
+
+/**
+ * The trip's economics — one set of numbers, served to both sides.
+ *
+ * Farmer screens read their own ShipmentShareDTO out of `shares`; transporter
+ * screens read `totalCost` and `transporterEarning`. Neither computes anything,
+ * so the two can never disagree.
+ */
+export interface TripPricingDTO {
+  ratePerKm: number;
+  /** the whole collection run: pickup₁ → … → pickupₙ → mandi */
+  effectiveRouteKm: number;
+  /** what the first pickup alone would have needed — the leg everyone shares */
+  baseRouteKm: number;
+  /** effectiveRouteKm × ratePerKm; the sum of every share, to the paisa */
+  totalCost: number;
+  baseCost: number;
+  /** totalCost − baseCost: the sum of every farmer's own detour */
+  detourCost: number;
+  totalQuantityKg: number;
+  totalTonneKm: number;
+  poolSize: number;
+  transporterEarning: number;
+  platformFee: number;
+  shares: ShipmentShareDTO[];
+  version: number;
+}
+
+// ---------------------------------------------------------------------------
 // pricing constants
 // ---------------------------------------------------------------------------
 
 /** Platform's cut of the route cost. The rest is the transporter's earning. */
 export const PLATFORM_COMMISSION_PCT = 0.1;
-
-/** A detour costs the trip real distance; it is added to the route before splitting. */
-export const DETOUR_WEIGHT = 1.0;
 
 /** Below this, a vehicle is not worth offering to — avoids 5kg loads on a 4t truck. */
 export const MIN_UTILISATION = 0.02;

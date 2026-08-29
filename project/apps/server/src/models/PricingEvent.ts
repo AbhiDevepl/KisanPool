@@ -25,6 +25,18 @@ const pricingEventSchema = new Schema(
             shipmentId: { type: Schema.Types.ObjectId, ref: 'TripShipment', required: true },
             farmerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
             quantityKg: Number,
+
+            // the working, not just the answer — a support agent has to be able to
+            // tell a farmer why their share is what it is (ADR-035)
+            /** km this produce rode: its pickup → the mandi, along the chain */
+            rideKm: { type: Number, default: 0 },
+            /** km the chain grew to collect this pickup — charged to this farmer alone */
+            detourKm: { type: Number, default: 0 },
+            /** tonnes × rideKm — the unit the shared line-haul was divided by */
+            tonneKm: { type: Number, default: 0 },
+            detourCost: { type: Number, default: 0 },
+            lineHaulCost: { type: Number, default: 0 },
+
             amount: { type: Number, required: true },
             previousAmount: { type: Number, default: null },
           },

@@ -4,6 +4,7 @@ import { ok } from '../../lib/envelope';
 import { asyncHandler } from '../../middleware/error';
 import { requireAuth, requireRole, type AuthedRequest } from '../../middleware/auth';
 import { listChatMessages } from '../chat/service';
+import { emitPricingUpdated, emitTripCapacity } from '../realtime';
 import {
   cancelRequest,
   createRequest,
@@ -56,7 +57,35 @@ transportRouter.post(
   requireAuth,
   asyncHandler<AuthedRequest>(async (req, res) => {
     const { reason } = z.object({ reason: z.string().min(1) }).parse(req.body);
-    ok(res, await cancelRequest(req.params.id, reason, req.userId));
+    const result = await cancelRequest(req.params.id, reason, req.userId);
+
+    // the farmers still aboard have just been re-priced and the driver has space
+    // back — both sides need to hear it without pulling to refresh
+    if (result.tripId && result.pricing) {
+      const tripId = String(result.tripId);
+      if (result.pricing.allocations.length) {
+        emitPricingUpdated({
+          tripId,
+          pricingVersion: result.pricing.version,
+          reason: 'a farmer left the trip',
+          updates: result.pricing.allocations.map((a) => ({
+            farmerId: a.farmerId,
+            shipmentId: a.shipmentId,
+            amount: a.amount,
+            previousAmount: a.previousAmount,
+          })),
+        });
+      }
+      if (result.capacity) {
+        emitTripCapacity({
+          tripId,
+          capacity: result.capacity,
+          poolSize: result.pricing.pricing?.poolSize ?? 0,
+        });
+      }
+    }
+
+    ok(res, result);
   }),
 );
 

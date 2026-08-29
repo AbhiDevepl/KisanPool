@@ -402,6 +402,45 @@ export default function SharedTrip() {
         )}
       </Card>
 
+      {/* the trip's money — the SAME numbers every farmer aboard is splitting */}
+      {detail.pricing ? (
+        <Card>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Txt variant="labelLg">Trip economics</Txt>
+            <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+              v{detail.pricing.version}
+            </Txt>
+          </View>
+
+          <View style={{ marginTop: space.gutter }}>
+            <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+              You expect to earn
+            </Txt>
+            <Txt variant="displayLg" color={colors.primary}>
+              {rupees(detail.pricing.transporterEarning)}
+            </Txt>
+          </View>
+
+          <Divider />
+          <Row
+            label="Route driven"
+            value={`${detail.pricing.effectiveRouteKm.toFixed(0)} km`}
+          />
+          <Row label="Your rate" value={`${rupees(detail.pricing.ratePerKm)} / km`} />
+          <Row label="Total trip value" value={rupees(detail.pricing.totalCost)} />
+          <Row label="Platform fee" value={`− ${rupees(detail.pricing.platformFee)}`} />
+          <Divider />
+          <Row label="Pooled load" value={kg(detail.pricing.totalQuantityKg)} />
+          <Row label="Remaining capacity" value={kg(capacity.availableKg)} bold />
+
+          <Txt variant="labelSm" color={colors.outline} style={{ marginTop: space.sm }}>
+            Every farmer aboard pays a slice of the {rupees(detail.pricing.totalCost)} above —
+            their own detour, plus a share of the shared run by tonne-kilometres. Take another
+            load and this grows.
+          </Txt>
+        </Card>
+      ) : null}
+
       {/* a delivery hands the space back — the pool is where it gets used again */}
       {canAddMore ? (
         <Banner tone={freedSpace ? 'primary' : 'info'}>
@@ -517,7 +556,20 @@ export default function SharedTrip() {
               </View>
 
               <Divider />
-              <Row label="Farmer pays" value={rupees(shipment.finalPrice ?? shipment.allocatedPrice)} />
+              <Row
+                label="Farmer pays"
+                value={rupees(shipment.pricing?.amount ?? shipment.finalPrice ?? shipment.allocatedPrice)}
+                bold
+              />
+              {shipment.pricing ? (
+                <Txt variant="labelSm" color={colors.outline}>
+                  {shipment.pricing.rideKm.toFixed(0)} km aboard ·{' '}
+                  {shipment.pricing.detourKm > 0
+                    ? `${shipment.pricing.detourKm.toFixed(1)} km detour for them`
+                    : 'on your route'}
+                  {shipment.pricing.frozen ? ' · final' : ''}
+                </Txt>
+              ) : null}
 
               {actionError?.key === shipment._id ? (
                 <Banner tone="error" style={{ marginTop: space.gutter, marginBottom: 0 }}>

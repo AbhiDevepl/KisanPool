@@ -235,6 +235,19 @@ export default function TransporterTrips() {
                 <Row label="Loaded" value={kg(trip.capacity.loadedKg)} />
                 <Row label="Still fits" value={kg(trip.capacity.availableKg)} bold />
 
+                {/* the same figures the farmers aboard are splitting */}
+                {trip.pricing ? (
+                  <>
+                    <Divider />
+                    <Row label="Total trip value" value={rupees(trip.pricing.totalCost)} />
+                    <Row label="Expected earning" value={rupees(trip.pricing.transporterEarning)} bold />
+                    <Txt variant="labelSm" color={colors.outline} style={{ marginTop: space.xs }}>
+                      {trip.pricing.effectiveRouteKm.toFixed(0)} km ·{' '}
+                      {kg(trip.pricing.totalQuantityKg)} pooled · rises as more farmers join.
+                    </Txt>
+                  </>
+                ) : null}
+
                 <Button
                   label="Manage trip"
                   icon="navigation"
@@ -267,6 +280,14 @@ export default function TransporterTrips() {
                 </View>
                 <StatusBadge status={trip.state} label={TRIP_LABEL[trip.state] ?? trip.state} />
               </View>
+
+              {trip.pricing && trip.state === 'COMPLETED' ? (
+                <>
+                  <Divider />
+                  <Row label="Trip value" value={rupees(trip.pricing.totalCost)} />
+                  <Row label="You earned" value={rupees(trip.pricing.transporterEarning)} bold />
+                </>
+              ) : null}
             </Card>
           ))
         )}

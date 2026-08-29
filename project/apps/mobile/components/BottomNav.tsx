@@ -146,6 +146,8 @@ const s = StyleSheet.create({
     borderTopColor: colors.outlineVariant,
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,
+    // the bar overlays the scroll view, so it has to win touch dispatch on both
+    // platforms: zIndex orders it on iOS, elevation does the same on Android
     shadowColor: '#000000',
     shadowOpacity: 0.05,
     shadowRadius: 16,

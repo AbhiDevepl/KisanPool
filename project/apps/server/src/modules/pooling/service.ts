@@ -19,7 +19,16 @@ import {
   Vehicle,
 } from '../../models';
 import { supportsTransactions } from '../../db';
-import { capacityOf, reallocate, routeCost, savingPct, soloPrice } from './pricing';
+import {
+  capacityOf,
+  priceTrip,
+  priceTripById,
+  reallocate,
+  routeCost,
+  savingPct,
+  soloPrice,
+  transporterEarning,
+} from './pricing';
 
 /** How far a transporter will reasonably divert to collect a load. */
 const MAX_PICKUP_RADIUS_KM = 60;
@@ -61,6 +70,11 @@ export async function poolForTransporter(transporterId: string) {
   const capacity = trip ? await capacityOf(trip) : null;
   const availableKg = capacity ? capacity.availableKg : vehicle.capacityKg;
 
+  // what the driver is on course to earn as things stand — every row below is
+  // quoted as the difference this load would make to it, not as a standalone fare
+  const current = trip ? await priceTripById(String(trip._id)) : null;
+  const currentEarning = current?.transporterEarning ?? 0;
+
   const from = vehicle.currentLocation
     ? { lat: vehicle.currentLocation.lat as number, lng: vehicle.currentLocation.lng as number }
     : null;
@@ -97,26 +111,55 @@ export async function poolForTransporter(transporterId: string) {
 
     if (request.quantityKg / vehicle.capacityKg < MIN_UTILISATION) continue;
 
-    const detourKm = trip ? await detourFor(trip, pickup) : 0;
-    if (detourKm > MAX_DETOUR_KM) continue;
+    // cheap straight-line prefilter first — the engine is the authority, but it
+    // costs route lookups, so obviously-wrong loads never reach it
+    if (trip && (await detourFor(trip, pickup)) > MAX_DETOUR_KM * 1.5) continue;
 
     const { distanceKm } = await getDirections(pickup, destination);
-    const solo = soloPrice(distanceKm, vehicle.ratePerKm);
-    const quoted = await quoteForJoining(trip, request.quantityKg, distanceKm, vehicle.ratePerKm);
+    const quote = await quoteForJoining(
+      trip,
+      {
+        requestId: String(request._id),
+        farmerId: String(request.farmerId),
+        quantityKg: request.quantityKg,
+        pickup,
+      },
+      destination,
+      distanceKm,
+      vehicle.ratePerKm,
+    );
+
+    // the real road detour, from the same engine that prices it
+    if (quote.detourKm > MAX_DETOUR_KM) continue;
+
+    // what taking this load actually adds to the driver's earning, after the
+    // platform's cut — never the gross fare, which was double-counting the
+    // kilometres the trip was already going to drive
+    const earningAfter = trip
+      ? ((await priceTripById(String(trip._id), {
+          id: String(request._id),
+          farmerId: String(request.farmerId),
+          quantityKg: request.quantityKg,
+          pickup,
+        }))?.transporterEarning ?? 0)
+      : transporterEarning(quote.quoted);
 
     scored.push({
       request,
       pickupDistanceKm: Math.round(pickupDistanceKm * 10) / 10,
-      detourKm: Math.round(detourKm * 10) / 10,
+      detourKm: quote.detourKm,
       distanceKm,
       etaMinutes: Math.round((pickupDistanceKm / 35) * 60),
-      soloPrice: solo,
-      quotedPrice: quoted,
-      transporterEarning: money(routeCost(distanceKm, vehicle.ratePerKm)),
+      soloPrice: quote.solo,
+      quotedPrice: quote.quoted,
+      /** what this load adds to what the driver takes home */
+      transporterEarning: money(Math.max(0, earningAfter - currentEarning)),
+      /** and what the whole trip would then be worth to them */
+      tripEarningAfter: money(earningAfter),
       utilisationPct: Math.round((request.quantityKg / vehicle.capacityKg) * 100),
       // on-route loads first, then near ones
       fitScore:
-        1 - Math.min(1, detourKm / MAX_DETOUR_KM) * 0.6 -
+        1 - Math.min(1, quote.detourKm / MAX_DETOUR_KM) * 0.6 -
         Math.min(1, pickupDistanceKm / MAX_PICKUP_RADIUS_KM) * 0.4,
     });
   }
@@ -156,31 +199,77 @@ async function detourFor(trip: { _id: unknown; destination: { lat?: number | nul
   return Math.max(0, viaPickup - direct);
 }
 
-/** What this farmer would pay if they joined — the whole point is that it drops. */
+/**
+ * What this farmer would pay if they joined — quoted by the real engine.
+ *
+ * It prices the driver's actual trip with this load appended, so the number the
+ * farmer compares offers on is literally the allocation they will receive on
+ * confirmation. Quoting with a second, simpler formula is what used to make the
+ * offer screen and the trip screen disagree (ADR-035).
+ */
 async function quoteForJoining(
   trip: Awaited<ReturnType<typeof activeFormingTrip>>,
-  quantityKg: number,
+  candidate: { requestId: string; farmerId: string; quantityKg: number; pickup: { lat: number; lng: number } },
+  destination: { lat: number; lng: number },
   distanceKm: number,
   ratePerKm: number,
-): Promise<number> {
+): Promise<{ quoted: number; solo: number; detourKm: number; rideKm: number }> {
   const solo = soloPrice(distanceKm, ratePerKm);
-  if (!trip) return solo;
 
-  const existing = await TripShipment.find({
-    tripId: trip._id,
-    state: { $in: OCCUPIES_CAPACITY },
+  // no trip yet: this load would BE the route, so the quote is the solo price —
+  // and the engine says so itself rather than us special-casing the arithmetic
+  if (!trip) {
+    const pricing = await priceTrip({
+      ratePerKm,
+      destination,
+      shipments: [
+        {
+          id: candidate.requestId,
+          farmerId: candidate.farmerId,
+          quantityKg: candidate.quantityKg,
+          pickup: candidate.pickup,
+          sequence: 0,
+        },
+      ],
+    });
+    const share = pricing.shares[0];
+    return { quoted: share?.amount ?? solo, solo, detourKm: 0, rideKm: share?.rideKm ?? distanceKm };
+  }
+
+  const pricing = await priceTripById(String(trip._id), {
+    id: candidate.requestId,
+    farmerId: candidate.farmerId,
+    quantityKg: candidate.quantityKg,
+    pickup: candidate.pickup,
   });
-  const existingKg = existing.reduce((sum, s) => sum + s.quantityKg, 0);
-  if (!existingKg) return solo;
+  const share = pricing?.shares.find((s) => s.shipmentId === candidate.requestId);
+  if (!share) return { quoted: solo, solo, detourKm: 0, rideKm: distanceKm };
 
-  const cost = routeCost(trip.routeDistanceKm || distanceKm, ratePerKm);
-  return money((cost * quantityKg) / (existingKg + quantityKg));
+  return { quoted: share.amount, solo, detourKm: share.detourKm, rideKm: share.rideKm };
 }
 
 export async function activeFormingTrip(transporterId: string) {
   return Trip.findOne({ transporterId, state: { $in: ['FORMING', 'EN_ROUTE'] } }).sort({
     createdAt: -1,
   });
+}
+
+/**
+ * The trip a load bound for `destination` would actually join.
+ *
+ * A driver's open trip is committed to one mandi. Quoting a load for a different
+ * mandi against it would price a pool the load can never enter — the farmer would
+ * be shown a pooled saving, tap confirm, and get CAPACITY_EXCEEDED ("that vehicle
+ * is already running a trip to a different mandi"). Such a load is priced solo,
+ * which is what it would actually cost.
+ */
+async function joinableTrip(
+  transporterId: string,
+  destination: { lat: number; lng: number },
+): Promise<Awaited<ReturnType<typeof activeFormingTrip>>> {
+  const trip = await activeFormingTrip(transporterId);
+  if (!trip) return null;
+  return sameDestination(trip, destination) ? trip : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -214,7 +303,23 @@ export async function claimRequest(
     throw new ApiError('BOOKING_STATE_INVALID', 'That request is no longer open.');
   }
 
-  const trip = await activeFormingTrip(transporterId);
+  const pickup = { lat: request.pickup.lat as number, lng: request.pickup.lng as number };
+  const destination = {
+    lat: request.destination.lat as number,
+    lng: request.destination.lng as number,
+  };
+
+  // an open trip to a DIFFERENT mandi cannot take this load at all — refuse here
+  // rather than letting the driver accept and the farmer hit the error on confirm
+  const openTrip = await activeFormingTrip(transporterId);
+  if (openTrip && !sameDestination(openTrip, destination)) {
+    throw new ApiError(
+      'CAPACITY_EXCEEDED',
+      `You are already running a trip to ${openTrip.destination.name || 'another mandi'}. Finish it before taking loads for a different one.`,
+    );
+  }
+
+  const trip = openTrip;
   const capacity = trip ? await capacityOf(trip) : null;
   const availableKg = capacity ? capacity.availableKg : vehicle.capacityKg;
 
@@ -226,11 +331,6 @@ export async function claimRequest(
     );
   }
 
-  const pickup = { lat: request.pickup.lat as number, lng: request.pickup.lng as number };
-  const destination = {
-    lat: request.destination.lat as number,
-    lng: request.destination.lng as number,
-  };
   const { distanceKm } = await getDirections(pickup, destination);
 
   const from = vehicle.currentLocation
@@ -238,8 +338,19 @@ export async function claimRequest(
     : pickup;
   const pickupDistanceKm = haversineKm(from, pickup);
 
-  const solo = soloPrice(distanceKm, vehicle.ratePerKm);
-  const quoted = await quoteForJoining(trip, request.quantityKg, distanceKm, vehicle.ratePerKm);
+  // the same engine that will allocate this load if the farmer confirms
+  const quote = await quoteForJoining(
+    trip,
+    {
+      requestId: String(request._id),
+      farmerId: String(request.farmerId),
+      quantityKg: request.quantityKg,
+      pickup,
+    },
+    destination,
+    distanceKm,
+    vehicle.ratePerKm,
+  );
 
   const offer = await TransporterOffer.findOneAndUpdate(
     { requestId: request._id, transporterId },
@@ -249,10 +360,10 @@ export async function claimRequest(
       vehicleId: vehicle._id,
       tripId: trip?._id,
       state: 'INTERESTED',
-      quotedPrice: quoted,
-      soloPrice: solo,
+      quotedPrice: quote.quoted,
+      soloPrice: quote.solo,
       pickupDistanceKm: Math.round(pickupDistanceKm * 10) / 10,
-      detourKm: trip ? Math.round((await detourFor(trip, pickup)) * 10) / 10 : 0,
+      detourKm: quote.detourKm,
       etaMinutes: Math.round((pickupDistanceKm / 35) * 60),
       message,
       withdrawnAt: undefined,
@@ -313,6 +424,13 @@ export async function offersForRequest(requestId: string, farmerId: string) {
     state: { $in: ['INTERESTED', 'SELECTED'] },
   }).sort({ quotedPrice: 1 });
 
+  const pickup = { lat: request.pickup.lat as number, lng: request.pickup.lng as number };
+  const destination = {
+    lat: request.destination.lat as number,
+    lng: request.destination.lng as number,
+  };
+  const { distanceKm } = await getDirections(pickup, destination);
+
   return Promise.all(
     offers.map(async (offer) => {
       const [transporter, vehicle] = await Promise.all([
@@ -320,18 +438,44 @@ export async function offersForRequest(requestId: string, farmerId: string) {
         Vehicle.findById(offer.vehicleId),
       ]);
 
-      const trip = offer.tripId ? await Trip.findById(offer.tripId) : null;
-      const capacity = trip ? await capacityOf(trip) : null;
-      const poolSize = trip
+      // A driver's open trip may have gained or lost farmers since they claimed,
+      // which moves what this farmer would pay. Re-quoting here is what makes the
+      // comparison screen live rather than a snapshot of claim time — and it is
+      // the same engine call that will allocate the load on confirmation, so the
+      // price the farmer taps is the price they get (ADR-035).
+      const openTrip = await joinableTrip(String(offer.transporterId), destination);
+
+      const quote = await quoteForJoining(
+        openTrip,
+        {
+          requestId: String(request._id),
+          farmerId: String(request.farmerId),
+          quantityKg: request.quantityKg,
+          pickup,
+        },
+        destination,
+        distanceKm,
+        vehicle?.ratePerKm ?? 0,
+      );
+
+      if (offer.quotedPrice !== quote.quoted || offer.soloPrice !== quote.solo) {
+        offer.quotedPrice = quote.quoted;
+        offer.soloPrice = quote.solo;
+        offer.detourKm = quote.detourKm;
+        await offer.save();
+      }
+
+      const capacity = openTrip ? await capacityOf(openTrip) : null;
+      const poolSize = openTrip
         ? await TripShipment.countDocuments({
-            tripId: trip._id,
+            tripId: openTrip._id,
             state: { $in: OCCUPIES_CAPACITY },
           })
         : 0;
 
       return {
         ...offer.toJSON(),
-        savingPct: savingPct(offer.soloPrice, offer.quotedPrice),
+        savingPct: savingPct(quote.solo, quote.quoted),
         poolSize,
         transporter: transporter && {
           _id: String(transporter._id),
@@ -499,8 +643,13 @@ export async function selectTransporter(requestId: string, offerId: string, farm
             lat: request.pickup.lat,
             lng: request.pickup.lng,
           },
-          pickupSequence: existing.length + 1,
+          // 0-based: the UI renders `pickupSequence + 1`, so starting at 1 here
+          // made the driver's very first pickup read "#2"
+          pickupSequence: existing.length,
           state: 'ASSIGNED',
+          // provisional — reallocate() below prices the whole pool and is what
+          // actually decides this. Seeding it with the accepted quote means the
+          // row is never briefly priced at zero.
           allocatedPrice: offer.quotedPrice,
           soloPrice: offer.soloPrice,
           pickupOtp: randomOtp(),
@@ -529,6 +678,21 @@ export async function selectTransporter(requestId: string, offerId: string, farm
     // prices move for everyone already aboard — after the commit, so a failed
     // reallocation can never roll back a confirmed booking
     const pricing = await reallocate(String(trip._id), 'farmer joined the trip');
+
+    // reallocate() wrote the real allocation to the database; the in-memory doc
+    // still holds the provisional quote it was created with. Callers (the REST
+    // response, and Servo AI's acceptMatch, which reads it to tell the farmer what
+    // they will pay) must see the final number, not the seed.
+    const settled = pricing.pricing?.shares.find(
+      (share) => share.shipmentId === String(shipment._id),
+    );
+    if (settled) {
+      shipment.allocatedPrice = settled.amount;
+      // the baseline the saving is quoted against comes from the same engine, so
+      // "you save X%" means the same thing on every screen that shows it
+      shipment.soloPrice = settled.soloPrice;
+      await shipment.save();
+    }
 
     return { trip, shipment, offer, pricing };
   } catch (err) {
@@ -666,8 +830,14 @@ export async function tripDetail(tripId: string, viewerId: string) {
   const vehicle = await Vehicle.findById(trip.vehicleId);
   const transporter = await User.findById(trip.transporterId);
 
+  // one set of numbers for both sides of the trip — the farmer reads their own
+  // share out of `pricing.shares`, the driver reads totalCost / transporterEarning
+  const pricing = await priceTripById(tripId);
+  const shareOf = new Map((pricing?.shares ?? []).map((share) => [share.shipmentId, share]));
+
   return {
     trip: { ...trip.toJSON(), capacity: await capacityOf(trip) },
+    pricing,
     vehicle,
     transporter: transporter && {
       _id: String(transporter._id),
@@ -679,11 +849,17 @@ export async function tripDetail(tripId: string, viewerId: string) {
     shipments: shipments.map((shipment) => {
       const farmer = farmers.find((f) => String(f._id) === String(shipment.farmerId));
       const mine = String(shipment.farmerId) === viewerId;
+      const share = shareOf.get(String(shipment._id));
       return {
         ...shipment.toJSON(),
         // a farmer sees their own pickup code; the driver never sees any of them
         pickupOtp: mine ? shipment.pickupOtp : undefined,
-        savingPct: savingPct(shipment.soloPrice, shipment.finalPrice ?? shipment.allocatedPrice),
+        // the working behind this load's bill, so a screen can explain it rather
+        // than just assert a number
+        pricing: share ?? null,
+        savingPct: share
+          ? share.savingPct
+          : savingPct(shipment.soloPrice, shipment.finalPrice ?? shipment.allocatedPrice),
         farmer: farmer && {
           _id: String(farmer._id),
           name: farmer.name,

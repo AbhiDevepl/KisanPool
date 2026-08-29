@@ -9,10 +9,12 @@ import type {
   PricingEventDTO,
   RatingDTO,
   Role,
+  ShipmentShareDTO,
   ShipmentState,
   TransporterOfferDTO,
   TransportRequestDTO,
   TripCapacity,
+  TripPricingDTO,
   TripState,
   UserDTO,
   VehicleDTO,
@@ -59,6 +61,8 @@ export interface FarmerShipment {
 
 export interface TripShipmentView extends FarmerShipment {
   savingPct?: number;
+  /** the working behind this load's bill — ride km, detour, tonne-km, both parts */
+  pricing?: ShipmentShareDTO | null;
   farmer?: { _id: string; name: string; phone?: string; ratingAvg: number };
 }
 
@@ -71,12 +75,23 @@ export interface PoolEntry {
   etaMinutes: number;
   soloPrice: number;
   quotedPrice: number;
+  /** what taking this load ADDS to the driver's earning, after the platform cut */
   transporterEarning: number;
+  /** and what the whole trip would then be worth to them */
+  tripEarningAfter: number;
   utilisationPct: number;
   fitScore: number;
 }
 
-export type { OfferState, ShipmentState, TripState, TransporterOfferDTO, TripCapacity };
+export type {
+  OfferState,
+  ShipmentState,
+  ShipmentShareDTO,
+  TripState,
+  TransporterOfferDTO,
+  TripCapacity,
+  TripPricingDTO,
+};
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
@@ -306,6 +321,7 @@ export const api = {
       shipment: FarmerShipment;
       capacity: TripCapacity;
       pricingVersion: number;
+      pricing: TripPricingDTO | null;
     }>(`/pool/requests/${requestId}/select`, { method: 'POST', body: { offerId } }),
 
   // ---------- the shared trip ----------
@@ -313,13 +329,23 @@ export const api = {
   getTrip: (tripId: string) =>
     request<{
       trip: TripSummary & { capacity: TripCapacity };
+      /** the one authoritative set of numbers — both roles render from this */
+      pricing: TripPricingDTO | null;
       vehicle: VehicleDTO | null;
       transporter: { _id: string; name: string; phone?: string; ratingAvg: number } | null;
       shipments: TripShipmentView[];
     }>(`/pool/trips/${tripId}`),
 
   myTrips: () =>
-    request<Array<TripSummary & { capacity: TripCapacity; poolSize: number }>>('/pool/trips/mine'),
+    request<
+      Array<
+        TripSummary & {
+          capacity: TripCapacity;
+          poolSize: number;
+          pricing: TripPricingDTO | null;
+        }
+      >
+    >('/pool/trips/mine'),
 
   setTripState: (tripId: string, state: TripState) =>
     request<TripSummary>(`/pool/trips/${tripId}/state`, { method: 'PATCH', body: { state } }),

@@ -15,7 +15,7 @@ import {
   tripDetail,
   withdrawOffer,
 } from './service';
-import { capacityOf, savingPct } from './pricing';
+import { capacityOf, priceTripById, reallocate, savingPct } from './pricing';
 import {
   emitOfferReceived,
   emitOfferWithdrawn,
@@ -203,10 +203,22 @@ poolRouter.post(
     emitTripCapacity({
       tripId: String(trip._id),
       capacity,
-      poolSize: pricing.allocations.length,
+      // every load aboard, not just the ones whose price still moves — a delivered
+      // farmer is still a farmer on this trip
+      poolSize: pricing.pricing?.poolSize ?? pricing.allocations.length,
     });
 
-    ok(res, { trip, shipment, capacity, pricingVersion: pricing.version }, 201);
+    ok(
+      res,
+      {
+        trip,
+        shipment,
+        capacity,
+        pricingVersion: pricing.version,
+        pricing: pricing.pricing,
+      },
+      201,
+    );
   }),
 );
 
@@ -214,14 +226,14 @@ poolRouter.post(
 // the shared trip
 // ---------------------------------------------------------------------------
 
-poolRouter.get(
-  '/trips/:id',
-  requireAuth,
-  asyncHandler<AuthedRequest>(async (req, res) => {
-    ok(res, await tripDetail(req.params.id, req.userId));
-  }),
-);
-
+/**
+ * The driver's own trips.
+ *
+ * MUST stay above `/trips/:id`. Express matches in registration order, so with
+ * the parameter route first this resolved as id="mine", `Trip.findById('mine')`
+ * threw a CastError, and the whole transporter Dashboard and Trips tab rendered
+ * "We could not find that" instead of the driver's trips.
+ */
 poolRouter.get(
   '/trips/mine',
   requireAuth,
@@ -238,9 +250,19 @@ poolRouter.get(
             tripId: trip._id,
             state: { $ne: 'CANCELLED' },
           }),
+          // the trip's economics, from the same engine the farmers are priced by
+          pricing: await priceTripById(String(trip._id)),
         })),
       ),
     );
+  }),
+);
+
+poolRouter.get(
+  '/trips/:id',
+  requireAuth,
+  asyncHandler<AuthedRequest>(async (req, res) => {
+    ok(res, await tripDetail(req.params.id, req.userId));
   }),
 );
 
@@ -292,6 +314,28 @@ poolRouter.patch(
 
     // delivering frees the space it held, so the driver can take another load
     if (state === 'DELIVERED') {
+      // billing opens the moment the produce is handed over
+      shipment.state = 'PAYMENT_PENDING';
+      await shipment.save();
+
+      // this load's bill just froze, so what is left of the route now splits
+      // among the farmers still aboard — without this they kept carrying a share
+      // computed for a pool that had already changed
+      const repriced = await reallocate(String(trip._id), 'a load was delivered');
+      if (repriced.allocations.length) {
+        emitPricingUpdated({
+          tripId: String(trip._id),
+          pricingVersion: repriced.version,
+          reason: 'a load was delivered',
+          updates: repriced.allocations.map((a) => ({
+            farmerId: a.farmerId,
+            shipmentId: a.shipmentId,
+            amount: a.amount,
+            previousAmount: a.previousAmount,
+          })),
+        });
+      }
+
       emitTripCapacity({
         tripId: String(trip._id),
         capacity: await capacityOf(trip),
@@ -300,10 +344,6 @@ poolRouter.patch(
           state: { $nin: ['CANCELLED'] },
         }),
       });
-
-      // billing opens the moment the produce is handed over
-      shipment.state = 'PAYMENT_PENDING';
-      await shipment.save();
     }
 
     ok(res, shipment);

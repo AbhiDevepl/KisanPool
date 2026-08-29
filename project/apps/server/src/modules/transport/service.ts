@@ -1,5 +1,6 @@
 import { ApiError } from '../../lib/envelope';
 import { TransporterOffer, TransportRequest, Trip, TripShipment } from '../../models';
+import { capacityOf, reallocate } from '../pooling/pricing';
 import type { GeoPoint } from '@kisanpool/shared';
 
 /**
@@ -121,5 +122,20 @@ export async function cancelRequest(requestId: string, reason: string, farmerId:
   request.cancelReason = reason;
   await request.save();
 
-  return { request, shipment };
+  // Leaving the pool moves everyone else's share — the route no longer detours to
+  // this pickup and the line-haul splits fewer ways. This used to be promised in
+  // a comment and never actually done, so the remaining farmers kept a price that
+  // had been computed for a pool they were no longer in.
+  let pricing = null;
+  let capacity = null;
+  if (shipment?.tripId) {
+    const trip = await Trip.findById(shipment.tripId);
+    if (trip) {
+      const result = await reallocate(String(trip._id), 'a farmer left the trip');
+      pricing = result;
+      capacity = await capacityOf(trip);
+    }
+  }
+
+  return { request, shipment, pricing, capacity, tripId: shipment?.tripId ?? null };
 }
