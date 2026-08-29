@@ -94,7 +94,7 @@ export async function notifyPriceChanged(
 }
 
 export async function notifyPayoutSent(transporterId: string, amount: number): Promise<void> {
-  await push([transporterId], 'Payout sent', `₹${amount} is on its way to your bank account.`, {
-    route: '/(transporter)/payouts',
+  await push([transporterId], 'Payout sent', `₹${amount} is on its way to your UPI.`, {
+    route: '/(transporter)/earnings',
   });
 }

@@ -15,11 +15,10 @@ import { api } from '../../lib/api';
 import { getUser } from '../../lib/session';
 import { useLoader } from '../../lib/useLoader';
 import { LIVE_SHIPMENT_STATES } from '../../lib/pooling';
-import { ISSUE_TOPICS, SUPPORT_HOURS, SUPPORT_PHONE } from '../../lib/support';
+import { ISSUE_TOPICS, SUPPORT_PHONE } from '../../lib/support';
 import { kg } from '../../lib/format';
 import {
   AppBar,
-  Banner,
   Button,
   Card,
   Divider,
@@ -61,27 +60,6 @@ export default function Support() {
         onRefresh={requests.refresh}
         header={<AppBar title="Support" />}
       >
-        <Banner tone="primary">
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.gutter }}>
-            <MaterialIcons name="headset-mic" size={28} color={colors.onPrimary} />
-            <View style={{ flex: 1 }}>
-              <Txt variant="headlineMd" color={colors.onPrimary}>
-                We are here to help
-              </Txt>
-              <Txt variant="labelSm" color={colors.onPrimaryContainer}>
-                {SUPPORT_HOURS}
-              </Txt>
-            </View>
-          </View>
-          <Button
-            label={`Call ${SUPPORT_PHONE}`}
-            variant="secondary"
-            icon="call"
-            onPress={() => void Linking.openURL(`tel:${SUPPORT_PHONE.replace(/-/g, '')}`)}
-            style={{ marginTop: space.gutter }}
-          />
-        </Banner>
-
         {/* Servo AI — a supporting feature, given its own card rather than the stage */}
         <Card style={{ borderColor: colors.primary, borderWidth: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.gutter }}>

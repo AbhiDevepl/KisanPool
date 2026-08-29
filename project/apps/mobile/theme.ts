@@ -102,20 +102,8 @@ export const radius = {
 /** Diffused, green-tinted — never neutral black against the warm ground. */
 export const elevation = {
   level0: {} as ViewStyle,
-  level1: {
-    shadowColor: '#000000',
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  } as ViewStyle,
-  level2: {
-    shadowColor: colors.primaryContainer,
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
-  } as ViewStyle,
+  level1: {} as ViewStyle,
+  level2: {} as ViewStyle,
 } as const;
 
 /** 16px edge margin, 48px minimum touch target — one-handed, outdoors. */

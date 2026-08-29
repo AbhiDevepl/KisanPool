@@ -4,6 +4,7 @@ import { Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Language, Role } from '@kisanpool/shared';
 import { api } from '../../lib/api';
+import { t as translate, useT } from '../../lib/i18n';
 import { toAppError } from '../../lib/errors';
 import { saveSession } from '../../lib/session';
 import { Button, Field, Header, Screen, Txt } from '../../components/ui';
@@ -11,6 +12,7 @@ import { colors, space } from '../../theme';
 
 export default function Verify() {
   const router = useRouter();
+  const { t } = useT();
   const params = useLocalSearchParams<{ role?: Role; language?: Language }>();
   const role = (params.role ?? 'FARMER') as Role;
   const language = (params.language ?? 'en') as Language;
@@ -31,7 +33,7 @@ export default function Verify() {
       const result = await api.requestOtp(phone, role);
       setSent(true);
       // demo mode returns the code so the flow is testable without an SMS provider
-      if (result.devCode) setHint(`Demo code: ${result.devCode}`);
+      if (result.devCode) setHint(translate('otp.demoCode', { code: result.devCode }));
     } catch (err) {
       const appError = toAppError(err);
       setError(appError.message);
@@ -54,9 +56,17 @@ export default function Verify() {
       await saveSession(accessToken, refreshToken, user);
       await api.updateMe({ language });
 
-      router.replace(
-        role === 'FARMER' ? '/(auth)/farmer-details' : '/(auth)/vehicle-register',
-      );
+      // a returning user has already given these details — skip onboarding
+      const hasName = !!user.name?.trim() && user.name.trim() !== user.phone;
+
+      if (user.role === 'FARMER') {
+        router.replace(hasName ? '/(farmer)/home' : '/(auth)/farmer-details');
+        return;
+      }
+
+      // transporter onboarding also needs a registered vehicle
+      const hasVehicle = hasName ? await api.myVehicle().catch(() => null) : null;
+      router.replace(hasVehicle ? '/(transporter)/home' : '/(auth)/vehicle-register');
     } catch (err) {
       // AUTH_OTP_INVALID -> inline under the field, clear the input, stay here
       setError(toAppError(err).message);
@@ -71,14 +81,14 @@ export default function Verify() {
       footer={
         sent ? (
           <Button
-            label="Verify & continue"
+            label={t('otp.verifyContinue')}
             loading={busy}
             disabled={code.length !== 6}
             onPress={() => void verify()}
           />
         ) : (
           <Button
-            label="Send OTP"
+            label={t('otp.sendOtp')}
             loading={busy}
             disabled={phone.length !== 10}
             onPress={() => void sendOtp()}
@@ -87,16 +97,16 @@ export default function Verify() {
       }
     >
       <Header
-        title="Verify your number"
-        subtitle="मोबाईल नंबर तपासा"
+        title={t('otp.title')}
+        subtitle={t('otp.titleNative')}
         onBack={() => router.back()}
       />
       <Field
-        label="Mobile number"
+        label={t('otp.mobileLabel')}
         value={phone}
         onChangeText={(text) => setPhone(text.replace(/\D/g, '').slice(0, 10))}
         keyboardType="number-pad"
-        placeholder="10-digit mobile number"
+        placeholder={t('otp.mobilePlaceholder')}
         editable={!sent}
         error={!sent ? error : undefined}
       />
@@ -104,7 +114,7 @@ export default function Verify() {
       {sent ? (
         <>
           <Field
-            label="6-digit code"
+            label={t('otp.codeLabel')}
             value={code}
             onChangeText={(text) => setCode(text.replace(/\D/g, '').slice(0, 6))}
             keyboardType="number-pad"
@@ -120,7 +130,7 @@ export default function Verify() {
 
           <View style={{ marginTop: space.sm }}>
             <Button
-              label={resendDisabled ? 'Resend available shortly' : 'Resend code'}
+              label={resendDisabled ? t('otp.resendShortly') : t('otp.resend')}
               variant="ghost"
               icon={null}
               disabled={resendDisabled || busy}
@@ -130,7 +140,7 @@ export default function Verify() {
         </>
       ) : (
         <Txt variant="bodyMd" color={colors.onSurfaceVariant}>
-          We will send you a 6-digit code. No password needed.
+          {t('otp.noPassword')}
         </Txt>
       )}
     </Screen>

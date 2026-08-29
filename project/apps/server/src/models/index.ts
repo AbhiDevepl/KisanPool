@@ -11,6 +11,10 @@ export { Trip } from './Trip';
 export { TripShipment } from './TripShipment';
 export { TransporterOffer } from './TransporterOffer';
 export { PricingEvent } from './PricingEvent';
+export { TransporterWallet } from './TransporterWallet';
+export { WalletTransaction } from './WalletTransaction';
+export { Withdrawal } from './Withdrawal';
+export { Mandi } from './Mandi';
 
 export type { UserDoc } from './User';
 export type { VehicleDoc } from './Vehicle';
@@ -25,3 +29,7 @@ export type { TripDoc } from './Trip';
 export type { TripShipmentDoc } from './TripShipment';
 export type { TransporterOfferDoc } from './TransporterOffer';
 export type { PricingEventDoc } from './PricingEvent';
+export type { WalletDoc } from './TransporterWallet';
+export type { WalletTxnDoc } from './WalletTransaction';
+export type { WithdrawalDoc } from './Withdrawal';
+export type { MandiDoc } from './Mandi';

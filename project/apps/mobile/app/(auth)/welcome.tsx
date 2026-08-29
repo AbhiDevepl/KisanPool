@@ -1,9 +1,10 @@
 /** f0.1_welcome_language — language picker, sets the default Servo AI language. */
-import { useState } from 'react';
-import { Image, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import type { Language } from '@kisanpool/shared';
+import { getLanguage, setLanguage as applyLanguage, useT } from '../../lib/i18n';
 import { Button, Card, Screen, Txt } from '../../components/ui';
 import { colors, radius, space } from '../../theme';
 
@@ -15,13 +16,24 @@ const LANGUAGES: Array<{ code: Language; native: string; english: string }> = [
 
 export default function Welcome() {
   const router = useRouter();
-  const [language, setLanguage] = useState<Language>('mr');
+  const { t, lang } = useT();
+  // highlight whatever language is actually active (re-syncs when it changes)
+  const [language, setLanguage] = useState<Language>(getLanguage());
+
+  useEffect(() => {
+    setLanguage(lang);
+  }, [lang]);
+
+  const chooseLanguage = (code: Language): void => {
+    setLanguage(code);
+    void applyLanguage(code); // switch the whole app right away
+  };
 
   return (
     <Screen
       footer={
         <Button
-          label="Continue"
+          label={t('common.continue')}
           onPress={() => router.push({ pathname: '/(auth)/role', params: { language } })}
         />
       }
@@ -43,15 +55,15 @@ export default function Welcome() {
           KisanPool
         </Txt>
         <Txt variant="bodyLg" color={colors.onSurfaceVariant} style={{ textAlign: 'center' }}>
-          Share a truck. Split the cost. Reach the mandi.
+          {t('common.tagline')}
         </Txt>
       </View>
 
       <Txt variant="headlineMd" style={{ marginBottom: space.sm }}>
-        भाषा निवडा
+        {t('welcome.chooseLanguageNative')}
       </Txt>
       <Txt variant="bilingualSubtext" color={colors.onSurfaceVariant} style={{ marginBottom: space.md }}>
-        Choose your language
+        {t('welcome.chooseLanguage')}
       </Txt>
 
       {LANGUAGES.map((item) => {
@@ -59,10 +71,8 @@ export default function Welcome() {
         return (
           <Card
             key={item.code}
-            onPress={() => setLanguage(item.code)}
+            onPress={() => chooseLanguage(item.code)}
             style={{
-              borderColor: selected ? colors.primary : colors.outlineVariant,
-              borderWidth: selected ? 2 : 1,
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',

@@ -12,6 +12,9 @@ const payoutAccountSchema = new Schema(
     razorpayFundAccountId: { type: String, default: undefined },
     razorpayAccountId: { type: String, default: undefined },
     payoutStatus: { type: String, enum: PAYOUT_STATUSES, default: 'NOT_ONBOARDED' },
+    /** the transporter withdraws to this UPI ID (ADR-038) */
+    upiId: { type: String, default: undefined },
+    // legacy bank fields — kept for old records, no longer collected
     bankAccountLast4: { type: String, default: undefined },
     ifsc: { type: String, default: undefined },
   },

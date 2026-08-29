@@ -358,16 +358,23 @@ export interface AdminBookings {
 }
 
 export interface AdminMandi {
+  _id: string;
   name: string;
+  city: string;
+  state: string;
+  crops: string[];
+  active: boolean;
+  location: { name: string; lat: number; lng: number };
+  createdAt: string;
+}
+
+export interface NewMandi {
+  name: string;
+  city: string;
+  state: string;
   lat: number;
   lng: number;
-  requests: number;
-  openRequests: number;
-  trips: number;
-  activeTrips: number;
-  tonnes: number;
-  revenue: number;
-  saved: number;
+  crops?: string[];
 }
 
 export interface AiActivity {
@@ -440,7 +447,23 @@ export const api = {
     return request<AdminBookings>(`/admin/requests?${params.toString()}`);
   },
 
-  mandis: () => request<AdminMandi[]>('/admin/mandis'),
+  mandis: () =>
+    request<{ mandis: AdminMandi[] }>('/admin/mandis').then((r) => r.mandis),
+
+  createMandis: (mandis: NewMandi[]) =>
+    request<{ mandis: AdminMandi[] }>('/admin/mandis', {
+      method: 'POST',
+      body: JSON.stringify({ mandis }),
+    }).then((r) => r.mandis),
+
+  setMandiActive: (id: string, active: boolean) =>
+    request<AdminMandi>(`/admin/mandis/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ active }),
+    }),
+
+  deleteMandi: (id: string) =>
+    request<{ deleted: boolean }>(`/admin/mandis/${id}`, { method: 'DELETE' }),
 
   ai: () => request<AiActivity>('/admin/ai'),
 };

@@ -8,19 +8,21 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
 import { api } from '../../lib/api';
+import { useT } from '../../lib/i18n';
 import { toAppError } from '../../lib/errors';
 import { Banner, Button, Card, Field, Header, Loading, Screen, StatusBadge, Txt } from '../../components/ui';
 import { ErrorView } from '../../components/ErrorView';
 import { colors, radius, space } from '../../theme';
 
 const DOCS = [
-  { type: 'RC', label: 'Registration Certificate (RC)', gate: 'Required to receive trips' },
-  { type: 'DL', label: 'Driving Licence (DL)', gate: 'Required to receive trips' },
-  { type: 'PAN', label: 'PAN card', gate: 'Required to receive payouts' },
+  { type: 'RC', labelKey: 'kyc.doc.RC', gateKey: 'kyc.gate.trips' },
+  { type: 'DL', labelKey: 'kyc.doc.DL', gateKey: 'kyc.gate.trips' },
+  { type: 'PAN', labelKey: 'kyc.doc.PAN', gateKey: 'kyc.gate.payouts' },
 ] as const;
 
 export default function Kyc() {
   const router = useRouter();
+  const { t } = useT();
   const [statuses, setStatuses] = useState<Record<string, string>>({});
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [verified, setVerified] = useState(false);
@@ -29,9 +31,7 @@ export default function Kyc() {
   const [uploading, setUploading] = useState<string | null>(null);
   const [error, setError] = useState<string>();
 
-  const [pan, setPan] = useState('');
-  const [account, setAccount] = useState('');
-  const [ifsc, setIfsc] = useState('');
+  const [upiId, setUpiId] = useState('');
   const [savingBank, setSavingBank] = useState(false);
   const [bankDone, setBankDone] = useState(false);
 
@@ -84,15 +84,11 @@ export default function Kyc() {
     }
   };
 
-  const saveBank = async (): Promise<void> => {
+  const saveUpi = async (): Promise<void> => {
     setSavingBank(true);
     setError(undefined);
     try {
-      await api.payoutOnboarding({
-        panNumber: pan.toUpperCase(),
-        bankAccountNumber: account,
-        ifsc: ifsc.toUpperCase(),
-      });
+      await api.payoutOnboarding({ upiId: upiId.trim() });
       setBankDone(true);
     } catch (err) {
       setError(toAppError(err).message);
@@ -102,31 +98,30 @@ export default function Kyc() {
   };
 
   return (
-    <Screen footer={<Button label="Done" onPress={() => router.replace('/(auth)/success')} />}>
-      <Header title="Verify your documents" subtitle="कागदपत्रे तपासा" />
+    <Screen footer={<Button label={t('common.done')} onPress={() => router.replace('/(auth)/success')} />}>
+      <Header title={t('kyc.title')} subtitle={t('kyc.titleNative')} />
 
       {loading ? null : verified ? (
         <Banner tone="primary">
           <Txt variant="labelLg" color={colors.onPrimary}>
-            Your documents are verified
+            {t('kyc.verifiedTitle')}
           </Txt>
           <Txt variant="bodyMd" color={colors.onPrimaryContainer} style={{ marginTop: space.xs }}>
-            You can go online and start receiving trip requests.
+            {t('kyc.verifiedBody')}
           </Txt>
         </Banner>
       ) : (
         <Banner tone="warning">
           <Txt variant="labelLg" color={colors.onWarningContainer}>
-            You'll start receiving trip requests once your documents are verified
+            {t('kyc.pendingTitle')}
           </Txt>
           <Txt variant="bodyMd" color={colors.onWarningContainer} style={{ marginTop: space.xs }}>
-            Your RC and driving licence must both be approved before your vehicle appears to
-            farmers. PAN and bank details are needed to receive payouts.
+            {t('kyc.pendingBody')}
           </Txt>
         </Banner>
       )}
 
-      {loading ? <Loading label="Checking your documents…" /> : null}
+      {loading ? <Loading label={t('kyc.checking')} /> : null}
       {loadError ? <ErrorView error={loadError} onRetry={() => void load()} /> : null}
 
       {DOCS.map((doc) => {
@@ -142,9 +137,9 @@ export default function Kyc() {
                 />
               </View>
               <View style={{ flex: 1 }}>
-                <Txt variant="labelLg">{doc.label}</Txt>
+                <Txt variant="labelLg">{t(doc.labelKey)}</Txt>
                 <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-                  {doc.gate}
+                  {t(doc.gateKey)}
                 </Txt>
               </View>
               {status ? <StatusBadge status={status} /> : null}
@@ -152,18 +147,19 @@ export default function Kyc() {
 
             {status === 'REJECTED' ? (
               <Txt variant="labelSm" color={colors.error} style={{ marginTop: space.sm }}>
-                Rejected{reasons[doc.type] ? `: ${reasons[doc.type]}` : ''} — please upload a
-                clearer photo.
+                {t('kyc.rejected', {
+                  reason: reasons[doc.type] ? `: ${reasons[doc.type]}` : '',
+                })}
               </Txt>
             ) : null}
 
             <Button
               label={
                 status === 'REJECTED'
-                  ? 'Re-upload'
+                  ? t('kyc.reupload')
                   : status
-                    ? 'Replace'
-                    : 'Upload'
+                    ? t('kyc.replace')
+                    : t('kyc.upload')
               }
               variant="secondary"
               icon="upload"
@@ -176,50 +172,36 @@ export default function Kyc() {
       })}
 
       <Txt variant="headlineMd" style={{ marginTop: space.md, marginBottom: space.sm }}>
-        Bank details for payouts
+        {t('kyc.upiTitle')}
       </Txt>
       <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ marginBottom: space.md }}>
-        These go straight to our payment partner. KisanPool never stores your account number.
+        {t('kyc.upiHelp')}
       </Txt>
 
       {bankDone ? (
         <Card>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
             <MaterialIcons name="check-circle" size={22} color={colors.primary} />
-            <Txt variant="labelLg">Bank details saved</Txt>
+            <Txt variant="labelLg">{t('kyc.upiSaved')}</Txt>
           </View>
         </Card>
       ) : (
         <>
           <Field
-            label="PAN number"
-            value={pan}
-            onChangeText={setPan}
-            autoCapitalize="characters"
-            placeholder="ABCDE1234F"
-          />
-          <Field
-            label="Bank account number"
-            value={account}
-            onChangeText={(text) => setAccount(text.replace(/\D/g, ''))}
-            keyboardType="number-pad"
-            placeholder="Account number"
-          />
-          <Field
-            label="IFSC code"
-            value={ifsc}
-            onChangeText={setIfsc}
-            autoCapitalize="characters"
-            placeholder="HDFC0001234"
+            label={t('kyc.upiLabel')}
+            value={upiId}
+            onChangeText={setUpiId}
+            autoCapitalize="none"
+            placeholder={t('kyc.upiPlaceholder')}
             error={error}
           />
           <Button
-            label="Save bank details"
+            label={t('kyc.saveUpi')}
             variant="secondary"
-            icon="account-balance"
+            icon="account-balance-wallet"
             loading={savingBank}
-            disabled={!pan || !account || !ifsc}
-            onPress={() => void saveBank()}
+            disabled={!/^[^\s@]{2,}@[a-zA-Z]{2,}$/.test(upiId.trim())}
+            onPress={() => void saveUpi()}
           />
         </>
       )}

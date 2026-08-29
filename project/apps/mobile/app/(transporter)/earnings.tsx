@@ -21,17 +21,21 @@ import {
   Card,
   Divider,
   EmptyState,
+  Field,
   FilterRow,
   Metric,
   Row,
   Screen,
   SectionHeader,
+  Sheet,
   SkeletonList,
   StatusBadge,
+  Toast,
   Txt,
 } from '../../components/ui';
 import { ErrorView } from '../../components/ErrorView';
 import { BottomNav } from '../../components/BottomNav';
+import { toAppError } from '../../lib/errors';
 import { colors, radius, space } from '../../theme';
 
 type Payout = Awaited<ReturnType<typeof api.payouts>>['payouts'][number];
@@ -52,10 +56,51 @@ export default function Earnings() {
   const [tab, setTab] = useState<Tab>('all');
 
   const data = useLoader(useCallback(() => api.payouts(), []));
+  const wallet = useLoader(useCallback(() => api.wallet(), []));
+  const withdrawals = useLoader(useCallback(() => api.withdrawals(), []));
+
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [upiId, setUpiId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [sending, setSending] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [toastTone, setToastTone] = useState<'success' | 'error'>('success');
 
   const payouts = useMemo(() => data.data?.payouts ?? [], [data.data]);
   const total = data.data?.total ?? 0;
-  const accountStatus = data.data?.account?.payoutStatus ?? 'NOT_ONBOARDED';
+  const account = data.data?.account ?? null;
+  const accountStatus = account?.payoutStatus ?? 'NOT_ONBOARDED';
+  const balance = wallet.data?.balance ?? 0;
+  const wdRows = withdrawals.data?.withdrawals ?? [];
+
+  const openWithdraw = (): void => {
+    setUpiId(account?.upiId ?? '');
+    setAmount(String(balance || ''));
+    setWithdrawOpen(true);
+  };
+
+  const amountNum = Math.floor(Number(amount) || 0);
+  const canWithdraw =
+    amountNum > 0 &&
+    amountNum <= balance &&
+    /^[^\s@]{2,}@[a-zA-Z]{2,}$/.test(upiId.trim());
+
+  const submitWithdraw = async (): Promise<void> => {
+    setSending(true);
+    try {
+      await api.withdraw({ amount: amountNum, upiId: upiId.trim() });
+      setWithdrawOpen(false);
+      setToastTone('success');
+      setToast('Withdrawal started');
+      wallet.refresh();
+      withdrawals.refresh();
+    } catch (err) {
+      setToastTone('error');
+      setToast(toAppError(err).message);
+    } finally {
+      setSending(false);
+    }
+  };
 
   const todayTotal = payouts
     .filter((payout) => isToday(payout.createdAt))
@@ -122,6 +167,26 @@ export default function Earnings() {
               </View>
             </Card>
 
+            {/* wallet — the balance a driver withdraws to their UPI */}
+            <Card style={{ backgroundColor: colors.secondaryContainer, borderRadius: radius.xl }}>
+              <Txt variant="bodyMd" color={colors.onSecondaryContainer}>
+                Wallet balance
+              </Txt>
+              <Txt variant="displayLg" color={colors.primary}>
+                {rupees(balance)}
+              </Txt>
+              <Txt variant="labelSm" color={colors.onSecondaryContainer} style={{ marginTop: space.xs }}>
+                Your delivered-load earnings collect here. Withdraw them to your UPI ID.
+              </Txt>
+              <Button
+                label="Withdraw money"
+                icon="account-balance-wallet"
+                disabled={balance <= 0 || accountStatus !== 'ACTIVE'}
+                onPress={openWithdraw}
+                style={{ marginTop: space.gutter }}
+              />
+            </Card>
+
             <View style={{ flexDirection: 'row', gap: space.gutter }}>
               <Card style={{ flex: 1 }}>
                 <Txt variant="labelSm" color={colors.onSurfaceVariant}>
@@ -142,25 +207,63 @@ export default function Earnings() {
             {accountStatus !== 'ACTIVE' ? (
               <Banner tone="warning">
                 <View style={{ flexDirection: 'row', gap: space.sm }}>
-                  <MaterialIcons name="account-balance" size={22} color={colors.onWarningContainer} />
+                  <MaterialIcons name="account-balance-wallet" size={22} color={colors.onWarningContainer} />
                   <View style={{ flex: 1 }}>
                     <Txt variant="labelLg" color={colors.onWarningContainer}>
-                      Payout account not set up
+                      UPI ID not set up
                     </Txt>
                     <Txt variant="bodyMd" color={colors.onWarningContainer}>
-                      Add your PAN and bank details so your earnings can be transferred
-                      automatically after each delivery.
+                      Add a UPI ID so you can withdraw your wallet balance.
                     </Txt>
                     <Button
-                      label="Add bank details"
+                      label="Add UPI ID"
                       variant="secondary"
-                      icon="account-balance"
+                      icon="account-balance-wallet"
                       onPress={() => router.push('/(auth)/kyc')}
                       style={{ marginTop: space.gutter }}
                     />
                   </View>
                 </View>
               </Banner>
+            ) : null}
+
+            {wdRows.length > 0 ? (
+              <>
+                <SectionHeader title="Withdrawals" />
+                {wdRows.slice(0, 5).map((w) => (
+                  <Card key={w._id}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={{ flex: 1 }}>
+                        <Txt variant="labelLg">{rupees(w.amount)}</Txt>
+                        <Txt variant="labelSm" color={colors.onSurfaceVariant} numberOfLines={1}>
+                          {w.upiId} · {shortDate(w.requestedAt)}
+                        </Txt>
+                        {w.failureReason ? (
+                          <Txt variant="labelSm" color={colors.error} numberOfLines={2}>
+                            {w.failureReason}
+                          </Txt>
+                        ) : null}
+                      </View>
+                      <StatusBadge
+                        status={
+                          w.status === 'SUCCESS'
+                            ? 'DELIVERED'
+                            : w.status === 'FAILED'
+                              ? 'REJECTED'
+                              : 'IN_TRANSIT'
+                        }
+                        label={
+                          w.status === 'SUCCESS'
+                            ? 'Paid'
+                            : w.status === 'FAILED'
+                              ? 'Failed'
+                              : 'Processing'
+                        }
+                      />
+                    </View>
+                  </Card>
+                ))}
+              </>
             ) : null}
 
             <SectionHeader title="Settlement history" />
@@ -247,6 +350,40 @@ export default function Earnings() {
         )}
       </Screen>
 
+      <Sheet
+        visible={withdrawOpen}
+        onClose={() => setWithdrawOpen(false)}
+        title="Withdraw money"
+        subtitle={`Available: ${rupees(balance)}`}
+      >
+        <Field
+          label="UPI ID"
+          value={upiId}
+          onChangeText={setUpiId}
+          autoCapitalize="none"
+          placeholder="name@bank"
+        />
+        <Field
+          label="Amount (₹)"
+          value={amount}
+          onChangeText={(text) => setAmount(text.replace(/[^0-9]/g, ''))}
+          keyboardType="number-pad"
+          placeholder="0"
+          error={
+            amountNum > balance ? 'More than your wallet balance' : undefined
+          }
+        />
+        <Button
+          label="Withdraw"
+          icon="check"
+          loading={sending}
+          disabled={!canWithdraw}
+          onPress={() => void submitWithdraw()}
+          style={{ marginTop: space.sm }}
+        />
+      </Sheet>
+
+      <Toast message={toast} tone={toastTone} onHide={() => setToast(null)} />
       <BottomNav role="transporter" active="earnings" />
     </View>
   );

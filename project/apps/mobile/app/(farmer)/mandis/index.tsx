@@ -19,8 +19,10 @@ import {
   DEMAND_LABEL,
   durationLabel,
   rankMandis,
+  refreshMandis,
   topModalPrice,
   type Category,
+  type Mandi,
   type RankedMandi,
 } from '../../../lib/mandis';
 import {
@@ -52,6 +54,7 @@ export default function MandiDiscovery() {
   const [query, setQuery] = useState('');
   const [onlyFavourites, setOnlyFavourites] = useState(params.filter === 'favourites');
   const [toast, setToast] = useState<string | null>(null);
+  const [mandis, setMandis] = useState<Mandi[]>([]);
 
   useEffect(() => {
     void getUser().then((user) => {
@@ -62,9 +65,14 @@ export default function MandiDiscovery() {
     void getFavourites().then(setFavourites);
   }, []);
 
+  // fetch operator-created mandis near the farmer (or all, before we know where)
+  useEffect(() => {
+    void refreshMandis(origin).then(setMandis).catch(() => setMandis([]));
+  }, [origin]);
+
   const ranked = useMemo(
-    () => rankMandis(origin, favourites, { category, query }),
-    [origin, favourites, category, query],
+    () => rankMandis(mandis, origin, favourites, { category, query }),
+    [mandis, origin, favourites, category, query],
   );
 
   const list = onlyFavourites ? ranked.filter((mandi) => mandi.favourite) : ranked;
@@ -221,15 +229,23 @@ export default function MandiDiscovery() {
 
                 <View style={s.metricsRow}>
                   <View>
-                    <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-                      {price.crop} · modal rate
-                    </Txt>
-                    <Txt variant="labelLg" color={colors.primary}>
-                      {rupees(price.modal)}{' '}
+                    {price ? (
+                      <>
+                        <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                          {price.crop} · modal rate
+                        </Txt>
+                        <Txt variant="labelLg" color={colors.primary}>
+                          {rupees(price.modal)}{' '}
+                          <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                            / qtl
+                          </Txt>
+                        </Txt>
+                      </>
+                    ) : (
                       <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-                        / qtl
+                        {origin ? km(mandi.distanceKm) : ''} from you
                       </Txt>
-                    </Txt>
+                    )}
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
                     <MaterialIcons

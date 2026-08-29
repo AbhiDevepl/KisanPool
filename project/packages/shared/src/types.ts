@@ -43,6 +43,20 @@ export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 export const PAYOUT_STATUSES = ['NOT_ONBOARDED', 'PENDING', 'ACTIVE'] as const;
 export type PayoutStatus = (typeof PAYOUT_STATUSES)[number];
 
+/** Internal transporter wallet — an earnings balance they withdraw to a UPI ID. */
+export const WITHDRAWAL_STATUSES = ['PENDING', 'SUCCESS', 'FAILED'] as const;
+export type WithdrawalStatus = (typeof WITHDRAWAL_STATUSES)[number];
+
+export const WALLET_TXN_TYPES = ['CREDIT', 'DEBIT'] as const;
+export type WalletTxnType = (typeof WALLET_TXN_TYPES)[number];
+
+export const WALLET_TXN_REASONS = [
+  'EARNING',
+  'WITHDRAWAL',
+  'WITHDRAWAL_REVERSAL',
+] as const;
+export type WalletTxnReason = (typeof WALLET_TXN_REASONS)[number];
+
 // ---------- value objects ----------
 
 export interface GeoPoint {
@@ -117,6 +131,50 @@ export interface TransportRequestDTO {
   cancelledAt?: string;
   cancelReason?: string;
   createdAt: string;
+}
+
+/** An APMC market an operator has placed on the map (ADR-039). */
+export interface MandiDTO {
+  _id: string;
+  name: string;
+  city: string;
+  state: string;
+  location: GeoPoint;
+  crops: string[];
+  active: boolean;
+  createdAt: string;
+  /** present only on the farmer's nearby list */
+  distanceKm?: number;
+}
+
+export interface WalletTransactionDTO {
+  _id: string;
+  userId: string;
+  type: WalletTxnType;
+  reason: WalletTxnReason;
+  amount: number;
+  balanceAfter: number;
+  paymentId?: string;
+  withdrawalId?: string;
+  createdAt: string;
+}
+
+export interface WalletDTO {
+  balance: number;
+  currency: 'INR';
+  transactions: WalletTransactionDTO[];
+}
+
+export interface WithdrawalDTO {
+  _id: string;
+  userId: string;
+  amount: number;
+  upiId: string;
+  status: WithdrawalStatus;
+  razorpayPayoutId?: string;
+  failureReason?: string;
+  requestedAt: string;
+  processedAt?: string;
 }
 
 export interface PaymentDTO {

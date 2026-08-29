@@ -13,15 +13,14 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getUser } from '../../../lib/session';
 import { getFavourites, toggleFavourite } from '../../../lib/favourites';
+import { api } from '../../../lib/api';
 import { km, rupees } from '../../../lib/format';
 import {
-  DEMAND_LABEL,
-  closingLabel,
   distanceFrom,
   durationLabel,
   findMandi,
-  isOpenNow,
   travelMinutes,
+  type Mandi,
   type Trend,
 } from '../../../lib/mandis';
 import {
@@ -60,7 +59,7 @@ const VALUE_PROPS = [
 export default function MandiDetails() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const mandi = findMandi(id);
+  const [mandi, setMandi] = useState<Mandi | null>(() => findMandi(id) ?? null);
 
   const [origin, setOrigin] = useState<{ lat: number; lng: number } | null>(null);
   const [favourite, setFavourite] = useState(false);
@@ -73,6 +72,26 @@ export default function MandiDetails() {
       }
     });
     void getFavourites().then((ids) => setFavourite(ids.includes(id)));
+    void api
+      .mandi(id)
+      .then((dto) =>
+        setMandi({
+          id: dto._id,
+          name: dto.name,
+          district: dto.city,
+          state: dto.state,
+          lat: dto.location.lat,
+          lng: dto.location.lng,
+          categories: [],
+          crops: dto.crops ?? [],
+          hours: 'Hours vary — check locally',
+          opensAt: 0,
+          closesAt: 24 * 60,
+          demand: 'MEDIUM',
+          prices: [],
+        }),
+      )
+      .catch(() => undefined);
   }, [id]);
 
   const star = useCallback(async () => {
@@ -98,7 +117,6 @@ export default function MandiDetails() {
   }
 
   const distanceKm = origin ? distanceFrom(origin, mandi) : null;
-  const open = isOpenNow(mandi);
 
   return (
     <View style={{ flex: 1 }}>
@@ -146,20 +164,6 @@ export default function MandiDetails() {
           </Txt>
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.sm }}>
-            <View style={[s.pill, { backgroundColor: open ? colors.secondaryContainer : colors.surfaceContainerHigh }]}>
-              <View
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: radius.full,
-                  backgroundColor: open ? colors.primary : colors.outline,
-                }}
-              />
-              <Txt variant="labelSm" color={open ? colors.onSecondaryContainer : colors.onSurfaceVariant}>
-                {open ? `Open now · closes ${closingLabel(mandi)}` : `Closed · opens ${mandi.hours.split('–')[0].trim()}`}
-              </Txt>
-            </View>
-
             {distanceKm != null ? (
               <View style={[s.pill, { backgroundColor: colors.surfaceContainerLow }]}>
                 <MaterialIcons name="directions-car" size={14} color={colors.onSurfaceVariant} />
@@ -169,27 +173,19 @@ export default function MandiDetails() {
               </View>
             ) : null}
 
-            <View style={[s.pill, { backgroundColor: colors.warningContainer }]}>
-              <MaterialIcons name="trending-up" size={14} color={colors.onWarningContainer} />
-              <Txt variant="labelSm" color={colors.onWarningContainer}>
-                {DEMAND_LABEL[mandi.demand]}
-              </Txt>
-            </View>
+            {mandi.crops.length ? (
+              <View style={[s.pill, { backgroundColor: colors.secondaryContainer }]}>
+                <MaterialIcons name="eco" size={14} color={colors.onSecondaryContainer} />
+                <Txt variant="labelSm" color={colors.onSecondaryContainer}>
+                  {mandi.crops.slice(0, 3).join(', ')}
+                </Txt>
+              </View>
+            ) : null}
           </View>
         </View>
 
-        {/* the three facts that describe the yard */}
-        <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.md }}>
-          <Fact icon="calendar-month" label="Established" value={String(mandi.establishedYear)} />
-          <Fact icon="map" label="Area" value={`${mandi.areaAcres} acres`} />
-          <Fact
-            icon="group"
-            label="Farmers"
-            value={`${(mandi.registeredFarmers / 1000).toFixed(1)}k+`}
-          />
-        </View>
-
-        {/* today's rates */}
+        {/* today's rates — only when the mandi carries price bands */}
+        {mandi.prices.length > 0 ? (
         <Card style={{ marginTop: space.md }}>
           <Txt variant="headlineMd">Market information</Txt>
           <Txt variant="labelSm" color={colors.onSurfaceVariant}>
@@ -242,6 +238,7 @@ export default function MandiDetails() {
             distance and the vehicle's rate.
           </Txt>
         </Card>
+        ) : null}
 
         {/* why this mandi */}
         <Txt variant="headlineMd" style={{ marginTop: space.md, marginBottom: space.sm }}>

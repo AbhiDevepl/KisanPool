@@ -11,7 +11,7 @@ import type { GeoPoint } from '@kisanpool/shared';
 import { api } from '../../../lib/api';
 import { toAppError } from '../../../lib/errors';
 import { getUser } from '../../../lib/session';
-import { MANDIS } from '../../../lib/mandis';
+import { refreshMandis, type Mandi } from '../../../lib/mandis';
 import { Button, Card, Chip, Field, Header, Screen, Txt } from '../../../components/ui';
 import { ErrorView } from '../../../components/ErrorView';
 import { colors, space } from '../../../theme';
@@ -42,10 +42,16 @@ export default function NewRequest() {
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
+  const [mandis, setMandis] = useState<Mandi[]>([]);
 
   useEffect(() => {
     void getUser().then((user) => {
-      if (user?.defaultLocation) setPickup(user.defaultLocation);
+      if (user?.defaultLocation) {
+        setPickup(user.defaultLocation);
+        void refreshMandis(user.defaultLocation).then(setMandis).catch(() => setMandis([]));
+      } else {
+        void refreshMandis().then(setMandis).catch(() => setMandis([]));
+      }
     });
   }, []);
 
@@ -120,26 +126,34 @@ export default function NewRequest() {
       <Txt variant="labelLg" color={colors.onSurfaceVariant} style={{ marginBottom: space.sm }}>
         Destination mandi
       </Txt>
-      {MANDIS.map((mandi) => {
-        const selected = destination?.name === mandi.name;
-        return (
-          <Card
-            key={mandi.id}
-            onPress={() =>
-              setDestination({ name: mandi.name, lat: mandi.lat, lng: mandi.lng })
-            }
-            style={{
-              borderColor: selected ? colors.primary : colors.outlineVariant,
-              borderWidth: selected ? 2 : 1,
-            }}
-          >
-            <Txt variant="labelLg">{mandi.name}</Txt>
-            <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-              {mandi.district}
-            </Txt>
-          </Card>
-        );
-      })}
+      {mandis.length === 0 ? (
+        <Card>
+          <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+            No mandis are available near you yet.
+          </Txt>
+        </Card>
+      ) : (
+        mandis.map((mandi) => {
+          const selected = destination?.name === mandi.name;
+          return (
+            <Card
+              key={mandi.id}
+              onPress={() =>
+                setDestination({ name: mandi.name, lat: mandi.lat, lng: mandi.lng })
+              }
+              style={{
+                borderColor: selected ? colors.primary : colors.outlineVariant,
+                borderWidth: selected ? 2 : 1,
+              }}
+            >
+              <Txt variant="labelLg">{mandi.name}</Txt>
+              <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                {mandi.district}, {mandi.state}
+              </Txt>
+            </Card>
+          );
+        })
+      )}
 
       <Field
         label="Anything the driver should know? (optional)"

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { api } from '../../lib/api';
+import { useT } from '../../lib/i18n';
 import { toAppError } from '../../lib/errors';
 import { Button, Field, Header, Screen, Txt } from '../../components/ui';
 import { TripMap } from '../../components/TripMap';
@@ -10,6 +11,7 @@ import { colors, space } from '../../theme';
 
 export default function FarmerDetails() {
   const router = useRouter();
+  const { t } = useT();
   const [name, setName] = useState('');
   const [placeName, setPlaceName] = useState('');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -39,7 +41,9 @@ export default function FarmerDetails() {
     try {
       await api.updateMe({
         name,
-        ...(coords ? { defaultLocation: { name: placeName || 'My farm', ...coords } } : {}),
+        ...(coords
+          ? { defaultLocation: { name: placeName || t('farmerDetails.defaultFarm'), ...coords } }
+          : {}),
       });
       router.replace('/(auth)/success');
     } catch (err) {
@@ -53,32 +57,32 @@ export default function FarmerDetails() {
     <Screen
       footer={
         <Button
-          label="Continue"
+          label={t('common.continue')}
           loading={busy}
           disabled={!name.trim()}
           onPress={() => void save()}
         />
       }
     >
-      <Header title="About you" subtitle="तुमची माहिती" />
+      <Header title={t('farmerDetails.title')} subtitle={t('farmerDetails.titleNative')} />
 
       <Field
-        label="Your name"
+        label={t('farmerDetails.nameLabel')}
         value={name}
         onChangeText={setName}
-        placeholder="e.g. Rahul Patil"
+        placeholder={t('farmerDetails.namePlaceholder')}
         error={error}
       />
 
       <Field
-        label="Default pickup place"
+        label={t('farmerDetails.placeLabel')}
         value={placeName}
         onChangeText={setPlaceName}
-        placeholder="e.g. Pimpri, Pune"
+        placeholder={t('farmerDetails.placePlaceholder')}
       />
 
       <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ marginBottom: space.sm }}>
-        We use this so you do not have to type your village on every request.
+        {t('farmerDetails.placeHelp')}
       </Txt>
 
       <TripMap pickup={coords ? { ...coords, title: placeName } : null} height={200} />

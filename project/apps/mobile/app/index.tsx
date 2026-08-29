@@ -5,6 +5,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { api } from '../lib/api';
+import { initI18n } from '../lib/i18n';
 import { registerForPush } from '../lib/notifications';
 import { clearSession, getAccessToken, setUser } from '../lib/session';
 import { Loading, Screen } from '../components/ui';
@@ -23,6 +24,7 @@ export default function Index() {
       try {
         const user = await api.me();
         await setUser(user);
+        await initI18n(user.language); // honour the account's saved language
         void registerForPush(); // token registered on login (ADR-005)
 
         router.replace(user.role === 'FARMER' ? '/(farmer)/home' : '/(transporter)/home');

@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { api } from '../../lib/api';
+import { useT } from '../../lib/i18n';
 import { registerForPush } from '../../lib/notifications';
 import { setUser } from '../../lib/session';
 import { Button, Screen, Txt } from '../../components/ui';
@@ -11,6 +12,7 @@ import { colors, radius, space } from '../../theme';
 
 export default function Success() {
   const router = useRouter();
+  const { t } = useT();
   const [role, setRole] = useState<'FARMER' | 'TRANSPORTER'>('FARMER');
 
   useEffect(() => {
@@ -27,7 +29,7 @@ export default function Success() {
     <Screen
       footer={
         <Button
-          label="Go to my dashboard"
+          label={t('success.goDashboard')}
           onPress={() =>
             router.replace(role === 'FARMER' ? '/(farmer)/home' : '/(transporter)/home')
           }
@@ -49,10 +51,10 @@ export default function Success() {
         </View>
 
         <Txt variant="displayLg" style={{ marginTop: space.lg, textAlign: 'center' }}>
-          You're all set!
+          {t('success.title')}
         </Txt>
         <Txt variant="headlineMd" color={colors.onSurfaceVariant} style={{ marginTop: space.xs }}>
-          तुमचं खातं तयार आहे
+          {t('success.titleNative')}
         </Txt>
 
         <Txt
@@ -60,9 +62,7 @@ export default function Success() {
           color={colors.onSurfaceVariant}
           style={{ marginTop: space.md, textAlign: 'center' }}
         >
-          {role === 'FARMER'
-            ? 'Create your first transport request — by tapping, or just by speaking to Servo AI.'
-            : 'Once your documents are verified you will start receiving trip requests near you.'}
+          {role === 'FARMER' ? t('success.farmerBody') : t('success.transporterBody')}
         </Txt>
       </View>
     </Screen>

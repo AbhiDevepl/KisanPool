@@ -4,7 +4,7 @@
  * (docs/DESIGN.md §6, ADR-017).
  */
 import { MaterialIcons } from '@expo/vector-icons';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -22,6 +22,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { getUser as getCachedUser } from '../lib/session';
 import { colors, elevation, layout, radius, space, type } from '../theme';
 
 // ---------- text ----------
@@ -479,7 +480,7 @@ const s = StyleSheet.create({
   card: {
     backgroundColor: colors.surfaceContainerLowest,
     borderRadius: radius.lg, // 16px — cards
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: colors.outlineVariant,
     padding: space.md,
     marginBottom: space.gutter,
@@ -498,7 +499,7 @@ const s = StyleSheet.create({
   input: {
     minHeight: layout.minTouchTarget,
     borderRadius: radius.base,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: colors.outlineVariant,
     backgroundColor: colors.surfaceContainerLowest,
     paddingHorizontal: space.gutter,
@@ -509,7 +510,7 @@ const s = StyleSheet.create({
   chip: {
     minHeight: 40,
     borderRadius: radius.full,
-    borderWidth: 1,
+    borderWidth: 0,
     paddingHorizontal: space.md,
     justifyContent: 'center',
   },
@@ -552,6 +553,11 @@ export function AppBar({
   unread?: number;
   onNotifications?: () => void;
 }) {
+  const [role, setRole] = useState<'FARMER' | 'TRANSPORTER' | null>(null);
+  useEffect(() => {
+    void getCachedUser().then((u) => setRole(u?.role ?? null));
+  }, []);
+
   return (
     <View style={s2.appBar}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, flex: 1 }}>
@@ -559,6 +565,13 @@ export function AppBar({
         <Txt variant="headlineLg" color={colors.primary}>
           {title ?? 'KisanPool'}
         </Txt>
+        {role ? (
+          <View style={s2.roleBadge}>
+            <Txt variant="labelSm" color={colors.onPrimary}>
+              {role === 'FARMER' ? 'Farmer' : 'Transporter'}
+            </Txt>
+          </View>
+        ) : null}
       </View>
       {right}
       {onNotifications ? (
@@ -1302,6 +1315,12 @@ const s2 = StyleSheet.create({
     backgroundColor: colors.background,
   },
   appBarIcon: { padding: space.xs },
+  roleBadge: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.full,
+    paddingHorizontal: space.sm,
+    paddingVertical: 2,
+  },
   unreadDot: {
     position: 'absolute',
     top: 4,
@@ -1325,7 +1344,7 @@ const s2 = StyleSheet.create({
     alignItems: 'center',
     gap: space.xs,
     backgroundColor: colors.surfaceContainerLow,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: colors.surfaceVariant,
     borderRadius: radius.base,
     paddingHorizontal: space.sm,
@@ -1337,7 +1356,7 @@ const s2 = StyleSheet.create({
     alignItems: 'center',
     gap: space.xs,
     borderRadius: radius.full,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: colors.secondaryContainer,
     backgroundColor: colors.secondaryContainer,
     paddingHorizontal: space.sm,
@@ -1355,7 +1374,7 @@ const s2 = StyleSheet.create({
     alignItems: 'center',
     gap: space.sm,
     backgroundColor: colors.surfaceContainerLowest,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: colors.surfaceVariant,
     borderRadius: radius.lg,
     paddingVertical: space.gutter,
@@ -1414,7 +1433,7 @@ const s2 = StyleSheet.create({
     gap: space.sm,
     minHeight: layout.minTouchTarget,
     borderRadius: radius.base,
-    borderWidth: 1,
+    borderWidth: 0,
     borderColor: colors.outlineVariant,
     backgroundColor: colors.surfaceContainerLowest,
     paddingHorizontal: space.gutter,

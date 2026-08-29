@@ -17,6 +17,7 @@ import { BackHandler, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useT } from '../lib/i18n';
 import { colors, layout, radius, space } from '../theme';
 import { Txt } from './ui';
 
@@ -25,25 +26,25 @@ export type TransporterTab = 'dashboard' | 'requests' | 'trips' | 'earnings' | '
 
 interface Item {
   key: string;
-  label: string;
+  labelKey: string;
   icon: keyof typeof MaterialIcons.glyphMap;
   href: string;
 }
 
 const FARMER_ITEMS: Item[] = [
-  { key: 'home', label: 'Home', icon: 'home', href: '/(farmer)/home' },
-  { key: 'bookings', label: 'Bookings', icon: 'assignment', href: '/(farmer)/bookings' },
-  { key: 'mandi', label: 'Mandi', icon: 'storefront', href: '/(farmer)/mandis' },
-  { key: 'support', label: 'Support', icon: 'support-agent', href: '/(farmer)/support' },
-  { key: 'profile', label: 'Profile', icon: 'person', href: '/(farmer)/profile' },
+  { key: 'home', labelKey: 'nav.home', icon: 'home', href: '/(farmer)/home' },
+  { key: 'bookings', labelKey: 'nav.bookings', icon: 'assignment', href: '/(farmer)/bookings' },
+  { key: 'mandi', labelKey: 'nav.mandi', icon: 'storefront', href: '/(farmer)/mandis' },
+  { key: 'support', labelKey: 'nav.support', icon: 'support-agent', href: '/(farmer)/support' },
+  { key: 'profile', labelKey: 'nav.profile', icon: 'person', href: '/(farmer)/profile' },
 ];
 
 const TRANSPORTER_ITEMS: Item[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/(transporter)/home' },
-  { key: 'requests', label: 'Requests', icon: 'local-shipping', href: '/(transporter)/requests' },
-  { key: 'trips', label: 'Trips', icon: 'route', href: '/(transporter)/trips' },
-  { key: 'earnings', label: 'Earnings', icon: 'payments', href: '/(transporter)/earnings' },
-  { key: 'profile', label: 'Profile', icon: 'person', href: '/(transporter)/profile' },
+  { key: 'dashboard', labelKey: 'nav.dashboard', icon: 'dashboard', href: '/(transporter)/home' },
+  { key: 'requests', labelKey: 'nav.requests', icon: 'local-shipping', href: '/(transporter)/requests' },
+  { key: 'trips', labelKey: 'nav.trips', icon: 'route', href: '/(transporter)/trips' },
+  { key: 'earnings', labelKey: 'nav.earnings', icon: 'payments', href: '/(transporter)/earnings' },
+  { key: 'profile', labelKey: 'nav.profile', icon: 'person', href: '/(transporter)/profile' },
 ];
 
 /** Counts that belong on a tab, e.g. offers the farmer has not answered yet. */
@@ -59,6 +60,7 @@ function BottomNavImpl({
   badges?: NavBadges;
 }) {
   const router = useRouter();
+  const { t } = useT();
   const insets = useSafeAreaInsets();
   const items = role === 'farmer' ? FARMER_ITEMS : TRANSPORTER_ITEMS;
   const root = items[0];
@@ -85,13 +87,14 @@ function BottomNavImpl({
       {items.map((item) => {
         const selected = item.key === active;
         const badge = badges?.[item.key] ?? 0;
+        const label = t(item.labelKey);
 
         return (
           <Pressable
             key={item.key}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
-            accessibilityLabel={item.label}
+            accessibilityLabel={label}
             // replace, not push — tabs are siblings, so the back stack stays flat
             onPress={() => (selected ? null : router.replace(item.href as never))}
             style={({ pressed }) => [
@@ -119,7 +122,7 @@ function BottomNavImpl({
               color={selected ? colors.primary : colors.onSurfaceVariant}
               style={selected ? { fontWeight: '700' } : undefined}
             >
-              {item.label}
+              {label}
             </Txt>
           </Pressable>
         );
@@ -142,16 +145,10 @@ const s = StyleSheet.create({
     paddingTop: space.sm,
     paddingHorizontal: space.xs,
     backgroundColor: colors.surfaceContainerLowest,
-    borderTopWidth: 1,
-    borderTopColor: colors.outlineVariant,
     borderTopLeftRadius: radius.lg,
     borderTopRightRadius: radius.lg,
-    // the bar overlays the scroll view, so it has to win touch dispatch on both
-    // platforms: zIndex orders it on iOS, elevation does the same on Android
-    shadowColor: '#000000',
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: -4 },
+    // the bar overlays the scroll view, so it has to win touch dispatch on
+    // Android — keep just enough elevation for that, with no visible shadow
     elevation: 12,
   },
   item: {

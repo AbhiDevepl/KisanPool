@@ -5,22 +5,26 @@
  * metrics. Those live in Bookings. This screen is who you are, how the app should
  * talk to you, and the way out.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Linking, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import * as Location from 'expo-location';
 import type { Language, UserDTO } from '@kisanpool/shared';
 import { api } from '../../lib/api';
+import { setLanguage as applyLanguage } from '../../lib/i18n';
 import { clearSession, getUser, setUser as persistUser } from '../../lib/session';
 import { getFavourites } from '../../lib/favourites';
-import { findMandi } from '../../lib/mandis';
+import { findMandi, refreshMandis } from '../../lib/mandis';
 import { toAppError } from '../../lib/errors';
 import { SUPPORT_PHONE } from '../../lib/support';
 import {
   AppBar,
   Avatar,
+  Button,
   Card,
   ConfirmDialog,
   Divider,
+  Field,
   Screen,
   SettingRow,
   Sheet,
@@ -42,6 +46,11 @@ export default function FarmerProfile() {
   const [user, setUserState] = useState<UserDTO | null>(null);
   const [favourites, setFavourites] = useState<string[]>([]);
   const [languageOpen, setLanguageOpen] = useState(false);
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [placeName, setPlaceName] = useState('');
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [savingLoc, setSavingLoc] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -50,6 +59,7 @@ export default function FarmerProfile() {
   const load = useCallback(async () => {
     setUserState(await getUser());
     setFavourites(await getFavourites());
+    void refreshMandis().catch(() => undefined); // so favourite mandi names resolve
     // the cached user can lag behind the server; refresh it quietly
     try {
       const fresh = await api.me();
@@ -60,17 +70,22 @@ export default function FarmerProfile() {
     }
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // reload every time the tab regains focus
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   const changeLanguage = async (language: Language): Promise<void> => {
     setSaving(true);
     try {
+      // switch the UI first so it works even if the server call fails
+      await applyLanguage(language);
+      setLanguageOpen(false);
       const updated = await api.updateMe({ language });
       await persistUser(updated);
       setUserState(updated);
-      setLanguageOpen(false);
       setToastTone('success');
       setToast('Language updated');
     } catch (err) {
@@ -78,6 +93,63 @@ export default function FarmerProfile() {
       setToast(toAppError(err).message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const openLocation = (): void => {
+    setPlaceName(user?.defaultLocation?.name ?? '');
+    setCoords(
+      user?.defaultLocation
+        ? { lat: user.defaultLocation.lat, lng: user.defaultLocation.lng }
+        : null,
+    );
+    setLocationOpen(true);
+  };
+
+  const detectLocation = async (): Promise<void> => {
+    setLocating(true);
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== 'granted') {
+        setToastTone('error');
+        setToast('Location permission denied');
+        return;
+      }
+      const position = await Location.getCurrentPositionAsync({});
+      setCoords({ lat: position.coords.latitude, lng: position.coords.longitude });
+      const [place] = await Location.reverseGeocodeAsync(position.coords);
+      if (place && !placeName.trim()) {
+        setPlaceName([place.district ?? place.city, place.region].filter(Boolean).join(', '));
+      }
+    } catch {
+      setToastTone('error');
+      setToast('Could not get your location');
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const saveLocation = async (): Promise<void> => {
+    if (!coords) {
+      setToastTone('error');
+      setToast('Tap "Use my current location" first');
+      return;
+    }
+    setSavingLoc(true);
+    try {
+      const updated = await api.updateMe({
+        defaultLocation: { name: placeName.trim() || 'My farm', ...coords },
+      });
+      await persistUser(updated);
+      setUserState(updated);
+      setLocationOpen(false);
+      setToastTone('success');
+      setToast('Pickup location updated');
+    } catch (err) {
+      setToastTone('error');
+      setToast(toAppError(err).message);
+    } finally {
+      setSavingLoc(false);
     }
   };
 
@@ -123,6 +195,7 @@ export default function FarmerProfile() {
             icon="place"
             label="Pickup location"
             value={user?.defaultLocation?.name ?? 'Not set'}
+            onPress={openLocation}
           />
           <SettingRow
             icon="translate"
@@ -203,6 +276,35 @@ export default function FarmerProfile() {
           KisanPool · v0.1.0
         </Txt>
       </Screen>
+
+      <Sheet
+        visible={locationOpen}
+        onClose={() => setLocationOpen(false)}
+        title="Pickup location"
+        subtitle="Where transporters come to collect your produce."
+      >
+        <Field
+          label="Place name"
+          value={placeName}
+          onChangeText={setPlaceName}
+          placeholder="e.g. Pimpri, Pune"
+        />
+        <Button
+          label={coords ? 'Update to my current location' : 'Use my current location'}
+          variant="secondary"
+          icon="my-location"
+          loading={locating}
+          onPress={() => void detectLocation()}
+        />
+        <Button
+          label="Save location"
+          icon="check"
+          loading={savingLoc}
+          disabled={!coords}
+          onPress={() => void saveLocation()}
+          style={{ marginTop: space.sm }}
+        />
+      </Sheet>
 
       <Sheet
         visible={languageOpen}

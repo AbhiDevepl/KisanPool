@@ -1,14 +1,13 @@
 /**
- * The mandi reference layer.
+ * The mandi layer.
  *
- * Maharashtra APMC markets with indicative price bands. This is demo/reference
- * data, deliberately kept in ONE place rather than scattered through the mandi
- * screens as literals — the discovery and detail screens read every number they
- * render from here, so there is exactly one story to keep consistent.
- *
- * Nothing here feeds pricing. A trip's cost is computed server-side from distance
- * and the vehicle's rate; these bands are market guidance for choosing a mandi.
+ * Mandis are now created by an operator in the admin console and stored in the
+ * database (ADR-039). The app fetches the active ones near the farmer; there is
+ * no static list any more. Price bands / opening hours are not part of an
+ * operator-created mandi, so the discovery UI degrades gracefully without them.
  */
+import type { MandiDTO } from '@kisanpool/shared';
+import { api } from './api';
 
 export type Category = 'Vegetables' | 'Fruits' | 'Grains';
 export type Demand = 'HIGH' | 'MEDIUM' | 'LOW';
@@ -18,7 +17,6 @@ export interface CommodityPrice {
   crop: string;
   min: number;
   max: number;
-  /** the price most lots actually clear at — what a farmer plans against */
   modal: number;
   trend: Trend;
 }
@@ -33,152 +31,45 @@ export interface Mandi {
   categories: Category[];
   crops: string[];
   hours: string;
-  /** minutes past midnight, used to decide "Open now" without hardcoding a string */
   opensAt: number;
   closesAt: number;
   demand: Demand;
-  establishedYear: number;
-  areaAcres: number;
-  registeredFarmers: number;
   prices: CommodityPrice[];
 }
 
-export const MANDIS: Mandi[] = [
-  {
-    id: 'lasalgaon',
-    name: 'Lasalgaon Mandi',
-    district: 'Nashik',
-    state: 'Maharashtra',
-    lat: 20.1417,
-    lng: 74.2389,
-    categories: ['Vegetables'],
-    crops: ['Onion', 'Grapes', 'Tomato'],
-    hours: '6:00 AM – 6:00 PM',
-    opensAt: 6 * 60,
-    closesAt: 18 * 60,
-    demand: 'HIGH',
-    establishedYear: 1975,
-    areaAcres: 25,
-    registeredFarmers: 2500,
-    prices: [
-      { crop: 'Onion', min: 1400, max: 2100, modal: 1860, trend: 'UP' },
-      { crop: 'Tomato', min: 900, max: 1600, modal: 1250, trend: 'UP' },
-      { crop: 'Grapes', min: 3500, max: 5200, modal: 4300, trend: 'FLAT' },
-    ],
-  },
-  {
-    id: 'pune-market-yard',
-    name: 'Pune Market Yard',
-    district: 'Pune',
-    state: 'Maharashtra',
-    lat: 18.4805,
-    lng: 73.8683,
-    categories: ['Vegetables', 'Fruits'],
-    crops: ['Tomato', 'Potato', 'Onion'],
-    hours: '5:00 AM – 8:00 PM',
-    opensAt: 5 * 60,
-    closesAt: 20 * 60,
-    demand: 'MEDIUM',
-    establishedYear: 1982,
-    areaAcres: 42,
-    registeredFarmers: 4100,
-    prices: [
-      { crop: 'Tomato', min: 900, max: 1600, modal: 1310, trend: 'UP' },
-      { crop: 'Potato', min: 1100, max: 1750, modal: 1450, trend: 'FLAT' },
-      { crop: 'Onion', min: 1250, max: 1900, modal: 1720, trend: 'UP' },
-    ],
-  },
-  {
-    id: 'vashi-apmc',
-    name: 'Vashi APMC',
-    district: 'Navi Mumbai',
-    state: 'Maharashtra',
-    lat: 19.0662,
-    lng: 73.0021,
-    categories: ['Vegetables', 'Fruits'],
-    crops: ['Onion', 'Tomato', 'Potato'],
-    hours: '4:00 AM – 7:00 PM',
-    opensAt: 4 * 60,
-    closesAt: 19 * 60,
-    demand: 'HIGH',
-    establishedYear: 1996,
-    areaAcres: 68,
-    registeredFarmers: 6800,
-    prices: [
-      { crop: 'Onion', min: 1400, max: 2100, modal: 1950, trend: 'UP' },
-      { crop: 'Tomato', min: 1000, max: 1800, modal: 1480, trend: 'UP' },
-      { crop: 'Potato', min: 1150, max: 1820, modal: 1520, trend: 'FLAT' },
-    ],
-  },
-  {
-    id: 'ahmednagar',
-    name: 'Ahmednagar Mandi',
-    district: 'Ahmednagar',
-    state: 'Maharashtra',
-    lat: 19.0948,
-    lng: 74.748,
-    categories: ['Vegetables', 'Grains'],
-    crops: ['Onion', 'Potato'],
-    hours: '6:00 AM – 5:00 PM',
-    opensAt: 6 * 60,
-    closesAt: 17 * 60,
-    demand: 'MEDIUM',
-    establishedYear: 1969,
-    areaAcres: 18,
-    registeredFarmers: 1900,
-    prices: [
-      { crop: 'Onion', min: 1150, max: 1700, modal: 1420, trend: 'DOWN' },
-      { crop: 'Potato', min: 1050, max: 1600, modal: 1330, trend: 'FLAT' },
-    ],
-  },
-  {
-    id: 'solapur',
-    name: 'Solapur Mandi',
-    district: 'Solapur',
-    state: 'Maharashtra',
-    lat: 17.6599,
-    lng: 75.9064,
-    categories: ['Fruits', 'Grains'],
-    crops: ['Grapes', 'Onion'],
-    hours: '6:00 AM – 6:00 PM',
-    opensAt: 6 * 60,
-    closesAt: 18 * 60,
-    demand: 'LOW',
-    establishedYear: 1971,
-    areaAcres: 21,
-    registeredFarmers: 1600,
-    prices: [
-      { crop: 'Grapes', min: 3200, max: 4800, modal: 3950, trend: 'FLAT' },
-      { crop: 'Onion', min: 1100, max: 1650, modal: 1380, trend: 'DOWN' },
-    ],
-  },
-  {
-    id: 'daund',
-    name: 'Daund Mandi',
-    district: 'Pune',
-    state: 'Maharashtra',
-    lat: 18.4646,
-    lng: 74.5815,
-    categories: ['Grains', 'Vegetables'],
-    crops: ['Onion', 'Pulses', 'Jowar'],
-    hours: '6:30 AM – 5:30 PM',
-    opensAt: 390,
-    closesAt: 17 * 60 + 30,
-    demand: 'MEDIUM',
-    establishedYear: 1988,
-    areaAcres: 14,
-    registeredFarmers: 1200,
-    prices: [
-      { crop: 'Onion', min: 1120, max: 1680, modal: 1400, trend: 'FLAT' },
-      { crop: 'Pulses', min: 4800, max: 6400, modal: 5600, trend: 'UP' },
-    ],
-  },
-];
-
 export const CATEGORIES: Array<'All' | Category> = ['All', 'Vegetables', 'Fruits', 'Grains'];
 
+const fromDTO = (m: MandiDTO): Mandi => ({
+  id: m._id,
+  name: m.name,
+  district: m.city,
+  state: m.state,
+  lat: m.location.lat,
+  lng: m.location.lng,
+  categories: [],
+  crops: m.crops ?? [],
+  hours: 'Hours vary — check locally',
+  opensAt: 0,
+  closesAt: 24 * 60, // treat as always open; operator mandis carry no hours
+  demand: 'MEDIUM',
+  prices: [],
+});
+
+// last fetched set, so findMandi() stays synchronous for favourites/labels
+let cache: Mandi[] = [];
+
+/** Active operator mandis near `origin` (or all, when location is unknown). */
+export async function refreshMandis(
+  origin?: { lat: number; lng: number } | null,
+  radiusKm = 150,
+): Promise<Mandi[]> {
+  const dtos = await api.mandis(origin ? { ...origin, radiusKm } : undefined);
+  cache = dtos.map(fromDTO);
+  return cache;
+}
+
 export const findMandi = (id?: string | null): Mandi | undefined =>
-  MANDIS.find((mandi) => mandi.id === id);
+  cache.find((mandi) => mandi.id === id);
 
 // ---------------------------------------------------------------------------
 // geo
@@ -199,7 +90,6 @@ export function distanceFrom(
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h));
 }
 
-/** Rough road time at a rural-highway average — good enough to compare two mandis. */
 const AVERAGE_SPEED_KMPH = 38;
 
 export const travelMinutes = (distanceKm: number): number =>
@@ -225,9 +115,11 @@ export function closingLabel(mandi: Mandi): string {
   return `${display}:${String(minute).padStart(2, '0')} ${suffix}`;
 }
 
-/** The headline rate a discovery card shows — the best modal price on offer. */
-export const topModalPrice = (mandi: Mandi): CommodityPrice =>
-  mandi.prices.reduce((best, price) => (price.modal > best.modal ? price : best), mandi.prices[0]);
+/** Best modal price on offer, or null when the mandi carries no price bands. */
+export const topModalPrice = (mandi: Mandi): CommodityPrice | null =>
+  mandi.prices.length
+    ? mandi.prices.reduce((best, price) => (price.modal > best.modal ? price : best), mandi.prices[0])
+    : null;
 
 export const DEMAND_LABEL: Record<Demand, string> = {
   HIGH: 'High demand',
@@ -239,15 +131,14 @@ export interface RankedMandi extends Mandi {
   distanceKm: number;
   etaMinutes: number;
   favourite: boolean;
-  /** 0–100; distance and demand together, so the top card is a real recommendation */
   score: number;
 }
 
 /**
- * Rank mandis for one farmer. Closeness dominates because transport is the cost
- * being optimised; demand breaks ties. Favourites float to the top of equal scores.
+ * Rank the given mandis for one farmer. Closeness dominates; favourites float up.
  */
 export function rankMandis(
+  mandis: Mandi[],
   origin: { lat: number; lng: number } | null,
   favourites: string[],
   filters: { category?: 'All' | Category; query?: string } = {},
@@ -255,9 +146,8 @@ export function rankMandis(
   const { category = 'All', query = '' } = filters;
   const needle = query.trim().toLowerCase();
 
-  const demandScore: Record<Demand, number> = { HIGH: 30, MEDIUM: 18, LOW: 8 };
-
-  return MANDIS.filter((mandi) => category === 'All' || mandi.categories.includes(category))
+  return mandis
+    .filter((mandi) => category === 'All' || mandi.categories.includes(category))
     .filter(
       (mandi) =>
         !needle ||
@@ -273,7 +163,7 @@ export function rankMandis(
         distanceKm,
         etaMinutes: travelMinutes(distanceKm),
         favourite: favourites.includes(mandi.id),
-        score: Math.round(Math.min(100, proximity + demandScore[mandi.demand])),
+        score: Math.round(Math.min(100, proximity + 18)),
       };
     })
     .sort((a, b) => {

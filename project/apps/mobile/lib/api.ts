@@ -16,10 +16,13 @@ import type {
   TripCapacity,
   TripPricingDTO,
   TripState,
+  MandiDTO,
   UserDTO,
   VehicleDTO,
   VehicleStatus,
   VehicleType,
+  WalletDTO,
+  WithdrawalDTO,
 } from '@kisanpool/shared';
 import { AppError } from './errors';
 import { API_URL as BASE_URL } from './config';
@@ -399,11 +402,32 @@ export const api = {
       }>
     >('/payments/me'),
 
-  payoutOnboarding: (input: { panNumber: string; bankAccountNumber: string; ifsc: string }) =>
-    request<{ payoutStatus: string }>('/transporters/payout-onboarding', {
+  payoutOnboarding: (input: { upiId: string }) =>
+    request<{ payoutStatus: string; upiId?: string }>('/transporters/payout-onboarding', {
       method: 'POST',
       body: input,
     }),
+
+  // ---------- transporter wallet & withdrawals ----------
+
+  wallet: () => request<WalletDTO>('/wallet/me'),
+
+  withdrawals: () =>
+    request<{ withdrawals: WithdrawalDTO[] }>('/wallet/withdrawals'),
+
+  withdraw: (input: { amount: number; upiId: string }) =>
+    request<WithdrawalDTO>('/wallet/withdraw', { method: 'POST', body: input }),
+
+  // ---------- mandis (operator-created) ----------
+
+  mandis: (near?: { lat: number; lng: number; radiusKm?: number }) => {
+    const q = near
+      ? `?lat=${near.lat}&lng=${near.lng}&radiusKm=${near.radiusKm ?? 150}`
+      : '';
+    return request<{ mandis: MandiDTO[] }>(`/mandis${q}`).then((r) => r.mandis);
+  },
+
+  mandi: (id: string) => request<MandiDTO>(`/mandis/${id}`),
 
   payouts: () =>
     request<{
@@ -421,7 +445,7 @@ export const api = {
         quantityKg: number | null;
       }>;
       total: number;
-      account: { payoutStatus: string } | null;
+      account: { payoutStatus: string; upiId?: string } | null;
     }>('/transporters/payouts'),
 
   // ---------- ratings (per shipment) ----------

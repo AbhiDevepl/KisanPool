@@ -13,6 +13,8 @@ import { documentsRouter } from './modules/documents/routes';
 import { transportRouter } from './modules/transport/routes';
 import { poolRouter } from './modules/pooling/routes';
 import { paymentsRouter, transportersRouter, webhookRouter } from './modules/payments/routes';
+import { walletRouter } from './modules/wallet/routes';
+import { mandisRouter, adminMandisRouter } from './modules/mandis/routes';
 import { ratingsRouter } from './modules/ratings/routes';
 import { aiRouter } from './modules/ai/routes';
 import { mapsRouter } from './modules/maps/routes';
@@ -44,6 +46,10 @@ export function createApp() {
   app.use('/shipments', ratingsRouter);
   app.use('/payments', paymentsRouter);
   app.use('/transporters', transportersRouter);
+  app.use('/wallet', walletRouter);
+  app.use('/mandis', mandisRouter);
+  // specific admin sub-route mounted before the catch-all /admin router
+  app.use('/admin/mandis', adminMandisRouter);
   app.use('/ai', aiRouter);
   app.use('/maps', mapsRouter);
   app.use('/admin', adminRouter);

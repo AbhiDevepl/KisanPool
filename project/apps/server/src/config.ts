@@ -58,9 +58,24 @@ export const config = {
     },
   },
 
+  // RazorpayX Payouts — the transporter withdraws their wallet balance to a UPI
+  // ID. Auth reuses the Razorpay key pair; the source account is the X account
+  // number. No keys / no account number -> demo mode (ADR-038).
+  razorpayx: {
+    baseUrl: process.env.RAZORPAYX_BASE_URL ?? 'https://api.razorpay.com/v1',
+    accountNumber: process.env.RAZORPAYX_ACCOUNT_NUMBER ?? '',
+    get enabled(): boolean {
+      return Boolean(
+        config.razorpay.keyId && config.razorpay.keySecret && this.accountNumber,
+      );
+    },
+  },
+
   // Policy values are config, never literals in the payment code (ADR-013).
   cancellationFeePct: num(process.env.PLATFORM_CANCELLATION_FEE_PCT, 5),
   platformFeePct: num(process.env.PLATFORM_FEE_PCT, 10),
+  /** smallest amount a transporter may withdraw from their wallet, in rupees */
+  minWithdrawalRupees: num(process.env.MIN_WITHDRAWAL_RUPEES, 100),
 
   cloudinaryUrl: process.env.CLOUDINARY_URL ?? '',
 

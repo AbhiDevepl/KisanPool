@@ -13,21 +13,14 @@ import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { VEHICLE_TYPES, type VehicleType } from '@kisanpool/shared';
 import { api } from '../../lib/api';
+import { useT } from '../../lib/i18n';
 import { toAppError } from '../../lib/errors';
 import { Button, Chip, Field, Header, Screen, Txt } from '../../components/ui';
 import { colors, space } from '../../theme';
 
-const LABELS: Record<VehicleType, string> = {
-  PICKUP: 'Pickup',
-  TRUCK: 'Truck',
-  TEMPO: 'Tempo',
-  TRACTOR: 'Tractor',
-  MINI_TRUCK: 'Mini truck',
-  OTHER: 'Other',
-};
-
 export default function VehicleRegister() {
   const router = useRouter();
+  const { t } = useT();
   const [name, setName] = useState('');
   const [vehicleType, setVehicleType] = useState<VehicleType>('MINI_TRUCK');
   const [registrationNumber, setRegistrationNumber] = useState('');
@@ -55,7 +48,9 @@ export default function VehicleRegister() {
       // the offer list and the trip roster were all rendering before
       await api.updateMe({
         name: name.trim(),
-        ...(currentLocation ? { defaultLocation: { name: 'My base', ...currentLocation } } : {}),
+        ...(currentLocation
+          ? { defaultLocation: { name: t('vehicle.defaultBase'), ...currentLocation } }
+          : {}),
       });
 
       await api.registerVehicle({
@@ -83,34 +78,34 @@ export default function VehicleRegister() {
     <Screen
       footer={
         <Button
-          label="Continue to documents"
+          label={t('vehicle.continueDocuments')}
           loading={busy}
           disabled={!valid}
           onPress={() => void save()}
         />
       }
     >
-      <Header title="You and your vehicle" subtitle="तुम्ही आणि तुमचे वाहन" />
+      <Header title={t('vehicle.title')} subtitle={t('vehicle.titleNative')} />
 
       <Field
-        label="Your name"
+        label={t('vehicle.nameLabel')}
         value={name}
         onChangeText={setName}
         autoCapitalize="words"
-        placeholder="e.g. Mahesh Jadhav"
+        placeholder={t('vehicle.namePlaceholder')}
       />
       <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ marginBottom: space.md }}>
-        Farmers see this name when they choose who carries their produce.
+        {t('vehicle.nameHelp')}
       </Txt>
 
       <Txt variant="labelLg" color={colors.onSurfaceVariant} style={{ marginBottom: space.sm }}>
-        Vehicle type
+        {t('vehicle.typeLabel')}
       </Txt>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginBottom: space.md }}>
         {VEHICLE_TYPES.map((item) => (
           <Chip
             key={item}
-            label={LABELS[item]}
+            label={t(`vehicle.type.${item}`)}
             selected={vehicleType === item}
             onPress={() => setVehicleType(item)}
           />
@@ -118,31 +113,30 @@ export default function VehicleRegister() {
       </View>
 
       <Field
-        label="Registration number"
+        label={t('vehicle.regLabel')}
         value={registrationNumber}
         onChangeText={setRegistrationNumber}
         autoCapitalize="characters"
-        placeholder="MH12 AB 1234"
+        placeholder={t('vehicle.regPlaceholder')}
       />
       <Field
-        label="Capacity (kg)"
+        label={t('vehicle.capacityLabel')}
         value={capacityKg}
         onChangeText={(text) => setCapacityKg(text.replace(/\D/g, ''))}
         keyboardType="number-pad"
-        placeholder="e.g. 2500"
+        placeholder={t('vehicle.capacityPlaceholder')}
       />
       <Field
-        label="Rate per km (₹)"
+        label={t('vehicle.rateLabel')}
         value={ratePerKm}
         onChangeText={(text) => setRatePerKm(text.replace(/[^0-9.]/g, ''))}
         keyboardType="decimal-pad"
-        placeholder="e.g. 36"
+        placeholder={t('vehicle.ratePlaceholder')}
         error={error}
       />
 
       <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-        Your vehicle stays "Pending verification" until your documents are approved. You will not
-        receive trip requests before that.
+        {t('vehicle.pendingNote')}
       </Txt>
     </Screen>
   );

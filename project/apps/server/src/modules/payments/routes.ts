@@ -12,7 +12,8 @@ import {
   refundPayment,
   verifyPayment,
 } from './service';
-import { razorpay, verifyWebhookSignature } from './razorpay';
+import { verifyWebhookSignature } from './razorpay';
+import { applyPayoutOutcome } from '../wallet/service';
 
 export const paymentsRouter = Router();
 
@@ -102,6 +103,10 @@ paymentsRouter.get(
 
 export const transportersRouter = Router();
 
+/**
+ * Payout onboarding is now just a UPI ID — the transporter's wallet is paid out
+ * to it via RazorpayX. No bank account or IFSC is collected or stored (ADR-038).
+ */
 transportersRouter.post(
   '/payout-onboarding',
   requireAuth,
@@ -109,52 +114,20 @@ transportersRouter.post(
   asyncHandler<AuthedRequest>(async (req, res) => {
     const body = z
       .object({
-        panNumber: z.string().regex(/^[A-Z]{5}\d{4}[A-Z]$/, 'must be a valid PAN'),
-        bankAccountNumber: z.string().min(6).max(20),
-        ifsc: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'must be a valid IFSC'),
-        name: z.string().min(1).optional(),
+        upiId: z
+          .string()
+          .regex(/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/, 'must be a valid UPI ID'),
       })
       .parse(req.body);
-
-    // PAN, account number and IFSC go to Razorpay; we keep only their ids (ADR-007)
-    let razorpayContactId: string | undefined;
-    let razorpayFundAccountId: string | undefined;
-    let razorpayAccountId: string | undefined;
-    let payoutStatus: 'PENDING' | 'ACTIVE' = 'ACTIVE';
-
-    if (razorpay) {
-      try {
-        const contact = await (razorpay as unknown as {
-          customers: { create: (a: unknown) => Promise<{ id: string }> };
-        }).customers.create({
-          name: body.name ?? 'KisanPool Transporter',
-          contact: '',
-          notes: { userId: req.userId },
-        });
-        razorpayContactId = contact.id;
-        razorpayAccountId = contact.id;
-        payoutStatus = 'PENDING';
-      } catch (err) {
-        console.error('[payouts] onboarding failed', err);
-        throw new ApiError(
-          'EXTERNAL_SERVICE_ERROR',
-          'We could not set up your payout account. Please try again.',
-        );
-      }
-    } else {
-      razorpayAccountId = `acc_demo_${req.userId}`;
-    }
 
     const account = await TransporterPayoutAccount.findOneAndUpdate(
       { userId: req.userId },
       {
         userId: req.userId,
-        razorpayContactId,
-        razorpayFundAccountId,
-        razorpayAccountId,
-        payoutStatus,
-        bankAccountLast4: body.bankAccountNumber.slice(-4),
-        ifsc: body.ifsc,
+        upiId: body.upiId,
+        payoutStatus: 'ACTIVE',
+        // a UPI payout needs no linked bank account on our side
+        razorpayAccountId: `acc_upi_${req.userId}`,
       },
       { new: true, upsert: true, setDefaultsOnInsert: true },
     );
@@ -244,6 +217,7 @@ webhookRouter.post(
       payload: {
         payment?: { entity: { id: string; order_id: string } };
         transfer?: { entity: { id: string; status: string } };
+        payout?: { entity: { id: string; status: string } };
       };
     };
 
@@ -272,6 +246,15 @@ webhookRouter.post(
             { transferStatus: event.payload.transfer?.entity.status ?? 'processed' },
           );
         }
+        break;
+      }
+      // RazorpayX wallet withdrawals (ADR-038)
+      case 'payout.processed':
+      case 'payout.failed':
+      case 'payout.reversed':
+      case 'payout.updated': {
+        const payout = event.payload.payout?.entity;
+        if (payout?.id) await applyPayoutOutcome(payout.id, payout.status);
         break;
       }
       default:

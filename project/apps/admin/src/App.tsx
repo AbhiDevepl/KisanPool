@@ -60,9 +60,18 @@ const TABS: Tab[] = [
 
 const GROUPS = ['Operations', 'Network', 'Money', 'Oversight'];
 
+const TAB_IDS = TABS.map((t) => t.id);
+const isTabId = (value: string): value is TabId => (TAB_IDS as string[]).includes(value);
+
+/** The selected tab lives in the URL hash, so a reload / shared link keeps it. */
+const tabFromHash = (): TabId => {
+  const hash = window.location.hash.replace(/^#\/?/, '');
+  return isTabId(hash) ? hash : 'dashboard';
+};
+
 export function App() {
   const [signedIn, setSignedIn] = useState(Boolean(getToken()));
-  const [tab, setTab] = useState<TabId>('dashboard');
+  const [tab, setTab] = useState<TabId>(tabFromHash);
   const [defaultCreds, setDefaultCreds] = useState(false);
   /** counts on the rail, so an operator sees where the trouble is without clicking */
   const [alertCount, setAlertCount] = useState(0);
@@ -86,6 +95,18 @@ export function App() {
     const timer = setInterval(() => void pollAlerts(), 60_000);
     return () => clearInterval(timer);
   }, [signedIn, pollAlerts]);
+
+  // keep the tab in sync with the URL hash (browser back/forward, manual edits)
+  useEffect(() => {
+    const onHashChange = (): void => setTab(tabFromHash());
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  const selectTab = useCallback((id: TabId): void => {
+    window.location.hash = id;
+    setTab(id);
+  }, []);
 
   if (!signedIn) {
     return (
@@ -133,7 +154,7 @@ export function App() {
                 <button
                   key={item.id}
                   className={`nav-item ${tab === item.id ? 'active' : ''}`}
-                  onClick={() => setTab(item.id)}
+                  onClick={() => selectTab(item.id)}
                   aria-current={tab === item.id ? 'page' : undefined}
                 >
                   <span aria-hidden style={{ width: 16, textAlign: 'center' }}>

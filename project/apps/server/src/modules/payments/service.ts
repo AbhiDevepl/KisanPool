@@ -10,6 +10,7 @@ import {
 } from '../../models';
 import { emitPaymentCaptured } from '../realtime';
 import { notifyPaymentCaptured, notifyPayoutSent } from '../notifications/service';
+import { creditEarning } from '../wallet/service';
 import { platformFee, transporterEarning } from '../pooling/pricing';
 import { razorpay, verifyCheckoutSignature } from './razorpay';
 
@@ -162,7 +163,18 @@ export async function markCaptured(paymentId: string): Promise<void> {
   await notifyPaymentCaptured(recipients, String(payment.tripId ?? payment.requestId));
 
   // the driver is paid out of this specific settled load
-  if (payment.tripId) {
+  if (payment.tripId && trip) {
+    // credit their internal wallet — this is the balance they withdraw (ADR-038)
+    try {
+      await creditEarning(
+        String(trip.transporterId),
+        String(payment._id),
+        payment.transporterPayoutAmount,
+      );
+    } catch (err) {
+      console.warn('[payments] wallet credit deferred', err);
+    }
+
     try {
       await payoutForPayment(String(payment._id));
     } catch (err) {

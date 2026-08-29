@@ -4,12 +4,13 @@
  * The vehicle record used to sit on the dashboard as a card among nine others.
  * It belongs here: it is identity and configuration, not an operational status.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Linking, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import type { Language, UserDTO, VehicleDTO } from '@kisanpool/shared';
 import { api } from '../../lib/api';
+import { setLanguage as applyLanguage } from '../../lib/i18n';
 import { clearSession, getUser, setUser as persistUser } from '../../lib/session';
 import { toAppError } from '../../lib/errors';
 import { SUPPORT_PHONE } from '../../lib/support';
@@ -74,9 +75,12 @@ export default function TransporterProfile() {
     }
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // reload every time the tab regains focus
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   /**
    * Drivers who registered before the onboarding step asked for a name have an
@@ -105,10 +109,12 @@ export default function TransporterProfile() {
   const changeLanguage = async (language: Language): Promise<void> => {
     setSaving(true);
     try {
+      // switch the UI first so it works even if the server call fails
+      await applyLanguage(language);
+      setLanguageOpen(false);
       const updated = await api.updateMe({ language });
       await persistUser(updated);
       setUserState(updated);
-      setLanguageOpen(false);
       setToastTone('success');
       setToast('Language updated');
     } catch (err) {
