@@ -97,7 +97,18 @@ export default function Bookings() {
         onRefresh={requests.refresh}
         header={
           <>
-            <AppBar title="My bookings" />
+            <AppBar
+              title="My bookings"
+              right={
+                // machine hires live in their own list — this is produce transport
+                <Button
+                  label="Farm services"
+                  variant="ghost"
+                  icon="agriculture"
+                  onPress={() => router.push('/(farmer)/services/bookings')}
+                />
+              }
+            />
             <View style={{ paddingHorizontal: space.md, paddingBottom: space.sm }}>
               <FilterRow options={filters} value={filter} onChange={setFilter} />
             </View>

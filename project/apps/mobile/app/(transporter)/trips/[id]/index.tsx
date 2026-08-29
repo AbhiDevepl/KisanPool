@@ -247,6 +247,12 @@ export default function SharedTrip() {
   );
   const ledger = ledgerFrom(capacity);
   const overloaded = capacity.loadedKg > capacity.totalKg;
+  /** the return journey's gate, mirrored from the server so the CTA never lies */
+  const allDelivered =
+    route.length > 0 &&
+    route.every((shipment) =>
+      ['DELIVERED', 'PAYMENT_PENDING', 'PAID', 'COMPLETED'].includes(shipment.state),
+    );
 
   return (
     <Screen
@@ -438,6 +444,40 @@ export default function SharedTrip() {
             their own detour, plus a share of the shared run by tonne-kilometres. Take another
             load and this grows.
           </Txt>
+        </Card>
+      ) : null}
+
+      {/*
+        The return journey.
+
+        Offered only once every farmer's load is delivered, which is the same gate
+        the server enforces — a driver should never be invited to think about the
+        way home while produce is still aboard.
+      */}
+      {allDelivered ? (
+        <Card
+          style={{ borderColor: colors.primary, borderWidth: 2 }}
+          onPress={() => router.push(`/(transporter)/trips/${id}/return`)}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+            <MaterialIcons name="u-turn-left" size={26} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Txt variant="headlineMd" color={colors.primary}>
+                Don't drive back empty
+              </Txt>
+              <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                Every load is delivered. There may be goods going your way — carrying one turns
+                the run home into earning.
+              </Txt>
+            </View>
+            <MaterialIcons name="chevron-right" size={22} color={colors.outline} />
+          </View>
+          <Button
+            label="See return loads"
+            icon="u-turn-left"
+            onPress={() => router.push(`/(transporter)/trips/${id}/return`)}
+            style={{ marginTop: space.gutter }}
+          />
         </Card>
       ) : null}
 

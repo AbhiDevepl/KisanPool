@@ -14,6 +14,14 @@ import type {
   TransporterSelectedEvent,
   TripCapacityEvent,
 } from '@kisanpool/shared';
+import type {
+  BackhaulBookedEvent,
+  BackhaulOfferedEvent,
+  BackhaulStateEvent,
+  MachineBookingRequestedEvent,
+  MachineBookingStateEvent,
+  ReturnLegStateEvent,
+} from '@kisanpool/shared';
 import { ApiError, socketError } from '../../lib/envelope';
 import { verifyAccessToken } from '../../lib/jwt';
 import { Trip, TripShipment } from '../../models';
@@ -79,6 +87,52 @@ export function emitTripCapacity(payload: TripCapacityEvent): void {
 export function emitShipmentState(payload: ShipmentStateEvent): void {
   io?.to(tripRoom(payload.tripId)).emit('shipment:state', payload);
   io?.to(requestRoom(payload.requestId)).emit('shipment:state', payload);
+}
+
+// ---- V2: Farm Resource Network ----
+//
+// A machine hire has exactly two parties and no shared room to put them in, so
+// these go to the user rooms every socket already joins on connect. No new room
+// type, no new access check to get wrong.
+
+export function emitMachineBookingRequested(payload: MachineBookingRequestedEvent): void {
+  io?.to(userRoom(payload.providerId)).emit('machine:booking_requested', payload);
+}
+
+/**
+ * A booking moved. Both parties need it, and the caller knows who they are — the
+ * booking row carries providerId and farmerId, so this takes them explicitly
+ * rather than re-reading the database inside an emitter.
+ */
+export function emitMachineBookingState(
+  payload: MachineBookingStateEvent,
+  parties: string[] = [],
+): void {
+  for (const userId of parties) {
+    io?.to(userRoom(userId)).emit('machine:booking_state', payload);
+  }
+}
+
+// ---- V2: Backhaul Network ----
+
+/** Return loads are waiting for this driver. Reaches them wherever they are. */
+export function emitBackhaulOffered(payload: BackhaulOfferedEvent): void {
+  io?.to(userRoom(payload.transporterId)).emit('backhaul:offered', payload);
+}
+
+export function emitBackhaulBooked(payload: BackhaulBookedEvent): void {
+  io?.to(tripRoom(payload.tripId)).emit('backhaul:booked', payload);
+  // the requester is not a party to the trip, so they are reached by user room
+  io?.to(userRoom(payload.requesterId)).emit('backhaul:booked', payload);
+}
+
+export function emitBackhaulState(payload: BackhaulStateEvent, requesterId?: string): void {
+  io?.to(tripRoom(payload.tripId)).emit('backhaul:state', payload);
+  if (requesterId) io?.to(userRoom(requesterId)).emit('backhaul:state', payload);
+}
+
+export function emitReturnLegState(payload: ReturnLegStateEvent): void {
+  io?.to(tripRoom(payload.tripId)).emit('trip:return_leg', payload);
 }
 
 // ---- server -> client emitters (docs/API_CONTRACTS.md §3) ----

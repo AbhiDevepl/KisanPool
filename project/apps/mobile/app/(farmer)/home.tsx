@@ -16,7 +16,7 @@ import { getUser } from '../../lib/session';
 import { getFavourites } from '../../lib/favourites';
 import { useLoader } from '../../lib/useLoader';
 import { REQUEST_COPY, SHIPMENT_COPY, LIVE_SHIPMENT_STATES } from '../../lib/pooling';
-import { kg, rupees, shortDate, timeAgo } from '../../lib/format';
+import { kg, rupees, shortDate } from '../../lib/format';
 import {
   AppBar,
   Button,
@@ -59,11 +59,13 @@ export default function FarmerHome() {
   // the pivotal state: transporters have accepted, but NOTHING is booked until
   // the farmer picks one. This is the most urgent thing Home can show.
   const awaitingConfirmation = rows.filter(
-    (row) => row.offerCount > 0 && row.state === 'TRANSPORTER_INTERESTED',
+    (r) => r.offerCount > 0 && r.state === 'TRANSPORTER_INTERESTED',
   );
+
   const live = rows.filter(
-    (row) => row.shipment && LIVE_SHIPMENT_STATES.includes(row.shipment.state),
+    (r) => r.shipment && LIVE_SHIPMENT_STATES.includes(r.shipment.state),
   );
+
   const recent = rows.slice(0, 4);
 
   const firstName = user?.name?.split(' ')[0] ?? 'there';
@@ -107,148 +109,25 @@ export default function FarmerHome() {
               आजचा दिवस कसा आहे!
             </Txt>
 
-            <View style={{ marginTop: space.md }}>
-              <Txt variant="headlineMd" color={colors.onPrimary}>
-                Need to transport your produce?
-              </Txt>
-              <Txt
-                variant="labelSm"
-                color={colors.onPrimaryContainer}
-                style={{ marginTop: space.xs }}
-              >
-                Share a vehicle with nearby farmers — the more of you aboard, the less each pays.
-              </Txt>
-              <Button
-                label="Transport produce"
-                variant="secondary"
-                onPress={() => router.push('/(farmer)/requests/new')}
-                style={{ marginTop: space.gutter }}
-              />
-            </View>
-          </Card>
-        </View>
-
-        {/* the decision only the farmer can make */}
-        {awaitingConfirmation.map((request) => (
-          <Card
-            key={`await-${request._id}`}
-            style={{ borderColor: colors.tertiaryContainer, borderWidth: 2 }}
-            onPress={() => router.push(`/(farmer)/requests/${request._id}/offers`)}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-              <MaterialIcons name="how-to-reg" size={22} color={colors.tertiary} />
-              <Txt variant="headlineMd" style={{ flex: 1 }}>
-                {request.offerCount} transporter{request.offerCount > 1 ? 's' : ''} accepted
-              </Txt>
-              <StatusBadge status="MATCHED" label="Your choice" />
-            </View>
-            <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: space.xs }}>
-              {request.cropType} · {kg(request.quantityKg)} to {request.destination.name}.{' '}
-              {REQUEST_COPY.TRANSPORTER_INTERESTED.detail}
-            </Txt>
-            <Button
-              label="Compare and confirm"
-              icon="compare-arrows"
-              onPress={() => router.push(`/(farmer)/requests/${request._id}/offers`)}
-              style={{ marginTop: space.gutter }}
-            />
-          </Card>
-        ))}
-
-        {/* active / upcoming trip */}
-        <SectionHeader
-          title="Active / upcoming trip"
-          actionLabel={rows.length > 0 ? 'View all' : undefined}
-          onAction={() => router.push('/(farmer)/bookings')}
-        />
-
-        {requests.loading ? (
-          <SkeletonList count={1} />
-        ) : requests.error ? (
-          <ErrorView error={requests.error} onRetry={requests.refresh} />
-        ) : live.length === 0 ? (
-          <Card raised={false} style={{ alignItems: 'center', paddingVertical: space.lg }}>
-            <IconBadge icon="local-shipping" tone="muted" />
-            <Txt variant="labelLg" style={{ marginTop: space.sm }}>
-              No trip on the road
-            </Txt>
             <Txt
               variant="labelSm"
-              color={colors.onSurfaceVariant}
-              style={{ textAlign: 'center', marginTop: space.xs }}
+              color={colors.onPrimaryContainer}
+              style={{ marginTop: space.md }}
             >
-              When a booking is confirmed you'll be able to track it live from here.
+              KisanPool shares what is already there — a truck with space in it, and a
+              machine standing idle.
             </Txt>
           </Card>
-        ) : (
-          live.map((request) => {
-            const copy = SHIPMENT_COPY[request.shipment!.state];
-            return (
-              <Card
-                key={`live-${request._id}`}
-                onPress={() => router.push(`/(farmer)/trips/${request.shipment!.tripId}`)}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                  <View style={{ flex: 1 }}>
-                    <StatusBadge status={copy.badge} label={copy.label} />
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: space.xs,
-                        marginTop: space.sm,
-                      }}
-                    >
-                      <Txt variant="labelLg" numberOfLines={1} style={{ maxWidth: 110 }}>
-                        {request.pickup.name}
-                      </Txt>
-                      <MaterialIcons name="arrow-right-alt" size={16} color={colors.outline} />
-                      <Txt variant="labelLg" numberOfLines={1} style={{ flex: 1 }}>
-                        {request.destination.name}
-                      </Txt>
-                    </View>
-                    <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-                      {request.cropType} · {kg(request.quantityKg)} ·{' '}
-                      {shortDate(request.preferredDate)}
-                    </Txt>
-                  </View>
-                  <MaterialIcons name="chevron-right" size={22} color={colors.outline} />
-                </View>
-
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginTop: space.gutter,
-                    paddingTop: space.sm,
-                    borderTopWidth: 1,
-                    borderTopColor: colors.surfaceVariant,
-                  }}
-                >
-                  <View>
-                    <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-                      Your share
-                    </Txt>
-                    <Txt variant="labelLg" color={colors.primary}>
-                      {rupees(request.shipment!.finalPrice ?? request.shipment!.allocatedPrice)}
-                    </Txt>
-                  </View>
-                  <Button
-                    label="Track trip"
-                    variant="secondary"
-                    icon="location-on"
-                    onPress={() => router.push(`/(farmer)/trips/${request.shipment!.tripId}`)}
-                  />
-                </View>
-              </Card>
-            );
-          })
-        )}
+        </View>
 
         {/* shortcuts */}
         <SectionHeader title="Quick actions" />
         <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <QuickAction
+            icon="agriculture"
+            label="Hire machinery"
+            onPress={() => router.push('/(farmer)/services')}
+          />
           <QuickAction
             icon="storefront"
             label="Nearby mandis"
@@ -297,32 +176,187 @@ export default function FarmerHome() {
             }
           />
         ) : (
-          recent.map((request) => {
-            const copy = request.shipment
-              ? SHIPMENT_COPY[request.shipment.state]
-              : REQUEST_COPY[request.state];
+          recent.map((r) => {
+            const copy = r.shipment
+              ? SHIPMENT_COPY[r.shipment.state]
+              : REQUEST_COPY[r.state];
             return (
               <Card
-                key={request._id}
+                key={r._id}
                 onPress={() =>
                   router.push(
-                    request.shipment
-                      ? `/(farmer)/trips/${request.shipment.tripId}`
-                      : `/(farmer)/requests/${request._id}/offers`,
+                    r.shipment ? `/(farmer)/trips/${r.shipment.tripId}` : `/(farmer)/requests/${r._id}/offers`,
                   )
                 }
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.gutter }}>
-                  <IconBadge icon="eco" />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                  <IconBadge icon={r.shipment ? 'local-shipping' : 'assignment'} />
                   <View style={{ flex: 1 }}>
-                    <Txt variant="labelLg">
-                      {request.cropType} · {kg(request.quantityKg)}
+                    <Txt variant="labelLg" numberOfLines={1}>
+                      {r.cropType} · {kg(r.quantityKg)}
                     </Txt>
                     <Txt variant="labelSm" color={colors.onSurfaceVariant} numberOfLines={1}>
-                      {request.destination.name} · {timeAgo(request.createdAt)}
+                      {r.destination?.name ?? '—'} · {shortDate(r.preferredDate ?? r.createdAt)}
                     </Txt>
                   </View>
                   <StatusBadge status={copy.badge} label={copy.label} />
+                </View>
+              </Card>
+            );
+          })
+        )}
+
+        {/* big CTA pair — move produce / farm services */}
+        <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.md }}>
+          <Card
+            style={{ flex: 1, borderColor: colors.primary, borderWidth: 2 }}
+            onPress={() => router.push('/(farmer)/requests/new')}
+          >
+            <IconBadge icon="local-shipping" />
+            <Txt variant="labelLg" style={{ marginTop: space.sm }}>
+              Move my produce
+            </Txt>
+            <Txt variant="bilingualSubtext" color={colors.onSurfaceVariant}>
+              माल पाठवा
+            </Txt>
+            <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ marginTop: space.xs }}>
+              Share a vehicle to the mandi — the more farmers aboard, the less each pays.
+            </Txt>
+          </Card>
+
+          <Card
+            style={{ flex: 1, borderColor: colors.tertiaryContainer, borderWidth: 2 }}
+            onPress={() => router.push('/(farmer)/services')}
+          >
+            <IconBadge icon="agriculture" tone="tertiary" />
+            <Txt variant="labelLg" style={{ marginTop: space.sm }}>
+              Farm services
+            </Txt>
+            <Txt variant="bilingualSubtext" color={colors.onSurfaceVariant}>
+              शेती यंत्रे
+            </Txt>
+            <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ marginTop: space.xs }}>
+              Hire a tractor, harvester or rotavator from someone nearby who has one.
+            </Txt>
+          </Card>
+        </View>
+
+        {/* awaiting confirmation — the decision only the farmer can make */}
+        {awaitingConfirmation.length > 0 && (
+          <>
+            <SectionHeader title="Awaiting your confirmation" />
+            {awaitingConfirmation.map((a) => (
+              <Card
+                key={`await-${a._id}`}
+                style={{ borderColor: colors.tertiaryContainer, borderWidth: 2 }}
+                onPress={() => router.push(`/(farmer)/requests/${a._id}/offers`)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                  <MaterialIcons name="how-to-reg" size={22} color={colors.tertiary} />
+                  <Txt variant="headlineMd" style={{ flex: 1 }}>
+                    {a.offerCount} transporter{a.offerCount > 1 ? 's' : ''} accepted
+                  </Txt>
+                  <StatusBadge status="MATCHED" label="Your choice" />
+                </View>
+                <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: space.xs }}>
+                  {a.cropType} · {kg(a.quantityKg)} to {a.destination?.name}.{' '}
+                  {REQUEST_COPY.TRANSPORTER_INTERESTED.detail}
+                </Txt>
+                <Button
+                  label="Compare and confirm"
+                  icon="compare-arrows"
+                  onPress={() => router.push(`/(farmer)/requests/${a._id}/offers`)}
+                  style={{ marginTop: space.gutter }}
+                />
+              </Card>
+            ))}
+          </>
+        )}
+
+        {/* active / upcoming trip */}
+        <SectionHeader
+          title="Active / upcoming trip"
+          actionLabel={rows.length > 0 ? 'View all' : undefined}
+          onAction={() => router.push('/(farmer)/bookings')}
+        />
+
+        {requests.loading ? (
+          <SkeletonList count={1} />
+        ) : requests.error ? (
+          <ErrorView error={requests.error} onRetry={requests.refresh} />
+        ) : live.length === 0 ? (
+          <Card raised={false} style={{ alignItems: 'center', paddingVertical: space.lg }}>
+            <IconBadge icon="local-shipping" tone="muted" />
+            <Txt variant="labelLg" style={{ marginTop: space.sm }}>
+              No trip on the road
+            </Txt>
+            <Txt
+              variant="labelSm"
+              color={colors.onSurfaceVariant}
+              style={{ textAlign: 'center', marginTop: space.xs }}
+            >
+              When a booking is confirmed you'll be able to track it live from here.
+            </Txt>
+          </Card>
+        ) : (
+          live.map((l) => {
+            const copy = SHIPMENT_COPY[l.shipment!.state];
+            return (
+              <Card
+                key={`live-${l._id}`}
+                onPress={() => router.push(`/(farmer)/trips/${l.shipment!.tripId}`)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{ flex: 1 }}>
+                    <StatusBadge status={copy.badge} label={copy.label} />
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: space.xs,
+                        marginTop: space.sm,
+                      }}
+                    >
+                      <Txt variant="labelLg" numberOfLines={1} style={{ maxWidth: 110 }}>
+                        {l.pickup?.name ?? '—'}
+                      </Txt>
+                      <MaterialIcons name="arrow-right-alt" size={16} color={colors.outline} />
+                      <Txt variant="labelLg" numberOfLines={1} style={{ flex: 1 }}>
+                        {l.destination?.name ?? '—'}
+                      </Txt>
+                    </View>
+                    <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                      {l.cropType} · {kg(l.quantityKg)} · {shortDate(l.preferredDate)}
+                    </Txt>
+                  </View>
+                  <MaterialIcons name="chevron-right" size={22} color={colors.outline} />
+                </View>
+
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginTop: space.gutter,
+                    paddingTop: space.sm,
+                    borderTopWidth: 1,
+                    borderTopColor: colors.surfaceVariant,
+                  }}
+                >
+                  <View>
+                    <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                      Your share
+                    </Txt>
+                    <Txt variant="labelLg" color={colors.primary}>
+                      {rupees(l.shipment!.finalPrice ?? l.shipment!.allocatedPrice)}
+                    </Txt>
+                  </View>
+                  <Button
+                    label="Track trip"
+                    variant="secondary"
+                    icon="location-on"
+                    onPress={() => router.push(`/(farmer)/trips/${l.shipment!.tripId}`)}
+                  />
                 </View>
               </Card>
             );

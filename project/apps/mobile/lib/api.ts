@@ -1,10 +1,24 @@
 import type {
   ApiResponse,
+  BackhaulBookingDTO,
+  BackhaulMatchDTO,
+  BackhaulRequestDTO,
+  BookingOperatorMode,
+  CargoCategory,
+  CargoRule,
   ChatMessageDTO,
+  DemandClusterDTO,
   DocumentDTO,
+  FarmMachineDTO,
   GeoPoint,
   Language,
+  MachineBookingDTO,
+  MachineBookingState,
+  MachineCategory,
+  MachineQuoteDTO,
   OfferState,
+  OperatorMode,
+  PricingUnit,
   PaymentDTO,
   PricingEventDTO,
   RatingDTO,
@@ -16,6 +30,8 @@ import type {
   TripCapacity,
   TripPricingDTO,
   TripState,
+  TripUtilisationDTO,
+  ReturnLegState,
   UserDTO,
   VehicleDTO,
   VehicleStatus,
@@ -91,7 +107,33 @@ export type {
   TransporterOfferDTO,
   TripCapacity,
   TripPricingDTO,
+  // V2
+  BackhaulBookingDTO,
+  BackhaulMatchDTO,
+  BackhaulRequestDTO,
+  BookingOperatorMode,
+  CargoCategory,
+  CargoRule,
+  DemandClusterDTO,
+  FarmMachineDTO,
+  MachineBookingDTO,
+  MachineBookingState,
+  MachineCategory,
+  MachineQuoteDTO,
+  OperatorMode,
+  PricingUnit,
+  ReturnLegState,
+  TripUtilisationDTO,
 };
+
+/** A machine as discovery returns it — the stored record plus this job's numbers. */
+export interface MachineSearchResult extends FarmMachineDTO {
+  distanceKm: number;
+  availableForWindow: boolean;
+  completedJobs: number;
+  /** priced for the window and area the farmer searched with; null if they gave none */
+  quote: MachineQuoteDTO | null;
+}
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
@@ -460,6 +502,219 @@ export const api = {
       method: 'POST',
       body: { message, sessionId, language },
     }),
+
+  // ==========================================================================
+  // V2 · Farm Resource Network
+  // ==========================================================================
+
+  /** Machines that could actually do THIS job — priced for the window and area. */
+  findMachines: (query: {
+    lat: number;
+    lng: number;
+    category?: MachineCategory;
+    start?: string;
+    end?: string;
+    operatorMode?: BookingOperatorMode;
+    areaAcres?: number;
+  }) => {
+    const params = new URLSearchParams({ lat: String(query.lat), lng: String(query.lng) });
+    if (query.category) params.set('category', query.category);
+    if (query.start) params.set('start', query.start);
+    if (query.end) params.set('end', query.end);
+    if (query.operatorMode) params.set('operatorMode', query.operatorMode);
+    if (query.areaAcres) params.set('areaAcres', String(query.areaAcres));
+    return request<MachineSearchResult[]>(`/farm/machines?${params.toString()}`);
+  },
+
+  getMachine: (id: string) =>
+    request<
+      FarmMachineDTO & {
+        completedJobs: number;
+        schedule: {
+          busy: Array<{ bookingId: string; start: string; end: string; state: string }>;
+          blackouts: Array<{ start: string; end: string; reason?: string }>;
+        };
+      }
+    >(`/farm/machines/${id}`),
+
+  /** Nearby farmers wanting the same machine the same week. */
+  machineDemand: (lat: number, lng: number, radiusKm = 40) =>
+    request<DemandClusterDTO[]>(`/farm/demand?lat=${lat}&lng=${lng}&radiusKm=${radiusKm}`),
+
+  // ---- the provider's side; any user may own a machine ----
+
+  myMachines: () =>
+    request<Array<FarmMachineDTO & { completedJobs: number; upcoming: number }>>(
+      '/farm/machines/mine',
+    ),
+
+  listMachine: (machine: {
+    category: MachineCategory;
+    title: string;
+    makeModel?: string;
+    operatorMode: OperatorMode;
+    attachments?: string[];
+    baseLocation: GeoPoint;
+    serviceRadiusKm: number;
+    pricing: {
+      unit: PricingUnit;
+      rate: number;
+      minimumCharge: number;
+      travelRatePerKm: number;
+    };
+  }) => request<FarmMachineDTO>('/farm/machines', { method: 'POST', body: machine }),
+
+  updateMachine: (id: string, updates: Record<string, unknown>) =>
+    request<FarmMachineDTO>(`/farm/machines/${id}`, { method: 'PATCH', body: updates }),
+
+  addBlackout: (id: string, blackout: { start: string; end: string; reason?: string }) =>
+    request<FarmMachineDTO>(`/farm/machines/${id}/blackouts`, { method: 'POST', body: blackout }),
+
+  // ---- bookings, both sides ----
+
+  bookMachine: (input: {
+    machineId: string;
+    start: string;
+    end: string;
+    location: GeoPoint;
+    operatorMode: BookingOperatorMode;
+    workType?: string;
+    areaAcres?: number;
+    notes?: string;
+  }) => request<MachineBookingDTO>('/farm/bookings', { method: 'POST', body: input }),
+
+  /** `role` picks the side: what I hired, or what I was asked to provide. */
+  machineBookings: (role: 'farmer' | 'provider' = 'farmer') =>
+    request<MachineBookingDTO[]>(`/farm/bookings/mine?role=${role}`),
+
+  setMachineBookingState: (id: string, state: MachineBookingState, extra?: { otp?: string; reason?: string }) =>
+    request<MachineBookingDTO>(`/farm/bookings/${id}/state`, {
+      method: 'PATCH',
+      body: { state, ...extra },
+    }),
+
+  machineEarnings: () =>
+    request<{
+      jobs: Array<{
+        bookingId: string;
+        machineId: string;
+        machineTitle: string;
+        category: MachineCategory;
+        completedAt?: string;
+        amount: number;
+        earning: number;
+        paid: boolean;
+      }>;
+      total: number;
+      settled: number;
+      machineCount: number;
+    }>('/farm/earnings'),
+
+  // ==========================================================================
+  // V2 · Backhaul Network
+  // ==========================================================================
+
+  /** What may be carried on what — configuration the server enforces. */
+  cargoCategories: () =>
+    request<Array<CargoRule & { key: CargoCategory }>>('/backhaul/cargo-categories'),
+
+  postReturnLoad: (input: {
+    cargoCategory: CargoCategory;
+    description: string;
+    weightKg: number;
+    pickup: GeoPoint;
+    destination: GeoPoint;
+    readyFrom: string;
+    readyUntil: string;
+    offeredPrice?: number;
+    notes?: string;
+  }) => request<BackhaulRequestDTO>('/backhaul/requests', { method: 'POST', body: input }),
+
+  myReturnLoads: () =>
+    request<
+      Array<
+        BackhaulRequestDTO & {
+          booking: {
+            _id: string;
+            tripId: string;
+            state: string;
+            price: number;
+            pickupOtp: string;
+            transporter: { _id: string; name: string; phone?: string; ratingAvg: number } | null;
+          } | null;
+        }
+      >
+    >('/backhaul/requests/mine'),
+
+  cancelReturnLoad: (id: string) =>
+    request<{ request: BackhaulRequestDTO }>(`/backhaul/requests/${id}/cancel`, {
+      method: 'POST',
+      body: {},
+    }),
+
+  // ---- the driver's side ----
+
+  openReturnLeg: (tripId: string) =>
+    request<{ trip: TripSummary; capacity: { totalKg: number; bookedKg: number; availableKg: number } }>(
+      `/backhaul/trips/${tripId}/return-leg/open`,
+      { method: 'POST', body: {} },
+    ),
+
+  returnLoads: (tripId: string) =>
+    request<{
+      open: boolean;
+      capacity: { totalKg: number; bookedKg: number; availableKg: number } | null;
+      leg: {
+        from: GeoPoint;
+        to: GeoPoint;
+        emptyReturnKm: number;
+        state: ReturnLegState;
+      } | null;
+      matches: BackhaulMatchDTO[];
+    }>(`/backhaul/trips/${tripId}/return-loads`),
+
+  acceptReturnLoad: (tripId: string, requestId: string) =>
+    request<{
+      booking: BackhaulBookingDTO;
+      quote: {
+        detourKm: number;
+        carryKm: number;
+        detourCost: number;
+        carriageCost: number;
+        price: number;
+        transporterEarning: number;
+        platformFee: number;
+        addedMinutes: number;
+        utilisationPct: number;
+        emptyKmRecovered: number;
+      };
+      capacity: { totalKg: number; bookedKg: number; availableKg: number };
+    }>(`/backhaul/trips/${tripId}/return-loads/${requestId}/accept`, { method: 'POST', body: {} }),
+
+  returnLeg: (tripId: string) =>
+    request<{
+      returnLeg: {
+        state: ReturnLegState;
+        origin?: GeoPoint;
+        emptyReturnKm: number;
+        routeKm: number;
+      } | null;
+      capacity: { totalKg: number; bookedKg: number; availableKg: number };
+      utilisation: TripUtilisationDTO | null;
+      bookings: BackhaulBookingDTO[];
+    }>(`/backhaul/trips/${tripId}/return-leg`),
+
+  setReturnLoadState: (bookingId: string, state: string, otp?: string) =>
+    request<{ booking: BackhaulBookingDTO; utilisation: TripUtilisationDTO | null }>(
+      `/backhaul/bookings/${bookingId}/state`,
+      { method: 'PATCH', body: { state, otp } },
+    ),
+
+  setReturnLegState: (tripId: string, state: ReturnLegState) =>
+    request<{ trip: TripSummary; utilisation: TripUtilisationDTO | null }>(
+      `/backhaul/trips/${tripId}/return-leg/state`,
+      { method: 'PATCH', body: { state } },
+    ),
 };
 
 export { BASE_URL };

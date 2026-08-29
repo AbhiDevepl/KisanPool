@@ -44,13 +44,27 @@ export function TripMap({
       }
     : undefined;
 
+  /**
+   * The camera refits when the POINTS change, not when how many of them there are
+   * changes.
+   *
+   * Keying the effect on `points.length` looked equivalent and was not: switching
+   * the mandi filter from one category to another with the same number of markers
+   * — Fruits and Grains both have three — left the length identical, so the effect
+   * never re-ran and the map stayed framed on the markets the farmer had just
+   * filtered away. The pins themselves redrew, which made it look like stale
+   * markers were stuck on the map.
+   */
+  const pointsKey = points.map((p) => `${p.lat},${p.lng}`).join('|');
+
   useEffect(() => {
     if (points.length < 2) return;
     mapRef.current?.fitToCoordinates(
       points.map((p) => ({ latitude: p.lat, longitude: p.lng })),
       { edgePadding: { top: 60, right: 60, bottom: 60, left: 60 }, animated: true },
     );
-  }, [points.length, vehicle?.lat, vehicle?.lng]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pointsKey IS the geometry
+  }, [pointsKey]);
 
   if (!region) {
     return (

@@ -1,5 +1,5 @@
 import { Schema, model, type InferSchemaType, type HydratedDocument } from 'mongoose';
-import { TRIP_STATES } from '@kisanpool/shared';
+import { RETURN_LEG_STATES, TRIP_STATES } from '@kisanpool/shared';
 
 /**
  * A shared vehicle journey to one mandi, carrying many farmers' produce.
@@ -61,6 +61,42 @@ const tripSchema = new Schema(
     completedAt: { type: Date, default: undefined },
     cancelledAt: { type: Date, default: undefined },
     cancelReason: { type: String, default: undefined },
+
+    /**
+     * The homeward half of the same journey (V2, ADR-039).
+     *
+     * A leg on this trip, NOT a second Trip. The vehicle is on one journey, and a
+     * separate Trip would have collided with the `openForVehicle` unique index
+     * from ADR-032 — correctly, because the vehicle genuinely is not free.
+     *
+     * Defaults to state NONE and is only opened once every outbound shipment has
+     * been delivered, which is the mechanism that stops a return load ever
+     * competing with a farmer's produce for space or for the driver's attention.
+     */
+    returnLeg: {
+      type: new Schema(
+        {
+          state: { type: String, enum: RETURN_LEG_STATES, default: 'NONE' },
+          /** where home is: where the vehicle started the outbound run */
+          origin: {
+            type: new Schema(
+              { name: { type: String, default: '' }, lat: Number, lng: Number },
+              { _id: false },
+            ),
+            default: undefined,
+          },
+          /** straight-line-ish distance of the empty run this leg is recovering */
+          emptyReturnKm: { type: Number, default: 0 },
+          /** the actual homeward route once loads are aboard */
+          routeKm: { type: Number, default: 0 },
+          openedAt: { type: Date, default: undefined },
+          startedAt: { type: Date, default: undefined },
+          completedAt: { type: Date, default: undefined },
+        },
+        { _id: false },
+      ),
+      default: () => ({ state: 'NONE' }),
+    },
   },
   { timestamps: true },
 );

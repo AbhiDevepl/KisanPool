@@ -12,6 +12,13 @@ export { TripShipment } from './TripShipment';
 export { TransporterOffer } from './TransporterOffer';
 export { PricingEvent } from './PricingEvent';
 
+// V2 — Farm Resource Network
+export { FarmMachine } from './FarmMachine';
+export { MachineBooking } from './MachineBooking';
+// V2 — Backhaul Network
+export { BackhaulRequest } from './BackhaulRequest';
+export { BackhaulBooking } from './BackhaulBooking';
+
 export type { UserDoc } from './User';
 export type { VehicleDoc } from './Vehicle';
 export type { KycDocumentDoc } from './Document';
@@ -25,3 +32,8 @@ export type { TripDoc } from './Trip';
 export type { TripShipmentDoc } from './TripShipment';
 export type { TransporterOfferDoc } from './TransporterOffer';
 export type { PricingEventDoc } from './PricingEvent';
+
+export type { FarmMachineDoc } from './FarmMachine';
+export type { MachineBookingDoc } from './MachineBooking';
+export type { BackhaulRequestDoc } from './BackhaulRequest';
+export type { BackhaulBookingDoc } from './BackhaulBooking';

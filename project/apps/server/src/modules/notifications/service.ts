@@ -98,3 +98,51 @@ export async function notifyPayoutSent(transporterId: string, amount: number): P
     route: '/(transporter)/payouts',
   });
 }
+
+// ---------------------------------------------------------------------------
+// V2 — Farm Resource Network
+// ---------------------------------------------------------------------------
+
+/**
+ * Something happened to a machine hire. One helper for both directions: the
+ * provider hears about a request, the farmer hears about the answer, and the
+ * caller decides which of the two is the recipient.
+ */
+export async function notifyMachineBooking(
+  userId: string,
+  bookingId: string,
+  headline: string,
+): Promise<void> {
+  await push([userId], headline, 'Open Farm Services to see the details.', {
+    route: `/(farmer)/services/bookings?id=${bookingId}`,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// V2 — Backhaul Network
+// ---------------------------------------------------------------------------
+
+/** Return loads are waiting for a driver who has just finished delivering. */
+export async function notifyBackhaulAvailable(
+  transporterId: string,
+  tripId: string,
+  count: number,
+): Promise<void> {
+  await push(
+    [transporterId],
+    `${count} return load${count === 1 ? '' : 's'} on your way home`,
+    'You are driving back anyway — one of these could pay for the return.',
+    { route: `/(transporter)/trips/${tripId}/return` },
+  );
+}
+
+/** The requester's goods have been taken by a driver heading their way. */
+export async function notifyBackhaulBooked(
+  requesterId: string,
+  bookingId: string,
+  who: string,
+): Promise<void> {
+  await push([requesterId], 'Your return load is booked', `${who} will carry it.`, {
+    route: `/(farmer)/backhaul/${bookingId}`,
+  });
+}

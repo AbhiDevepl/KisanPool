@@ -12,6 +12,9 @@ import { vehiclesRouter } from './modules/vehicles/routes';
 import { documentsRouter } from './modules/documents/routes';
 import { transportRouter } from './modules/transport/routes';
 import { poolRouter } from './modules/pooling/routes';
+// V2 — the two networks added on top of produce pooling
+import { machineryRouter } from './modules/machinery/routes';
+import { backhaulRouter } from './modules/backhaul/routes';
 import { paymentsRouter, transportersRouter, webhookRouter } from './modules/payments/routes';
 import { ratingsRouter } from './modules/ratings/routes';
 import { aiRouter } from './modules/ai/routes';
@@ -41,6 +44,10 @@ export function createApp() {
   app.use('/documents', documentsRouter);
   app.use('/transport', transportRouter);
   app.use('/pool', poolRouter);
+  // V2: Farm Resource Network and Backhaul Network, mounted alongside — never
+  // inside — the produce-pooling routes, so V1 paths are untouched
+  app.use('/farm', machineryRouter);
+  app.use('/backhaul', backhaulRouter);
   app.use('/shipments', ratingsRouter);
   app.use('/payments', paymentsRouter);
   app.use('/transporters', transportersRouter);

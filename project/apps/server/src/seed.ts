@@ -10,7 +10,11 @@
  */
 import { connectDb, disconnectDb } from './db';
 import {
+  BackhaulBooking,
+  BackhaulRequest,
+  FarmMachine,
   KycDocument,
+  MachineBooking,
   Payment,
   PricingEvent,
   Rating,
@@ -82,6 +86,11 @@ async function main(): Promise<void> {
       Payment.deleteMany({ farmerId: { $in: ids } }),
       TransporterPayoutAccount.deleteMany({ userId: { $in: ids } }),
       Rating.deleteMany({ $or: [{ fromUserId: { $in: ids } }, { toUserId: { $in: ids } }] }),
+      // V2 — the two new networks
+      FarmMachine.deleteMany({ ownerId: { $in: ids } }),
+      MachineBooking.deleteMany({ $or: [{ providerId: { $in: ids } }, { farmerId: { $in: ids } }] }),
+      BackhaulRequest.deleteMany({ requesterId: { $in: ids } }),
+      BackhaulBooking.deleteMany({ $or: [{ requesterId: { $in: ids } }, { transporterId: { $in: ids } }] }),
       User.deleteMany(demoPhones),
     ]);
     console.log('[seed] demo (9000*) and test (9100*) accounts cleared');
@@ -271,6 +280,225 @@ async function main(): Promise<void> {
     });
   }
 
+  // =========================================================================
+  // V2 — Farm Resource Network
+  //
+  // Deliberately mixed supply. Two of the three providers are FARMERS who already
+  // exist in this seed, because that is the product story: the tractor that works
+  // twenty days a year belongs to a farmer, not to a hire company. The third is a
+  // custom-hiring centre, which is how a combine harvester is actually reached.
+  // =========================================================================
+
+  const hiringCentre = await upsertUser('9000000008', {
+    name: 'Krishi Seva Kendra',
+    role: 'FARMER',
+    language: 'mr',
+    defaultLocation: { name: 'Manchar', lat: 19.0038, lng: 73.9403 },
+  });
+
+  const MACHINES = [
+    {
+      owner: farmer, // Rahul's own tractor — idle most of the year
+      category: 'TRACTOR_TROLLEY' as const,
+      title: 'Mahindra 575 with trolley',
+      makeModel: 'Mahindra 575 DI',
+      operatorMode: 'WITH_OPERATOR' as const,
+      attachments: ['Trolley', 'Cage wheels'],
+      base: { name: 'Pimpri, Pune', ...PUNE },
+      radius: 30,
+      pricing: { unit: 'PER_HOUR' as const, rate: 650, minimumCharge: 1300, travelRatePerKm: 18 },
+    },
+    {
+      owner: farmer3, // Sanjay hires his rotavator out between his own seasons
+      category: 'ROTAVATOR' as const,
+      title: 'Rotavator — 7 feet',
+      makeModel: 'Shaktiman 7ft',
+      operatorMode: 'WITH_OPERATOR' as const,
+      attachments: [],
+      base: { name: 'Hinjewadi, Pune', lat: 18.5913, lng: 73.7389 },
+      radius: 22,
+      pricing: { unit: 'PER_ACRE' as const, rate: 1100, minimumCharge: 2200, travelRatePerKm: 15 },
+    },
+    {
+      owner: hiringCentre,
+      category: 'COMBINE_HARVESTER' as const,
+      title: 'Combine harvester — wheat & soybean',
+      makeModel: 'John Deere W70',
+      operatorMode: 'WITH_OPERATOR' as const,
+      attachments: ['Grain tank', 'Straw spreader'],
+      base: { name: 'Manchar', lat: 19.0038, lng: 73.9403 },
+      radius: 60,
+      pricing: { unit: 'PER_ACRE' as const, rate: 2400, minimumCharge: 4800, travelRatePerKm: 40 },
+    },
+    {
+      owner: hiringCentre,
+      category: 'TRACTOR_TROLLEY' as const,
+      title: 'Swaraj 744 with trolley',
+      makeModel: 'Swaraj 744 FE',
+      operatorMode: 'EITHER' as const,
+      attachments: ['Trolley'],
+      base: { name: 'Manchar', lat: 19.0038, lng: 73.9403 },
+      radius: 45,
+      pricing: { unit: 'PER_HOUR' as const, rate: 700, minimumCharge: 1400, travelRatePerKm: 22 },
+    },
+    {
+      owner: hiringCentre,
+      category: 'THRESHER' as const,
+      title: 'Multi-crop thresher',
+      operatorMode: 'WITH_OPERATOR' as const,
+      attachments: [],
+      base: { name: 'Manchar', lat: 19.0038, lng: 73.9403 },
+      radius: 35,
+      pricing: { unit: 'PER_DAY' as const, rate: 5200, minimumCharge: 5200, travelRatePerKm: 25 },
+    },
+  ];
+
+  for (const m of MACHINES) {
+    await FarmMachine.findOneAndUpdate(
+      { ownerId: m.owner._id, title: m.title },
+      {
+        ownerId: m.owner._id,
+        category: m.category,
+        title: m.title,
+        makeModel: m.makeModel,
+        operatorMode: m.operatorMode,
+        attachments: m.attachments,
+        baseLocation: m.base,
+        serviceRadiusKm: m.radius,
+        pricing: m.pricing,
+        status: 'LISTED',
+      },
+      { upsert: true, setDefaultsOnInsert: true },
+    );
+  }
+
+  /*
+   * SCENARIO B — several farmers wanting a harvester in the same week.
+   *
+   * These are real REQUESTED bookings, so they do two jobs at once: they populate
+   * the provider's inbox, and they are what `demandClusters` counts. Without them
+   * the aggregation endpoint returns an honest empty array and the feature cannot
+   * be demonstrated.
+   */
+  const harvester = await FarmMachine.findOne({ category: 'COMBINE_HARVESTER' });
+  if (harvester) {
+    const day = 86_400_000;
+    const cluster = [
+      { who: farmer2, acres: 4, inDays: 3, place: 'Chinchwad, Pune', lat: 18.6298, lng: 73.7997 },
+      { who: farmer3, acres: 6, inDays: 4, place: 'Hinjewadi, Pune', lat: 18.5913, lng: 73.7389 },
+    ];
+
+    for (const c of cluster) {
+      const exists = await MachineBooking.findOne({ machineId: harvester._id, farmerId: c.who._id });
+      if (exists) continue;
+
+      const start = new Date(Date.now() + c.inDays * day);
+      start.setHours(7, 0, 0, 0);
+      const end = new Date(start.getTime() + 6 * 3_600_000);
+
+      // priced by the same engine the API uses — a seed must never invent money
+      const travelKm = 30;
+      const workCost = c.acres * harvester.pricing.rate;
+      const travelCost = travelKm * 2 * harvester.pricing.travelRatePerKm;
+      const total = Math.max(workCost + travelCost, harvester.pricing.minimumCharge);
+
+      await MachineBooking.create({
+        machineId: harvester._id,
+        providerId: harvester.ownerId,
+        farmerId: c.who._id,
+        category: harvester.category,
+        operatorMode: 'WITH_OPERATOR',
+        window: { start, end },
+        location: { name: c.place, lat: c.lat, lng: c.lng },
+        workType: 'Wheat harvesting',
+        areaAcres: c.acres,
+        state: 'REQUESTED',
+        quote: {
+          unit: harvester.pricing.unit,
+          rate: harvester.pricing.rate,
+          billableUnits: c.acres,
+          workCost,
+          travelKm,
+          travelCost,
+          minimumTopUp: Math.max(0, harvester.pricing.minimumCharge - (workCost + travelCost)),
+          total,
+          platformFee: Math.round(total * 0.1 * 100) / 100,
+          providerEarning: Math.round(total * 0.9 * 100) / 100,
+        },
+        startOtp: String(1000 + Math.floor(Math.random() * 9000)),
+      });
+    }
+  }
+
+  // =========================================================================
+  // V2 — Backhaul Network
+  //
+  // SCENARIO C. Every one of these starts AT or near Lasalgaon and ends back
+  // toward Pune, which is precisely the empty leg a truck drives after dropping
+  // produce at the mandi. Categories are mixed on purpose so the eligibility
+  // rules have something to actually reject: a TRACTOR can take the empty crates
+  // and none of the rest.
+  // =========================================================================
+
+  const RETURN_LOADS = [
+    {
+      requester: hiringCentre,
+      cargoCategory: 'GROCERY_RETAIL' as const,
+      description: 'Kirana shop restock — rice, oil, pulses',
+      weightKg: 900,
+      pickup: { name: 'Lasalgaon Market', lat: 20.1465, lng: 74.2405 },
+      destination: { name: 'Manchar', lat: 19.0038, lng: 73.9403 },
+      hours: 8,
+    },
+    {
+      requester: farmer2,
+      cargoCategory: 'EMPTY_CRATES' as const,
+      description: 'Empty onion crates going back to the village',
+      weightKg: 300,
+      pickup: { ...LASALGAON },
+      destination: { name: 'Chinchwad, Pune', lat: 18.6298, lng: 73.7997 },
+      hours: 10,
+    },
+    {
+      requester: farmer3,
+      cargoCategory: 'AGRI_INPUTS' as const,
+      description: 'Seed and packaged soil inputs from the agri store',
+      weightKg: 1400,
+      pickup: { name: 'Niphad', lat: 20.0806, lng: 74.1097 },
+      destination: { name: 'Hinjewadi, Pune', lat: 18.5913, lng: 73.7389 },
+      hours: 12,
+    },
+    {
+      requester: hiringCentre,
+      cargoCategory: 'ANIMAL_FEED' as const,
+      description: 'Cattle feed sacks for the dairy co-operative',
+      weightKg: 2200,
+      pickup: { name: 'Lasalgaon', lat: 20.1502, lng: 74.2321 },
+      destination: { name: 'Narayangaon', lat: 19.0742, lng: 73.9375 },
+      hours: 9,
+    },
+  ];
+
+  for (const load of RETURN_LOADS) {
+    const exists = await BackhaulRequest.findOne({
+      requesterId: load.requester._id,
+      description: load.description,
+    });
+    if (exists) continue;
+
+    await BackhaulRequest.create({
+      requesterId: load.requester._id,
+      cargoCategory: load.cargoCategory,
+      description: load.description,
+      weightKg: load.weightKg,
+      pickup: load.pickup,
+      destination: load.destination,
+      readyFrom: new Date(Date.now() - 3_600_000),
+      readyUntil: new Date(Date.now() + load.hours * 3_600_000),
+      state: 'OPEN',
+    });
+  }
+
   console.log(`
 Seeded${RESET ? ' (after reset)' : ' (nothing deleted)'}.
 
@@ -282,6 +510,18 @@ Seeded${RESET ? ' (after reset)' : ' (nothing deleted)'}.
 
   3 open requests to Lasalgaon Mandi are waiting in the pool — enough for one
   4-tonne truck to claim all three and show pooled pricing.
+
+  V2 · Farm Resource Network
+  Providers     9000000001 Rahul Patil        (his own tractor + trolley)
+                9000000007 Sanjay Deshmukh    (rotavator)
+                9000000008 Krishi Seva Kendra (harvester, tractor, thresher)
+  5 machines listed. 2 farmers already want the harvester the same week, so the
+  demand-cluster endpoint has a real cluster to report.
+
+  V2 · Backhaul Network
+  4 open return loads from around Lasalgaon back toward Pune — grocery, empty
+  crates, agri inputs and cattle feed. Only the crates are eligible for a tractor,
+  so the cargo rules have something to refuse.
 
 OTP codes print to the server console in demo mode.
 `);

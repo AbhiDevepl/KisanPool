@@ -24,6 +24,16 @@ npm run seed --silent -- --reset
 python3 tests/06_pooled_pricing.py
 
 echo
+echo "########## 3. farm machinery: availability, slot race, unit pricing, utilisation ##########"
+npm run seed --silent -- --reset
+python3 tests/07_farm_machinery.py
+
+echo
+echo "########## 4. backhaul: cargo rules, return-leg matching, capacity, round-trip economics ##########"
+npm run seed --silent -- --reset
+python3 tests/08_backhaul.py
+
+echo
 echo "########## STALE (pre-pooling API) — see note above ##########"
 echo "########## 1b. core flow: auth, KYC gate, matching, payment, booking ##########"
 python3 tests/01_core_flow.py || echo "  (STALE SUITE — targets the pre-pooling API, see note above)"

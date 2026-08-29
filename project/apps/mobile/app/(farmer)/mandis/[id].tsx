@@ -22,6 +22,7 @@ import {
   findMandi,
   isOpenNow,
   travelMinutes,
+  type Demand,
   type Trend,
 } from '../../../lib/mandis';
 import {
@@ -50,11 +51,29 @@ const TREND_COLOR: Record<Trend, string> = {
   DOWN: '#ba1a1a',
 };
 
-const VALUE_PROPS = [
-  { icon: 'trending-up' as const, label: 'High\ndemand' },
-  { icon: 'verified-user' as const, label: 'Good\nprices' },
+/**
+ * "Why this mandi?" — the demand tile has to tell the truth.
+ *
+ * These four were hardcoded, so every market claimed "High demand" including
+ * Solapur, which this app's own data marks LOW and whose card two screens back
+ * says so. A farmer choosing where to send a lorry-load should not be told two
+ * different things by the same app.
+ *
+ * The other three are genuine properties of an APMC yard rather than claims about
+ * one market, so they stay as they are.
+ */
+const demandProp = (
+  demand: Demand,
+): { icon: keyof typeof MaterialIcons.glyphMap; label: string } => {
+  if (demand === 'HIGH') return { icon: 'trending-up', label: 'High\ndemand' };
+  if (demand === 'LOW') return { icon: 'trending-down', label: 'Quieter\nmarket' };
+  return { icon: 'trending-flat', label: 'Steady\ndemand' };
+};
+
+const STANDING_PROPS = [
+  { icon: 'verified-user' as const, label: 'Regulated\nAPMC' },
   { icon: 'payments' as const, label: 'Regular\npayments' },
-  { icon: 'groups' as const, label: 'More\nbuyers' },
+  { icon: 'groups' as const, label: 'Licensed\nbuyers' },
 ];
 
 export default function MandiDetails() {
@@ -67,12 +86,19 @@ export default function MandiDetails() {
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
-    void getUser().then((user) => {
-      if (user?.defaultLocation) {
-        setOrigin({ lat: user.defaultLocation.lat, lng: user.defaultLocation.lng });
+    void (async () => {
+      try {
+        const [user, ids] = await Promise.all([getUser(), getFavourites()]);
+        setOrigin(
+          user?.defaultLocation
+            ? { lat: user.defaultLocation.lat, lng: user.defaultLocation.lng }
+            : null,
+        );
+        setFavourite(ids.includes(id));
+      } catch {
+        // local storage only — the screen renders fine without either
       }
-    });
-    void getFavourites().then((ids) => setFavourite(ids.includes(id)));
+    })();
   }, [id]);
 
   const star = useCallback(async () => {
@@ -248,7 +274,7 @@ export default function MandiDetails() {
           Why this mandi?
         </Txt>
         <View style={{ flexDirection: 'row', gap: space.sm }}>
-          {VALUE_PROPS.map((prop) => (
+          {[demandProp(mandi.demand), ...STANDING_PROPS].map((prop) => (
             <View key={prop.label} style={s.prop}>
               <View style={s.propIcon}>
                 <MaterialIcons name={prop.icon} size={20} color={colors.primary} />

@@ -10,7 +10,7 @@
  * and the vehicle's rate; these bands are market guidance for choosing a mandi.
  */
 
-export type Category = 'Vegetables' | 'Fruits' | 'Grains';
+export type Category = 'Vegetables' | 'Fruits' | 'Grains' | 'Flowers';
 export type Demand = 'HIGH' | 'MEDIUM' | 'LOW';
 export type Trend = 'UP' | 'FLAT' | 'DOWN';
 
@@ -73,8 +73,10 @@ export const MANDIS: Mandi[] = [
     state: 'Maharashtra',
     lat: 18.4805,
     lng: 73.8683,
-    categories: ['Vegetables', 'Fruits'],
-    crops: ['Tomato', 'Potato', 'Onion'],
+    // the yard runs a flower section alongside the produce halls, so Flowers is
+    // added to the record that already exists rather than duplicating the mandi
+    categories: ['Vegetables', 'Fruits', 'Flowers'],
+    crops: ['Tomato', 'Potato', 'Onion', 'Marigold'],
     hours: '5:00 AM – 8:00 PM',
     opensAt: 5 * 60,
     closesAt: 20 * 60,
@@ -86,6 +88,7 @@ export const MANDIS: Mandi[] = [
       { crop: 'Tomato', min: 900, max: 1600, modal: 1310, trend: 'UP' },
       { crop: 'Potato', min: 1100, max: 1750, modal: 1450, trend: 'FLAT' },
       { crop: 'Onion', min: 1250, max: 1900, modal: 1720, trend: 'UP' },
+      { crop: 'Marigold', min: 2600, max: 4800, modal: 3800, trend: 'UP' },
     ],
   },
   {
@@ -153,6 +156,54 @@ export const MANDIS: Mandi[] = [
     ],
   },
   {
+    id: 'dadar-phool',
+    name: 'Dadar Phool Market',
+    district: 'Mumbai',
+    state: 'Maharashtra',
+    lat: 19.0184,
+    lng: 72.844,
+    categories: ['Flowers'],
+    crops: ['Marigold', 'Rose', 'Jasmine', 'Tuberose'],
+    // flower markets trade before dawn and are finished by midday — the produce
+    // has to reach shops and temples the same morning
+    hours: '4:00 AM – 12:00 PM',
+    opensAt: 4 * 60,
+    closesAt: 12 * 60,
+    demand: 'HIGH',
+    establishedYear: 1963,
+    areaAcres: 8,
+    registeredFarmers: 3200,
+    prices: [
+      { crop: 'Marigold', min: 2800, max: 5200, modal: 4100, trend: 'UP' },
+      { crop: 'Rose', min: 7500, max: 14000, modal: 10500, trend: 'UP' },
+      { crop: 'Jasmine', min: 18000, max: 34000, modal: 26000, trend: 'FLAT' },
+      { crop: 'Tuberose', min: 4500, max: 8000, modal: 6200, trend: 'FLAT' },
+    ],
+  },
+  {
+    id: 'nashik-flower',
+    name: 'Nashik Flower Market',
+    district: 'Nashik',
+    state: 'Maharashtra',
+    lat: 19.9975,
+    lng: 73.7898,
+    categories: ['Flowers', 'Vegetables'],
+    crops: ['Marigold', 'Chrysanthemum', 'Gerbera', 'Tomato'],
+    hours: '5:00 AM – 2:00 PM',
+    opensAt: 5 * 60,
+    closesAt: 14 * 60,
+    demand: 'MEDIUM',
+    establishedYear: 1994,
+    areaAcres: 11,
+    registeredFarmers: 1400,
+    prices: [
+      { crop: 'Marigold', min: 2400, max: 4600, modal: 3500, trend: 'FLAT' },
+      { crop: 'Chrysanthemum', min: 3200, max: 6000, modal: 4600, trend: 'UP' },
+      { crop: 'Gerbera', min: 9000, max: 16000, modal: 12500, trend: 'UP' },
+      { crop: 'Tomato', min: 950, max: 1550, modal: 1220, trend: 'FLAT' },
+    ],
+  },
+  {
     id: 'daund',
     name: 'Daund Mandi',
     district: 'Pune',
@@ -175,7 +226,13 @@ export const MANDIS: Mandi[] = [
   },
 ];
 
-export const CATEGORIES: Array<'All' | Category> = ['All', 'Vegetables', 'Fruits', 'Grains'];
+export const CATEGORIES: Array<'All' | Category> = [
+  'All',
+  'Vegetables',
+  'Fruits',
+  'Grains',
+  'Flowers',
+];
 
 export const findMandi = (id?: string | null): Mandi | undefined =>
   MANDIS.find((mandi) => mandi.id === id);

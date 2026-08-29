@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getUser } from '../../../lib/session';
 import { getFavourites, toggleFavourite } from '../../../lib/favourites';
@@ -33,6 +33,7 @@ import {
   Screen,
   SearchField,
   SectionHeader,
+  SkeletonList,
   StatusBadge,
   Toast,
   Txt,
@@ -51,16 +52,47 @@ export default function MandiDiscovery() {
   const [category, setCategory] = useState<'All' | Category>('All');
   const [query, setQuery] = useState('');
   const [onlyFavourites, setOnlyFavourites] = useState(params.filter === 'favourites');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  useEffect(() => {
-    void getUser().then((user) => {
-      if (user?.defaultLocation) {
-        setOrigin({ lat: user.defaultLocation.lat, lng: user.defaultLocation.lng });
-      }
-    });
-    void getFavourites().then(setFavourites);
+  /**
+   * Re-read on every focus, not once on mount.
+   *
+   * Both of these change on OTHER screens: a farmer stars a mandi on its detail
+   * page, or sets their pickup location in Profile. Reading them in a mount-only
+   * effect meant coming back here showed the star they had just toggled in its
+   * old state, and distances that were still sorted against no location at all.
+   */
+  const load = useCallback(async () => {
+    try {
+      const [user, saved] = await Promise.all([getUser(), getFavourites()]);
+      setOrigin(
+        user?.defaultLocation
+          ? { lat: user.defaultLocation.lat, lng: user.defaultLocation.lng }
+          : null,
+      );
+      setFavourites(saved);
+    } catch {
+      // both reads are local storage; a failure just means no location and no
+      // favourites, which the screen already renders correctly
+      setFavourites([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
+
+  // the tab may be re-entered with ?filter=favourites while already mounted, and
+  // useState only reads its initial value once
+  useEffect(() => {
+    setOnlyFavourites(params.filter === 'favourites');
+  }, [params.filter]);
 
   const ranked = useMemo(
     () => rankMandis(origin, favourites, { category, query }),
@@ -87,6 +119,11 @@ export default function MandiDiscovery() {
     <View style={{ flex: 1 }}>
       <Screen
         withNav
+        refreshing={refreshing}
+        onRefresh={() => {
+          setRefreshing(true);
+          void load().finally(() => setRefreshing(false));
+        }}
         header={
           <>
             <AppBar
@@ -145,7 +182,9 @@ export default function MandiDiscovery() {
           </Txt>
         ) : null}
 
-        {list.length === 0 ? (
+        {loading ? (
+          <SkeletonList count={3} />
+        ) : list.length === 0 ? (
           onlyFavourites ? (
             <EmptyState
               icon="star-border"
@@ -156,8 +195,16 @@ export default function MandiDiscovery() {
           ) : (
             <EmptyState
               icon="search-off"
-              title="No mandi matches that"
-              message="Try a different crop, district or category."
+              title={
+                category === 'All'
+                  ? 'No mandi matches that'
+                  : `No ${category.toLowerCase()} mandi matches that`
+              }
+              message={
+                query
+                  ? `Nothing matching "${query}"${category === 'All' ? '' : ` under ${category}`}. Try another crop or district.`
+                  : 'Try another category, or search for a crop or district.'
+              }
               action={
                 <Button
                   label="Clear filters"

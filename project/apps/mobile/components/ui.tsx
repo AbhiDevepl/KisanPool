@@ -227,13 +227,16 @@ export function Card({
   onPress?: () => void;
   raised?: boolean;
 }) {
-  const content = (
-    <View style={[s.card, raised ? elevation.level1 : null, style]}>{children}</View>
-  );
-  if (!onPress) return content;
+  // the caller's style (flex, alignSelf, width, ...) must land on the outermost
+  // node so it works as a flex child — not on an inner View wrapped by Pressable.
+  const boxStyle = [s.card, raised ? elevation.level1 : null, style];
+  if (!onPress) return <View style={boxStyle}>{children}</View>;
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.9 : 1 })}>
-      {content}
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [boxStyle, { opacity: pressed ? 0.9 : 1 }]}
+    >
+      {children}
     </Pressable>
   );
 }
