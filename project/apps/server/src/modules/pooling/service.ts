@@ -134,15 +134,10 @@ export async function poolForTransporter(transporterId: string) {
 
     // what taking this load actually adds to the driver's earning, after the
     // platform's cut — never the gross fare, which was double-counting the
-    // kilometres the trip was already going to drive
-    const earningAfter = trip
-      ? ((await priceTripById(String(trip._id), {
-          id: String(request._id),
-          farmerId: String(request.farmerId),
-          quantityKg: request.quantityKg,
-          pickup,
-        }))?.transporterEarning ?? 0)
-      : transporterEarning(quote.quoted);
+    // kilometres the trip was already going to drive.
+    // Optimization: quoteForJoining already runs priceTrip/priceTripById and
+    // returns quote.transporterEarning, avoiding duplicate database queries.
+    const earningAfter = quote.transporterEarning;
 
     scored.push({
       request,
@@ -213,7 +208,7 @@ async function quoteForJoining(
   destination: { lat: number; lng: number },
   distanceKm: number,
   ratePerKm: number,
-): Promise<{ quoted: number; solo: number; detourKm: number; rideKm: number }> {
+): Promise<{ quoted: number; solo: number; detourKm: number; rideKm: number; transporterEarning: number }> {
   const solo = soloPrice(distanceKm, ratePerKm);
 
   // no trip yet: this load would BE the route, so the quote is the solo price —
@@ -233,7 +228,13 @@ async function quoteForJoining(
       ],
     });
     const share = pricing.shares[0];
-    return { quoted: share?.amount ?? solo, solo, detourKm: 0, rideKm: share?.rideKm ?? distanceKm };
+    return {
+      quoted: share?.amount ?? solo,
+      solo,
+      detourKm: 0,
+      rideKm: share?.rideKm ?? distanceKm,
+      transporterEarning: pricing.transporterEarning,
+    };
   }
 
   const pricing = await priceTripById(String(trip._id), {
@@ -243,9 +244,23 @@ async function quoteForJoining(
     pickup: candidate.pickup,
   });
   const share = pricing?.shares.find((s) => s.shipmentId === candidate.requestId);
-  if (!share) return { quoted: solo, solo, detourKm: 0, rideKm: distanceKm };
+  if (!share || !pricing) {
+    return {
+      quoted: solo,
+      solo,
+      detourKm: 0,
+      rideKm: distanceKm,
+      transporterEarning: transporterEarning(solo),
+    };
+  }
 
-  return { quoted: share.amount, solo, detourKm: share.detourKm, rideKm: share.rideKm };
+  return {
+    quoted: share.amount,
+    solo,
+    detourKm: share.detourKm,
+    rideKm: share.rideKm,
+    transporterEarning: pricing.transporterEarning,
+  };
 }
 
 export async function activeFormingTrip(transporterId: string) {
