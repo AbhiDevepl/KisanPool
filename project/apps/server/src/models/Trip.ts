@@ -45,6 +45,18 @@ const tripSchema = new Schema(
      */
     openForVehicle: { type: Schema.Types.ObjectId, default: undefined },
 
+    /**
+     * Bumped once per reservation attempt, inside the booking transaction.
+     *
+     * It carries no meaning — it exists purely so that two farmers confirming at
+     * the same instant write the SAME document and one of them loses. Each
+     * confirmation otherwise only INSERTS its own shipment, and MongoDB's
+     * document-level concurrency raises no conflict between two inserts, so both
+     * transactions would read the same pre-race capacity and both commit
+     * (ADR-033).
+     */
+    reservationSeq: { type: Number, default: 0 },
+
     startedAt: { type: Date, default: undefined },
     completedAt: { type: Date, default: undefined },
     cancelledAt: { type: Date, default: undefined },

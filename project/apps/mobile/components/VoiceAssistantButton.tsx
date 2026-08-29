@@ -231,7 +231,8 @@ const s = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: layout.edgeMargin,
-    bottom: layout.edgeMargin,
+    // clears <BottomNav />, which floats over the same corner (Stitch: bottom-20 right-4)
+    bottom: layout.fabOffset,
     width: 56,
     height: 56,
     borderRadius: radius.full,

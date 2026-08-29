@@ -108,3 +108,112 @@ export const when = (iso: string | null): string =>
         minute: '2-digit',
       })
     : '—';
+
+// ---------------------------------------------------------------------------
+// data loading — one shape for every tab
+// ---------------------------------------------------------------------------
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+export interface Remote<T> {
+  data: T | null;
+  loading: boolean;
+  error: unknown;
+  refresh: () => void;
+  refreshedAt: Date | null;
+}
+
+/**
+ * Fetch on mount, optionally on a timer. `loading` is only true before the first
+ * result, so a poll never blanks a table an operator is reading.
+ */
+export function useRemote<T>(fetcher: () => Promise<T>, everyMs?: number): Remote<T> {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<unknown>();
+  const [refreshedAt, setRefreshedAt] = useState<Date | null>(null);
+
+  const ref = useRef(fetcher);
+  ref.current = fetcher;
+
+  const run = useCallback(async () => {
+    try {
+      const result = await ref.current();
+      setData(result);
+      setError(undefined);
+      setRefreshedAt(new Date());
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void run();
+    if (!everyMs) return;
+    const timer = setInterval(() => void run(), everyMs);
+    return () => clearInterval(timer);
+  }, [run, everyMs]);
+
+  return { data, loading, error, refresh: () => void run(), refreshedAt };
+}
+
+/** Table-shaped placeholder for a tab's first load. */
+export function SkeletonTable({ rows = 5 }: { rows?: number }) {
+  return (
+    <div className="card stack">
+      {Array.from({ length: rows }).map((_, index) => (
+        <div key={index} className="skeleton" style={{ height: 20, width: `${95 - index * 7}%` }} />
+      ))}
+    </div>
+  );
+}
+
+export function Toolbar({ children }: { children: ReactNode }) {
+  return (
+    <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', marginBottom: 'var(--s-md)' }}>
+      {children}
+    </div>
+  );
+}
+
+/** "Updated 12:04:33" — an operator needs to know how old a board is. */
+export function Freshness({ at, onRefresh }: { at: Date | null; onRefresh: () => void }) {
+  return (
+    <div className="row">
+      <span className="label-sm muted">
+        {at ? `Updated ${at.toLocaleTimeString('en-IN')}` : 'Loading…'}
+      </span>
+      <button className="btn ghost" onClick={onRefresh}>
+        Refresh
+      </button>
+    </div>
+  );
+}
+
+/** A stacked proportion bar. Segments are given, never computed from magic ratios. */
+export function Meter({ segments }: { segments: Array<{ pct: number; color: string }> }) {
+  return (
+    <div className="meter">
+      {segments.map((segment, index) => (
+        <span
+          key={index}
+          style={{ width: `${Math.max(0, Math.min(100, segment.pct))}%`, background: segment.color }}
+        />
+      ))}
+    </div>
+  );
+}
+
+export function Health({ label, ok, detail }: { label: string; ok: boolean; detail: string }) {
+  return (
+    <div className="row" style={{ justifyContent: 'space-between', padding: '6px 0' }}>
+      <div className="row">
+        <span className={`dot ${ok ? 'ok' : 'warn'}`} />
+        <span className="body-md">{label}</span>
+      </div>
+      <span className="label-sm muted">{detail}</span>
+    </div>
+  );
+}

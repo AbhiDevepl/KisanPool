@@ -24,6 +24,7 @@ import { openCheckout } from '../../../../lib/razorpayCheckout';
 import { connectTripSocket, useSocket } from '../../../../lib/socket';
 import { getUser } from '../../../../lib/session';
 import { kg, rupees } from '../../../../lib/format';
+import { SUPPORT_PHONE } from '../../../../lib/support';
 import {
   Banner,
   Button,
@@ -95,6 +96,7 @@ export default function SharedTrip() {
   );
   const [priceNote, setPriceNote] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -293,6 +295,11 @@ export default function SharedTrip() {
 
   return (
     <Screen
+      refreshing={refreshing}
+      onRefresh={() => {
+        setRefreshing(true);
+        void refresh().finally(() => setRefreshing(false));
+      }}
       footer={
         mine.state === 'PAYMENT_PENDING' ? (
           <Button
@@ -555,6 +562,55 @@ export default function SharedTrip() {
         <Row label="Route" value={`${trip.routeDistanceKm.toFixed(1)} km`} />
       </Card>
 
+      {/* help — a phone number before a chatbot, always */}
+      <Card>
+        <Txt variant="labelLg" color={colors.onSurfaceVariant} style={{ marginBottom: space.sm }}>
+          Need help?
+        </Txt>
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <Pressable
+            style={[s.action, { flex: 1 }]}
+            onPress={() => void Linking.openURL(`tel:${SUPPORT_PHONE.replace(/-/g, '')}`)}
+          >
+            <MaterialIcons name="headset-mic" size={20} color={colors.primary} />
+            <Txt variant="labelLg" color={colors.primary}>
+              Support
+            </Txt>
+          </Pressable>
+          <Pressable
+            style={[s.action, { flex: 1 }]}
+            onPress={() => router.push('/(farmer)/support')}
+          >
+            <MaterialIcons name="report-problem" size={20} color={colors.primary} />
+            <Txt variant="labelLg" color={colors.primary}>
+              Report issue
+            </Txt>
+          </Pressable>
+        </View>
+
+        <View style={s.aiRow}>
+          <View style={s.aiIcon}>
+            <MaterialIcons name="smart-toy" size={20} color={colors.onPrimary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Txt variant="labelLg">Servo AI</Txt>
+            <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+              Ask anything about this trip, in your own language
+            </Txt>
+          </View>
+          <MaterialIcons name="mic" size={22} color={colors.primary} />
+        </View>
+
+        <View
+          style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs, marginTop: space.gutter }}
+        >
+          <MaterialIcons name="lock" size={14} color={colors.outline} />
+          <Txt variant="labelSm" color={colors.outline} style={{ flex: 1 }}>
+            Every trip is monitored. Your pickup code is never shared with other farmers aboard.
+          </Txt>
+        </View>
+      </Card>
+
       <ChatSheet
         visible={chatOpen}
         onClose={() => setChatOpen(false)}
@@ -603,6 +659,23 @@ const s = {
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     borderColor: colors.secondaryContainer,
+  },
+  aiRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: space.gutter,
+    marginTop: space.gutter,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radius.md,
+    padding: space.gutter,
+  },
+  aiIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    backgroundColor: colors.primary,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
   action: {
     minHeight: 48,

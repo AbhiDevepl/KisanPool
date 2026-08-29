@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { io, type Socket } from 'socket.io-client';
+import { SOCKET_URL } from './config';
 import { getAccessToken } from './session';
-
-const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL ?? 'http://localhost:4000';
 
 /**
  * One socket per screen that needs it; disconnected on unmount. The JWT rides in

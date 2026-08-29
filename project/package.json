@@ -1,4 +1,3 @@
-
 {
   "name": "kisanpool",
   "private": true,
@@ -12,7 +11,7 @@
     "dev:server": "npm run dev --workspace @kisanpool/server",
     "dev:mobile": "npm run start --workspace @kisanpool/mobile",
     "build:shared": "npm run build --workspace @kisanpool/shared",
-    "seed": "npm run seed --workspace @kisanpool/server",
+    "seed": "npm run seed --workspace @kisanpool/server --",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "bash tests/run-all.sh",
     "dev": "npm run dev:server",

@@ -452,6 +452,26 @@ export async function selectTransporter(requestId: string, offerId: string, farm
       trip = created[0];
     }
 
+    /*
+     * Serialise every reservation for this trip through the trip document.
+     *
+     * The capacity re-check below reads TripShipment; two farmers confirming at
+     * once each INSERT a different shipment, so neither transaction sees the
+     * other's uncommitted row and MongoDB finds no document written by both.
+     * Both re-checks would pass against the same stale committed total and the
+     * vehicle would be overbooked — 1.5t + 1.5t into the last 1.5t.
+     *
+     * Touching one shared document makes the second writer conflict, and
+     * asPoolingError turns that into CONCURRENT_BOOKING (ADR-033).
+     */
+    const guarded = await Trip.findOneAndUpdate(
+      { _id: trip._id },
+      { $inc: { reservationSeq: 1 } },
+      { new: true, ...(session ? { session } : {}) },
+    );
+    if (!guarded) throw new ApiError('RESOURCE_NOT_FOUND', 'That trip no longer exists.');
+    trip = guarded;
+
     // the race: re-check against shipments as they stand right now
     const existing = await TripShipment.find({
       tripId: trip._id,

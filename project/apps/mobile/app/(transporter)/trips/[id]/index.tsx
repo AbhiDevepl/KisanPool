@@ -23,6 +23,8 @@ import { connectTripSocket } from '../../../../lib/socket';
 import { getUser } from '../../../../lib/session';
 import { toAppError } from '../../../../lib/errors';
 import { kg, rupees } from '../../../../lib/format';
+import { ledgerFrom, ledgerSegments, usedPct } from '../../../../lib/pooling';
+import { SUPPORT_PHONE } from '../../../../lib/support';
 import {
   Banner,
   Button,
@@ -32,6 +34,7 @@ import {
   Field,
   Header,
   Loading,
+  ProgressTrack,
   Row,
   Screen,
   StatusBadge,
@@ -230,6 +233,21 @@ export default function SharedTrip() {
   const tripNext = TRIP_NEXT[trip.state];
   const canAddMore = ['FORMING', 'EN_ROUTE'].includes(trip.state) && capacity.availableKg > 0;
 
+  // the pickup run, in the order the driver drives it
+  const route = shipments
+    .filter((shipment) => shipment.state !== 'CANCELLED')
+    .sort((a, b) => a.pickupSequence - b.pickupSequence);
+  const collected = route.filter((shipment) =>
+    ['PICKED_UP', 'IN_TRANSIT', 'DELIVERED', 'PAYMENT_PENDING', 'PAID', 'COMPLETED'].includes(
+      shipment.state,
+    ),
+  );
+  const nextPickup = route.find(
+    (shipment) => !['PICKED_UP', 'IN_TRANSIT', 'DELIVERED', 'PAYMENT_PENDING', 'PAID', 'COMPLETED'].includes(shipment.state),
+  );
+  const ledger = ledgerFrom(capacity);
+  const overloaded = capacity.loadedKg > capacity.totalKg;
+
   return (
     <Screen
       footer={
@@ -261,6 +279,50 @@ export default function SharedTrip() {
         right={<StatusBadge status={trip.state} label={TRIP_LABEL[trip.state]} />}
       />
 
+      {/* what the driver is doing right now, and what is next */}
+      <Card style={{ marginTop: space.md }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+          <View style={{ flex: 1 }}>
+            <Txt variant="headlineMd" color={colors.primary}>
+              {nextPickup
+                ? `On the way to ${nextPickup.farmer?.name ?? 'the next pickup'}`
+                : trip.state === 'AT_DESTINATION'
+                  ? 'At the mandi'
+                  : 'All loads collected'}
+            </Txt>
+            <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+              {collected.length} of {route.length} pickup{route.length === 1 ? '' : 's'} completed
+            </Txt>
+          </View>
+          {nextPickup ? (
+            <View style={{ alignItems: 'flex-end' }}>
+              <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                Next stop
+              </Txt>
+              <Txt variant="headlineMd">#{nextPickup.pickupSequence + 1}</Txt>
+            </View>
+          ) : null}
+        </View>
+
+        <View style={{ marginTop: space.gutter }}>
+          <ProgressTrack
+            pct={route.length ? (collected.length / route.length) * 100 : 0}
+            height={8}
+          />
+        </View>
+
+        <Divider />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+          <MaterialIcons name="place" size={16} color={colors.tertiary} />
+          <Txt variant="bodyMd" style={{ flex: 1 }} numberOfLines={1}>
+            {trip.destination.name}
+          </Txt>
+          <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+            {trip.routeDistanceKm.toFixed(0)} km
+          </Txt>
+        </View>
+      </Card>
+
       <TripMap
         destination={{ ...trip.destination, title: trip.destination.name }}
         vehicle={position ? { ...position, title: 'You' } : null}
@@ -287,33 +349,57 @@ export default function SharedTrip() {
         </Banner>
       ) : null}
 
-      <Card style={{ marginTop: space.md }}>
-        <Txt variant="labelLg">Load on board</Txt>
-        <View
-          style={{
-            flexDirection: 'row',
-            height: 12,
-            borderRadius: radius.full,
-            overflow: 'hidden',
-            backgroundColor: colors.surfaceContainerHigh,
-            marginTop: space.gutter,
-          }}
-        >
-          <View style={{ flex: Math.max(0, capacity.loadedKg), backgroundColor: colors.primary }} />
-          <View
-            style={{
-              flex: Math.max(0, capacity.committedKg - capacity.loadedKg),
-              backgroundColor: colors.primaryContainer,
-            }}
+      <Card>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Txt variant="labelLg">Load / capacity</Txt>
+          <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+            {kg(capacity.committedKg)} / {kg(capacity.totalKg)}
+          </Txt>
+        </View>
+
+        <View style={{ marginTop: space.gutter }}>
+          <ProgressTrack
+            height={12}
+            segments={ledgerSegments(ledger, {
+              loaded: colors.primary,
+              confirmed: colors.primaryContainer,
+            })}
           />
-          <View style={{ flex: Math.max(0, capacity.availableKg) }} />
+        </View>
+        <View
+          style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: space.sm }}
+        >
+          <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+            {usedPct(ledger)}% reserved
+          </Txt>
+          <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+            {kg(capacity.availableKg)} available
+          </Txt>
         </View>
 
         <Divider />
-        <Row label="Total capacity" value={kg(capacity.totalKg)} />
-        <Row label="Committed" value={kg(capacity.committedKg)} />
+        <Row label="Vehicle capacity" value={kg(capacity.totalKg)} />
+        <Row label="Confirmed by farmers" value={kg(capacity.committedKg)} />
         <Row label="In the vehicle now" value={kg(capacity.loadedKg)} />
         <Row label="Still free" value={kg(capacity.availableKg)} bold />
+
+        {overloaded ? (
+          <Banner tone="error" style={{ marginTop: space.gutter, marginBottom: 0 }}>
+            <View style={{ flexDirection: 'row', gap: space.sm, alignItems: 'center' }}>
+              <MaterialIcons name="warning" size={20} color={colors.onErrorContainer} />
+              <Txt variant="labelLg" color={colors.onErrorContainer} style={{ flex: 1 }}>
+                Loaded weight is over your rated capacity — do not take more.
+              </Txt>
+            </View>
+          </Banner>
+        ) : (
+          <View style={{ flexDirection: 'row', gap: space.sm, alignItems: 'center', marginTop: space.sm }}>
+            <MaterialIcons name="verified-user" size={15} color={colors.outline} />
+            <Txt variant="labelSm" color={colors.outline} style={{ flex: 1 }}>
+              Stay within {kg(capacity.totalKg)} for a safe, legal trip.
+            </Txt>
+          </View>
+        )}
       </Card>
 
       {/* a delivery hands the space back — the pool is where it gets used again */}
@@ -333,7 +419,7 @@ export default function SharedTrip() {
                 label="Open the load pool"
                 variant="secondary"
                 icon="add"
-                onPress={() => router.push('/(transporter)/trips/available')}
+                onPress={() => router.push('/(transporter)/requests')}
                 style={{ marginTop: space.sm }}
               />
             </View>
@@ -362,6 +448,15 @@ export default function SharedTrip() {
             Trip chat{unread > 0 ? ` (${unread})` : ''}
           </Txt>
         </Pressable>
+        <Pressable
+          style={[actionButton, { flex: 1 }]}
+          onPress={() => void Linking.openURL(`tel:${SUPPORT_PHONE.replace(/-/g, '')}`)}
+        >
+          <MaterialIcons name="headset-mic" size={20} color={colors.primary} />
+          <Txt variant="labelLg" color={colors.primary}>
+            Support
+          </Txt>
+        </Pressable>
       </View>
 
       <Txt variant="headlineMd" style={{ marginBottom: space.sm }}>
@@ -377,7 +472,7 @@ export default function SharedTrip() {
             <Button
               label="Open the load pool"
               icon="local-shipping"
-              onPress={() => router.push('/(transporter)/trips/available')}
+              onPress={() => router.push('/(transporter)/requests')}
             />
           }
         />

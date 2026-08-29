@@ -319,6 +319,72 @@ export interface PricingAudit {
   }>;
 }
 
+
+// ---- bookings / mandis / AI ----
+
+export interface AdminRequestRow {
+  _id: string;
+  state: string;
+  cropType: string;
+  quantityKg: number;
+  from: string;
+  to: string;
+  preferredDate: string;
+  createdAt: string;
+  minutesOpen: number;
+  farmer: { _id: string; name: string; phone: string } | null;
+  /** transporters who ACCEPTED — reserves nothing */
+  offerCount: number;
+  totalOffers: number;
+  /** present only once the farmer CONFIRMED one of them */
+  shipment: {
+    _id: string;
+    tripId: string;
+    state: ShipmentState;
+    price: number;
+    soloPrice: number;
+  } | null;
+}
+
+export interface AdminBookings {
+  requests: AdminRequestRow[];
+  totals: {
+    total: number;
+    open: number;
+    awaitingFarmer: number;
+    confirmed: number;
+    cancelled: number;
+  };
+}
+
+export interface AdminMandi {
+  name: string;
+  lat: number;
+  lng: number;
+  requests: number;
+  openRequests: number;
+  trips: number;
+  activeTrips: number;
+  tonnes: number;
+  revenue: number;
+  saved: number;
+}
+
+export interface AiActivity {
+  totals: { sessions: number; turns: number; awaitingConfirmation: number; avgTurns: number };
+  byLanguage: Record<string, number>;
+  recent: Array<{
+    _id: string;
+    user: { name: string; role: string } | null;
+    language: string;
+    turns: number;
+    lastMessage: string | null;
+    lastRole: string | null;
+    pending: string | null;
+    updatedAt: string;
+  }>;
+}
+
 export const api = {
   login: (username: string, password: string) =>
     request<{ token: string; usingDefaultCredentials: boolean }>('/admin/login', {
@@ -366,4 +432,15 @@ export const api = {
   },
 
   pricingAudit: (tripId: string) => request<PricingAudit>(`/admin/trips/${tripId}/pricing`),
+
+  bookings: (query: { state?: string; q?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (query.state) params.set('state', query.state);
+    if (query.q) params.set('q', query.q);
+    return request<AdminBookings>(`/admin/requests?${params.toString()}`);
+  },
+
+  mandis: () => request<AdminMandi[]>('/admin/mandis'),
+
+  ai: () => request<AiActivity>('/admin/ai'),
 };

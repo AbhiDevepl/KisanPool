@@ -122,6 +122,10 @@ export const elevation = {
 export const layout = {
   edgeMargin: space.md,
   minTouchTarget: 48,
+  /** height of <BottomNav />; screens that show it reserve this much scroll padding */
+  navHeight: 72,
+  /** the AI mic FAB sits just above the nav bar (Stitch: bottom-20 right-4) */
+  fabOffset: 88,
 } as const;
 
 export const theme = { colors, fontFamily, type, space, radius, elevation, layout } as const;

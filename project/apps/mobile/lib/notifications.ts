@@ -27,6 +27,13 @@ interface NotificationsModule {
 
 let cached: NotificationsModule | null = null;
 
+/**
+ * Expo Go's lack of push is a fixed property of the runtime, not an event. Saying
+ * so once is information; saying it on every registration — and registration runs
+ * again on every Fast Refresh — is noise that buries real warnings.
+ */
+let saidUnsupported = false;
+
 function load(): NotificationsModule | null {
   if (isExpoGo) return null;
   if (cached) return cached;
@@ -61,10 +68,13 @@ export const pushSupported = (): boolean => !isExpoGo;
  */
 export async function registerForPush(): Promise<string | null> {
   if (isExpoGo) {
-    console.warn(
-      '[push] Expo Go cannot receive remote notifications since SDK 53 — ' +
-        'use a development build to test them. Live updates still work over the socket.',
-    );
+    if (!saidUnsupported) {
+      saidUnsupported = true;
+      console.log(
+        '[push] Expo Go cannot receive remote notifications since SDK 53 — ' +
+          'use a development build to test them. Live updates still work over the socket.',
+      );
+    }
     return null;
   }
 

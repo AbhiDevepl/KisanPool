@@ -23,6 +23,7 @@ import {
   TransportRequest,
   TransporterOffer,
   TransporterPayoutAccount,
+  AiSession,
   Trip,
   TripShipment,
   User,
@@ -790,6 +791,240 @@ adminRouter.get(
           delta: a.previousAmount == null ? null : Math.round(a.amount - a.previousAmount),
         })),
       })),
+    });
+  }),
+);
+
+// ---------- 9. bookings — every request, and what became of it ----------
+
+/**
+ * The operator's view of the demand side. Deliberately reports the two pooling
+ * states separately: `offerCount` is how many transporters ACCEPTED (which
+ * reserves nothing) and `shipment` is set only once the farmer CONFIRMED one.
+ * Collapsing them would hide exactly the failure an operator needs to spot —
+ * requests with plenty of acceptances that no farmer ever confirmed.
+ */
+adminRouter.get(
+  '/requests',
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const { state, q } = z
+      .object({ state: z.string().optional(), q: z.string().optional() })
+      .parse(req.query);
+
+    const filter: Record<string, unknown> = {};
+    if (state) filter.state = state;
+
+    const requests = await TransportRequest.find(filter).sort({ createdAt: -1 }).limit(300);
+    const ids = requests.map((request) => request._id);
+
+    const [farmers, offers, shipments] = await Promise.all([
+      User.find({ _id: { $in: requests.map((request) => request.farmerId) } }, 'name phone'),
+      TransporterOffer.find({ requestId: { $in: ids } }, 'requestId state transporterId'),
+      TripShipment.find({ requestId: { $in: ids } }, 'requestId tripId state allocatedPrice finalPrice soloPrice'),
+    ]);
+
+    const farmerById = new Map(farmers.map((farmer) => [String(farmer._id), farmer]));
+    const needle = q?.trim().toLowerCase();
+
+    const rows = requests
+      .map((request) => {
+        const id = String(request._id);
+        const mine = offers.filter((offer) => String(offer.requestId) === id);
+        const shipment = shipments.find((item) => String(item.requestId) === id) ?? null;
+        const farmer = farmerById.get(String(request.farmerId));
+
+        return {
+          _id: id,
+          state: request.state,
+          cropType: request.cropType,
+          quantityKg: request.quantityKg,
+          from: request.pickup.name,
+          to: request.destination.name,
+          preferredDate: request.preferredDate,
+          createdAt: request.get('createdAt') as Date,
+          minutesOpen: minutesSince(request.get('createdAt') as Date),
+          farmer: farmer ? { _id: String(farmer._id), name: farmer.name, phone: farmer.phone } : null,
+          /** transporters who accepted — none of this is reserved capacity */
+          offerCount: mine.filter((offer) => offer.state === 'INTERESTED').length,
+          totalOffers: mine.length,
+          /** set only when the farmer confirmed one of them */
+          shipment: shipment
+            ? {
+                _id: String(shipment._id),
+                tripId: String(shipment.tripId),
+                state: shipment.state,
+                price: shipment.finalPrice ?? shipment.allocatedPrice,
+                soloPrice: shipment.soloPrice,
+              }
+            : null,
+        };
+      })
+      .filter(
+        (row) =>
+          !needle ||
+          row.cropType.toLowerCase().includes(needle) ||
+          row.to.toLowerCase().includes(needle) ||
+          (row.farmer?.name ?? '').toLowerCase().includes(needle),
+      );
+
+    ok(res, {
+      requests: rows,
+      totals: {
+        total: rows.length,
+        open: rows.filter((row) => row.state === 'OPEN').length,
+        /** accepted by someone, still waiting on the farmer — the funnel's weak point */
+        awaitingFarmer: rows.filter((row) => row.state === 'TRANSPORTER_INTERESTED').length,
+        confirmed: rows.filter((row) => row.state === 'CONFIRMED').length,
+        cancelled: rows.filter((row) => row.state === 'CANCELLED' || row.state === 'EXPIRED').length,
+      },
+    });
+  }),
+);
+
+// ---------- 10. mandis — demand by destination ----------
+
+/**
+ * Derived from real requests and trips rather than a static list, so the board
+ * reflects where produce is actually going.
+ */
+adminRouter.get(
+  '/mandis',
+  requireAdmin,
+  asyncHandler(async (_req, res) => {
+    const [requests, trips, shipments] = await Promise.all([
+      TransportRequest.find({}, 'destination state quantityKg'),
+      Trip.find({}, 'destination state'),
+      TripShipment.find({}, 'tripId quantityKg state allocatedPrice finalPrice soloPrice'),
+    ]);
+
+    const shipmentsByTrip = new Map<string, typeof shipments>();
+    for (const shipment of shipments) {
+      const key = String(shipment.tripId);
+      shipmentsByTrip.set(key, [...(shipmentsByTrip.get(key) ?? []), shipment]);
+    }
+
+    const byName = new Map<
+      string,
+      {
+        name: string;
+        lat: number;
+        lng: number;
+        requests: number;
+        openRequests: number;
+        trips: number;
+        activeTrips: number;
+        tonnes: number;
+        revenue: number;
+        saved: number;
+      }
+    >();
+
+    const entry = (name: string, lat: number, lng: number) => {
+      if (!byName.has(name)) {
+        byName.set(name, {
+          name,
+          lat,
+          lng,
+          requests: 0,
+          openRequests: 0,
+          trips: 0,
+          activeTrips: 0,
+          tonnes: 0,
+          revenue: 0,
+          saved: 0,
+        });
+      }
+      return byName.get(name)!;
+    };
+
+    for (const request of requests) {
+      const row = entry(
+        request.destination.name,
+        request.destination.lat ?? 0,
+        request.destination.lng ?? 0,
+      );
+      row.requests += 1;
+      if (request.state === 'OPEN' || request.state === 'TRANSPORTER_INTERESTED') row.openRequests += 1;
+    }
+
+    for (const trip of trips) {
+      const row = entry(trip.destination.name, trip.destination.lat ?? 0, trip.destination.lng ?? 0);
+      row.trips += 1;
+      if (ACTIVE_TRIP_STATES.includes(trip.state as TripState)) row.activeTrips += 1;
+
+      for (const shipment of shipmentsByTrip.get(String(trip._id)) ?? []) {
+        row.tonnes += shipment.quantityKg / 1000;
+        const price = shipment.finalPrice ?? shipment.allocatedPrice;
+        row.revenue += price;
+        row.saved += Math.max(0, shipment.soloPrice - price);
+      }
+    }
+
+    ok(
+      res,
+      [...byName.values()]
+        .map((row) => ({
+          ...row,
+          tonnes: Math.round(row.tonnes * 10) / 10,
+          revenue: Math.round(row.revenue),
+          saved: Math.round(row.saved),
+        }))
+        .sort((a, b) => b.requests - a.requests),
+    );
+  }),
+);
+
+// ---------- 11. Servo AI activity ----------
+
+/**
+ * What the assistant is actually being used for. Language mix matters most: the
+ * whole reason Servo exists is farmers who would not otherwise use the app.
+ */
+adminRouter.get(
+  '/ai',
+  requireAdmin,
+  asyncHandler(async (_req, res) => {
+    const sessions = await AiSession.find({}).sort({ updatedAt: -1 }).limit(200);
+    const users = await User.find(
+      { _id: { $in: sessions.map((session) => session.userId) } },
+      'name role',
+    );
+    const userById = new Map(users.map((user) => [String(user._id), user]));
+
+    const byLanguage: Record<string, number> = {};
+    let turns = 0;
+    let awaitingConfirmation = 0;
+
+    for (const session of sessions) {
+      const language = session.detectedLanguage ?? 'en';
+      byLanguage[language] = (byLanguage[language] ?? 0) + 1;
+      turns += session.history.length;
+      if (session.pendingConfirmation) awaitingConfirmation += 1;
+    }
+
+    ok(res, {
+      totals: {
+        sessions: sessions.length,
+        turns,
+        awaitingConfirmation,
+        avgTurns: sessions.length ? Math.round((turns / sessions.length) * 10) / 10 : 0,
+      },
+      byLanguage,
+      recent: sessions.slice(0, 40).map((session) => {
+        const last = session.history[session.history.length - 1];
+        const user = userById.get(String(session.userId));
+        return {
+          _id: String(session._id),
+          user: user ? { name: user.name, role: user.role } : null,
+          language: session.detectedLanguage ?? 'en',
+          turns: session.history.length,
+          lastMessage: last ? last.content.slice(0, 160) : null,
+          lastRole: last?.role ?? null,
+          pending: session.pendingConfirmation?.tool ?? null,
+          updatedAt: session.get('updatedAt') as Date,
+        };
+      }),
     });
   }),
 );

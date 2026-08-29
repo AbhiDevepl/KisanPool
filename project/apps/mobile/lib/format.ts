@@ -58,3 +58,14 @@ const STATUS_LABEL: Record<string, string> = {
 
 export const statusLabel = (status: string): string =>
   STATUS_LABEL[status] ?? status.replace(/_/g, ' ').toLowerCase();
+
+/** True when an ISO timestamp falls on the local calendar day. */
+export function isToday(iso: string): boolean {
+  const then = new Date(iso);
+  const now = new Date();
+  return (
+    then.getFullYear() === now.getFullYear() &&
+    then.getMonth() === now.getMonth() &&
+    then.getDate() === now.getDate()
+  );
+}

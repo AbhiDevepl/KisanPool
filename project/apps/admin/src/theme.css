@@ -140,3 +140,136 @@ tr:last-child td { border-bottom: 0; }
 .row { display: flex; align-items: center; gap: var(--s-sm); }
 .stack { display: flex; flex-direction: column; gap: var(--s-gutter); }
 .grid { display: grid; gap: var(--s-gutter); }
+
+/* ---------------------------------------------------------------------------
+   Desktop console shell.
+   Admin is desktop-first — a persistent left rail and a wide content canvas, not
+   a stack of mobile cards. It still collapses to a top bar under 900px so an
+   operator on a laptop in the field is not locked out.
+   --------------------------------------------------------------------------- */
+
+.shell { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: 248px;
+  flex-shrink: 0;
+  background: var(--surface-lowest);
+  border-right: 1px solid var(--outline-variant);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-sm);
+  padding: var(--s-md);
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+.sidebar-nav { flex: 1; overflow-y: auto; padding: var(--s-sm); }
+
+.nav-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--outline);
+  padding: var(--s-gutter) var(--s-gutter) var(--s-xs);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-gutter);
+  width: 100%;
+  padding: 9px var(--s-gutter);
+  margin-bottom: 2px;
+  border: 0;
+  border-radius: var(--r-base);
+  background: transparent;
+  color: var(--on-surface-variant);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  transition: background 0.12s ease;
+}
+.nav-item:hover { background: var(--surface-low); color: var(--on-surface); }
+.nav-item.active { background: var(--secondary-container); color: var(--on-secondary-container); font-weight: 600; }
+.nav-item .nav-count {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: var(--r-md);
+  background: var(--error-container);
+  color: var(--on-error-container);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+.nav-item.active .nav-count { background: rgba(255, 255, 255, 0.6); }
+
+.sidebar-foot { padding: var(--s-sm); border-top: 1px solid var(--outline-variant); }
+
+.canvas { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-md);
+  padding: var(--s-gutter) var(--s-lg);
+  background: var(--surface);
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+.content { padding: var(--s-lg); max-width: 1440px; width: 100%; }
+
+/* KPI and table helpers */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--s-gutter); }
+.split { display: grid; grid-template-columns: 2fr 1fr; gap: var(--s-gutter); align-items: start; }
+.split-even { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-gutter); align-items: start; }
+
+.subnav { display: flex; gap: var(--s-xs); border-bottom: 1px solid var(--outline-variant); margin-bottom: var(--s-md); }
+.subnav button {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 10px var(--s-gutter);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+}
+.subnav button.active { border-bottom-color: var(--primary); color: var(--primary); }
+
+.meter { height: 8px; border-radius: var(--r-md); background: var(--surface-high); overflow: hidden; display: flex; }
+.meter > span { display: block; height: 100%; }
+
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.dot.ok { background: var(--primary); }
+.dot.warn { background: #926500; }
+.dot.bad { background: var(--error); }
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-container) 25%, var(--surface-high) 50%, var(--surface-container) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.3s infinite;
+  border-radius: var(--r-base);
+}
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+@media (max-width: 900px) {
+  .shell { flex-direction: column; }
+  .sidebar { width: 100%; height: auto; position: static; flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--outline-variant); }
+  .sidebar-brand, .sidebar-foot, .nav-group-label { display: none; }
+  .sidebar-nav { display: flex; gap: var(--s-xs); padding: var(--s-sm); }
+  .nav-item { width: auto; white-space: nowrap; }
+  .split, .split-even { grid-template-columns: 1fr; }
+  .content { padding: var(--s-md); }
+}

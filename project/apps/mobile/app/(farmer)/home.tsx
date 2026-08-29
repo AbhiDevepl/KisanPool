@@ -1,240 +1,341 @@
-/** f1_farmer_home — dashboard, New Request CTA, the pool's claims, Servo AI mic. */
-import { useCallback, useState } from 'react';
+/**
+ * F1 · Farmer Home — the entry screen, not a dashboard.
+ *
+ * Home answers one question: "what should I do next?" Everything that is a
+ * product area of its own — the full booking list, mandi discovery, support, the
+ * profile — lives behind the bottom navigation. Home only carries the greeting,
+ * the primary action, whatever is live right now, and shortcuts.
+ */
+import { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import type { RequestState, UserDTO } from '@kisanpool/shared';
 import { api } from '../../lib/api';
 import { getUser } from '../../lib/session';
-import { kg, rupees, shortDate } from '../../lib/format';
+import { getFavourites } from '../../lib/favourites';
+import { useLoader } from '../../lib/useLoader';
+import { REQUEST_COPY, SHIPMENT_COPY, LIVE_SHIPMENT_STATES } from '../../lib/pooling';
+import { kg, rupees, shortDate, timeAgo } from '../../lib/format';
 import {
-  Banner,
+  AppBar,
   Button,
   Card,
+  ContextStrip,
   EmptyState,
-  Loading,
+  IconBadge,
+  QuickAction,
   Screen,
+  SectionHeader,
+  SkeletonList,
   StatusBadge,
   Txt,
 } from '../../components/ui';
 import { ErrorView } from '../../components/ErrorView';
+import { BottomNav } from '../../components/BottomNav';
 import { VoiceAssistantButton } from '../../components/VoiceAssistantButton';
-import { colors, radius, space } from '../../theme';
+import { colors, space } from '../../theme';
 
-/**
- * The shared TransportRequestDTO still declares the pre-pool `status` field, while
- * the backend now sends the request's own `state` (packages/shared/src/pooling.ts).
- * Until that DTO catches up, this screen widens the row locally.
- */
-type PooledRequest = Awaited<ReturnType<typeof api.myRequests>>[number] & { state: RequestState };
+type MyRequest = Awaited<ReturnType<typeof api.myRequests>>[number] & { state: RequestState };
 
-const STATE_LABEL: Record<RequestState, string> = {
-  OPEN: 'In the pool',
-  TRANSPORTER_INTERESTED: 'Transporters interested',
-  CONFIRMED: 'Confirmed',
-  CANCELLED: 'Cancelled',
-  EXPIRED: 'Expired',
-};
-
-/** StatusBadge's tone keys predate the pool states; map onto the tone that means the same. */
-const STATE_TONE: Record<RequestState, string> = {
-  OPEN: 'SEARCHING',
-  TRANSPORTER_INTERESTED: 'MATCHED',
-  CONFIRMED: 'BOOKED',
-  CANCELLED: 'CANCELLED',
-  EXPIRED: 'REJECTED',
-};
-
-/** A load still worth tracking on the map. */
-const LIVE_SHIPMENT_STATES = ['ASSIGNED', 'EN_ROUTE', 'ARRIVED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED', 'PAYMENT_PENDING'];
+const LANGUAGE_LABEL: Record<string, string> = { mr: 'मराठी', hi: 'हिंदी', en: 'English' };
 
 export default function FarmerHome() {
   const router = useRouter();
-  const [user, setUserState] = useState<UserDTO | null>(null);
-  const [requests, setRequests] = useState<PooledRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<unknown>();
+  const [user, setUser] = useState<UserDTO | null>(null);
+  const [favourites, setFavourites] = useState<string[]>([]);
 
-  const load = useCallback(async () => {
-    setError(undefined);
-    try {
-      setUserState(await getUser());
-      setRequests((await api.myRequests()) as PooledRequest[]);
-    } catch (err) {
-      setError(err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load]),
+  const requests = useLoader<MyRequest[]>(
+    useCallback(async () => (await api.myRequests()) as MyRequest[], []),
   );
 
-  // a claim the farmer has not answered yet is the most urgent thing on this screen
-  const awaitingChoice = requests.filter((r) => r.offerCount > 0 && r.state !== 'CONFIRMED');
-  const riding = requests.filter((r) => r.shipment && LIVE_SHIPMENT_STATES.includes(r.shipment.state));
+  useEffect(() => {
+    void getUser().then(setUser);
+    void getFavourites().then(setFavourites);
+  }, []);
+
+  const rows = requests.data ?? [];
+
+  // the pivotal state: transporters have accepted, but NOTHING is booked until
+  // the farmer picks one. This is the most urgent thing Home can show.
+  const awaitingConfirmation = rows.filter(
+    (row) => row.offerCount > 0 && row.state === 'TRANSPORTER_INTERESTED',
+  );
+  const live = rows.filter(
+    (row) => row.shipment && LIVE_SHIPMENT_STATES.includes(row.shipment.state),
+  );
+  const recent = rows.slice(0, 4);
+
+  const firstName = user?.name?.split(' ')[0] ?? 'there';
 
   return (
     <View style={{ flex: 1 }}>
-      <Screen>
-        <View style={{ paddingTop: space.md }}>
-          <Txt variant="displayLg">Hello, {user?.name?.split(' ')[0] ?? 'there'}! 👋</Txt>
-          <Txt variant="bodyLg" color={colors.onSurfaceVariant}>
-            {user?.defaultLocation?.name ?? 'Set your pickup location'}
-          </Txt>
-        </View>
-
-        <Banner style={{ marginTop: space.lg }}>
-          <Txt variant="headlineMd" color={colors.onPrimary}>
-            Need to transport your produce?
-          </Txt>
-          <Txt variant="bodyMd" color={colors.onPrimaryContainer} style={{ marginTop: space.xs }}>
-            Share a vehicle with nearby farmers — the more of you aboard, the less each pays.
-          </Txt>
-          <Button
-            label="Transport produce"
-            variant="secondary"
-            onPress={() => router.push('/(farmer)/requests/new')}
-            style={{ marginTop: space.md }}
-          />
-        </Banner>
-
-        <View style={{ flexDirection: 'row', gap: space.gutter, marginBottom: space.md }}>
-          <Card style={{ flex: 1, marginBottom: 0 }} onPress={() => router.push('/(farmer)/mandis')}>
-            <MaterialIcons name="storefront" size={24} color={colors.primary} />
-            <Txt variant="labelLg" style={{ marginTop: space.sm }}>
-              Nearby mandis
-            </Txt>
-          </Card>
+      <Screen
+        withNav
+        refreshing={requests.refreshing}
+        onRefresh={requests.refresh}
+        header={
+          <>
+            <AppBar
+              unread={awaitingConfirmation.length}
+              onNotifications={() => router.push('/(farmer)/bookings')}
+            />
+            <ContextStrip
+              location={user?.defaultLocation?.name ?? 'Set your pickup location'}
+              language={LANGUAGE_LABEL[user?.language ?? 'en'] ?? 'English'}
+              onLocation={() => router.push('/(farmer)/profile')}
+              onLanguage={() => router.push('/(farmer)/profile')}
+            />
+          </>
+        }
+      >
+        {/* hero — greeting and the one action this app exists for */}
+        <View style={{ marginTop: space.sm }}>
           <Card
-            style={{ flex: 1, marginBottom: 0 }}
-            onPress={() => router.push('/(farmer)/payments')}
+            raised
+            style={{
+              backgroundColor: colors.primary,
+              borderColor: colors.primary,
+              borderRadius: 24,
+              padding: space.md,
+            }}
           >
-            <MaterialIcons name="receipt-long" size={24} color={colors.primary} />
-            <Txt variant="labelLg" style={{ marginTop: space.sm }}>
-              Payments
+            <Txt variant="displayLg" color={colors.onPrimary}>
+              Hello, {firstName}! 👋
             </Txt>
+            <Txt variant="bilingualSubtext" color={colors.onPrimaryContainer}>
+              आजचा दिवस कसा आहे!
+            </Txt>
+
+            <View style={{ marginTop: space.md }}>
+              <Txt variant="headlineMd" color={colors.onPrimary}>
+                Need to transport your produce?
+              </Txt>
+              <Txt
+                variant="labelSm"
+                color={colors.onPrimaryContainer}
+                style={{ marginTop: space.xs }}
+              >
+                Share a vehicle with nearby farmers — the more of you aboard, the less each pays.
+              </Txt>
+              <Button
+                label="Transport produce"
+                variant="secondary"
+                onPress={() => router.push('/(farmer)/requests/new')}
+                style={{ marginTop: space.gutter }}
+              />
+            </View>
           </Card>
         </View>
 
-        {awaitingChoice.map((request) => (
+        {/* the decision only the farmer can make */}
+        {awaitingConfirmation.map((request) => (
           <Card
-            key={`offers-${request._id}`}
-            style={{ borderColor: colors.primary, borderWidth: 2 }}
+            key={`await-${request._id}`}
+            style={{ borderColor: colors.tertiaryContainer, borderWidth: 2 }}
             onPress={() => router.push(`/(farmer)/requests/${request._id}/offers`)}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-              <MaterialIcons name="local-shipping" size={22} color={colors.primary} />
+              <MaterialIcons name="how-to-reg" size={22} color={colors.tertiary} />
               <Txt variant="headlineMd" style={{ flex: 1 }}>
-                {request.offerCount} transporter{request.offerCount > 1 ? 's' : ''} interested
+                {request.offerCount} transporter{request.offerCount > 1 ? 's' : ''} accepted
               </Txt>
+              <StatusBadge status="MATCHED" label="Your choice" />
             </View>
             <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: space.xs }}>
-              {request.cropType} · {kg(request.quantityKg)} to {request.destination.name}. Compare
-              their prices and pick one — it costs nothing.
+              {request.cropType} · {kg(request.quantityKg)} to {request.destination.name}.{' '}
+              {REQUEST_COPY.TRANSPORTER_INTERESTED.detail}
             </Txt>
             <Button
-              label="Compare and choose"
+              label="Compare and confirm"
+              icon="compare-arrows"
               onPress={() => router.push(`/(farmer)/requests/${request._id}/offers`)}
               style={{ marginTop: space.gutter }}
             />
           </Card>
         ))}
 
-        {riding.length > 0 ? (
-          <>
-            <Txt variant="headlineMd" style={{ marginBottom: space.sm }}>
-              On the road
+        {/* active / upcoming trip */}
+        <SectionHeader
+          title="Active / upcoming trip"
+          actionLabel={rows.length > 0 ? 'View all' : undefined}
+          onAction={() => router.push('/(farmer)/bookings')}
+        />
+
+        {requests.loading ? (
+          <SkeletonList count={1} />
+        ) : requests.error ? (
+          <ErrorView error={requests.error} onRetry={requests.refresh} />
+        ) : live.length === 0 ? (
+          <Card raised={false} style={{ alignItems: 'center', paddingVertical: space.lg }}>
+            <IconBadge icon="local-shipping" tone="muted" />
+            <Txt variant="labelLg" style={{ marginTop: space.sm }}>
+              No trip on the road
             </Txt>
-            {riding.map((request) => (
+            <Txt
+              variant="labelSm"
+              color={colors.onSurfaceVariant}
+              style={{ textAlign: 'center', marginTop: space.xs }}
+            >
+              When a booking is confirmed you'll be able to track it live from here.
+            </Txt>
+          </Card>
+        ) : (
+          live.map((request) => {
+            const copy = SHIPMENT_COPY[request.shipment!.state];
+            return (
               <Card
-                key={`trip-${request._id}`}
-                onPress={() => router.push(`/(farmer)/trips/${request.shipment?.tripId}`)}
+                key={`live-${request._id}`}
+                onPress={() => router.push(`/(farmer)/trips/${request.shipment!.tripId}`)}
               >
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Txt variant="labelLg">{request.cropType}</Txt>
-                  <StatusBadge status={STATE_TONE[request.state]} label={STATE_LABEL[request.state]} />
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{ flex: 1 }}>
+                    <StatusBadge status={copy.badge} label={copy.label} />
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: space.xs,
+                        marginTop: space.sm,
+                      }}
+                    >
+                      <Txt variant="labelLg" numberOfLines={1} style={{ maxWidth: 110 }}>
+                        {request.pickup.name}
+                      </Txt>
+                      <MaterialIcons name="arrow-right-alt" size={16} color={colors.outline} />
+                      <Txt variant="labelLg" numberOfLines={1} style={{ flex: 1 }}>
+                        {request.destination.name}
+                      </Txt>
+                    </View>
+                    <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                      {request.cropType} · {kg(request.quantityKg)} ·{' '}
+                      {shortDate(request.preferredDate)}
+                    </Txt>
+                  </View>
+                  <MaterialIcons name="chevron-right" size={22} color={colors.outline} />
                 </View>
+
                 <View
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: space.sm }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginTop: space.gutter,
+                    paddingTop: space.sm,
+                    borderTopWidth: 1,
+                    borderTopColor: colors.surfaceVariant,
+                  }}
                 >
-                  <Txt variant="bodyMd" color={colors.onSurfaceVariant}>
-                    {request.pickup.name}
-                  </Txt>
-                  <MaterialIcons name="arrow-right-alt" size={18} color={colors.onSurfaceVariant} />
-                  <Txt variant="bodyMd" color={colors.onSurfaceVariant}>
-                    {request.destination.name}
-                  </Txt>
+                  <View>
+                    <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                      Your share
+                    </Txt>
+                    <Txt variant="labelLg" color={colors.primary}>
+                      {rupees(request.shipment!.finalPrice ?? request.shipment!.allocatedPrice)}
+                    </Txt>
+                  </View>
+                  <Button
+                    label="Track trip"
+                    variant="secondary"
+                    icon="location-on"
+                    onPress={() => router.push(`/(farmer)/trips/${request.shipment!.tripId}`)}
+                  />
                 </View>
-                {request.shipment ? (
-                  <Txt variant="labelSm" color={colors.primary} style={{ marginTop: space.xs }}>
-                    Your share {rupees(request.shipment.finalPrice ?? request.shipment.allocatedPrice)} ·
-                    alone it would be {rupees(request.shipment.soloPrice)}
-                  </Txt>
-                ) : null}
               </Card>
-            ))}
-          </>
-        ) : null}
+            );
+          })
+        )}
 
-        <Txt variant="headlineMd" style={{ marginTop: space.md, marginBottom: space.sm }}>
-          Recent requests
-        </Txt>
+        {/* shortcuts */}
+        <SectionHeader title="Quick actions" />
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <QuickAction
+            icon="storefront"
+            label="Nearby mandis"
+            onPress={() => router.push('/(farmer)/mandis')}
+          />
+          <QuickAction
+            icon="assignment"
+            label="My bookings"
+            badge={awaitingConfirmation.length}
+            onPress={() => router.push('/(farmer)/bookings')}
+          />
+          <QuickAction
+            icon="star"
+            label="Favourites"
+            tone="tertiary"
+            badge={favourites.length || undefined}
+            onPress={() => router.push('/(farmer)/mandis?filter=favourites')}
+          />
+          <QuickAction
+            icon="support-agent"
+            label="AI assistant"
+            tag="AI"
+            onPress={() => router.push('/(farmer)/support')}
+          />
+        </View>
 
-        {loading ? (
-          <Loading />
-        ) : error ? (
-          <ErrorView error={error} onRetry={() => void load()} />
-        ) : requests.length === 0 ? (
+        {/* recent activity */}
+        <SectionHeader
+          title="Recent activity"
+          actionLabel={rows.length > recent.length ? 'View all' : undefined}
+          onAction={() => router.push('/(farmer)/bookings')}
+        />
+
+        {requests.loading ? (
+          <SkeletonList count={2} />
+        ) : recent.length === 0 ? (
           <EmptyState
             icon="local-shipping"
             title="No requests yet"
             message="Create your first request, or tap the mic and just say what you want to send."
+            action={
+              <Button
+                label="Transport produce"
+                onPress={() => router.push('/(farmer)/requests/new')}
+              />
+            }
           />
         ) : (
-          requests.slice(0, 8).map((request) => (
-            <Card
-              key={request._id}
-              onPress={() =>
-                router.push(
-                  request.shipment
-                    ? `/(farmer)/trips/${request.shipment.tripId}`
-                    : `/(farmer)/requests/${request._id}/offers`,
-                )
-              }
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.gutter }}>
-                <View
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: radius.md,
-                    backgroundColor: colors.surfaceContainer,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <MaterialIcons name="eco" size={24} color={colors.primary} />
+          recent.map((request) => {
+            const copy = request.shipment
+              ? SHIPMENT_COPY[request.shipment.state]
+              : REQUEST_COPY[request.state];
+            return (
+              <Card
+                key={request._id}
+                onPress={() =>
+                  router.push(
+                    request.shipment
+                      ? `/(farmer)/trips/${request.shipment.tripId}`
+                      : `/(farmer)/requests/${request._id}/offers`,
+                  )
+                }
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.gutter }}>
+                  <IconBadge icon="eco" />
+                  <View style={{ flex: 1 }}>
+                    <Txt variant="labelLg">
+                      {request.cropType} · {kg(request.quantityKg)}
+                    </Txt>
+                    <Txt variant="labelSm" color={colors.onSurfaceVariant} numberOfLines={1}>
+                      {request.destination.name} · {timeAgo(request.createdAt)}
+                    </Txt>
+                  </View>
+                  <StatusBadge status={copy.badge} label={copy.label} />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Txt variant="labelLg">
-                    {request.cropType} · {kg(request.quantityKg)}
-                  </Txt>
-                  <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-                    {shortDate(request.preferredDate)} · {request.destination.name}
-                  </Txt>
-                </View>
-                <StatusBadge status={STATE_TONE[request.state]} label={STATE_LABEL[request.state]} />
-              </View>
-            </Card>
-          ))
+              </Card>
+            );
+          })
         )}
       </Screen>
 
       <VoiceAssistantButton language={user?.language} />
+      <BottomNav
+        role="farmer"
+        active="home"
+        badges={{ bookings: awaitingConfirmation.length }}
+      />
     </View>
   );
 }

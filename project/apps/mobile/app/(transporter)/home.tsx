@@ -1,38 +1,59 @@
 /**
- * transporter_dashboard — availability toggle, the trip being built right now,
- * claims the farmers are still deciding on, earnings, and the verification banner.
+ * Transporter · Dashboard — "am I available, what fits, what am I doing next?"
  *
- * Same Farmer design tokens and the same shared components as the farmer stack —
- * nothing here branches on role for styling (ADR-017).
+ * The old screen was the whole app: availability, capacity, earnings, the load
+ * pool, my claims, the vehicle record and the payouts link all on one scroll.
+ * Requests, Trips, Earnings and Profile are now tabs of their own; what stays
+ * here is only the status summary and the single next action.
+ *
+ * The capacity card is the important one. It shows FOUR different numbers because
+ * they mean four different things, and folding them together would break pooling:
+ *
+ *   Accepted   claimed by me, no farmer has confirmed  -> reserves NOTHING
+ *   Confirmed  a farmer chose me                       -> reserved
+ *   Loaded     physically aboard                       -> reserved
+ *   Available  what a farmer could still confirm into
  */
 import { useCallback, useState } from 'react';
 import { Switch, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import type { TripCapacity, UserDTO, VehicleDTO } from '@kisanpool/shared';
 import { api } from '../../lib/api';
 import { useSocket } from '../../lib/socket';
 import { getUser } from '../../lib/session';
-import { kg, rupees } from '../../lib/format';
+import { useLoader } from '../../lib/useLoader';
+import { toAppError } from '../../lib/errors';
 import {
+  acceptedKgFrom,
+  emptyLedger,
+  ledgerFrom,
+  ledgerSegments,
+  usedPct,
+  OPEN_TRIP_STATES,
+} from '../../lib/pooling';
+
+import { isToday, kg, rupees } from '../../lib/format';
+import {
+  AppBar,
   Banner,
   Button,
   Card,
   Divider,
-  Loading,
-  RatingStars,
+  Metric,
+  ProgressTrack,
   Row,
   Screen,
+  SectionHeader,
+  SkeletonCard,
   StatusBadge,
+  Toast,
   Txt,
 } from '../../components/ui';
 import { ErrorView } from '../../components/ErrorView';
+import { BottomNav } from '../../components/BottomNav';
+import { VoiceAssistantButton } from '../../components/VoiceAssistantButton';
 import { colors, radius, space } from '../../theme';
-
-type MyTrip = Awaited<ReturnType<typeof api.myTrips>>[number];
-
-/** A trip still running — a vehicle may only ever have one of these. */
-const OPEN_TRIP_STATES = ['FORMING', 'EN_ROUTE', 'IN_TRANSIT', 'AT_DESTINATION'];
 
 const TRIP_LABEL: Record<string, string> = {
   FORMING: 'Taking loads',
@@ -43,309 +64,371 @@ const TRIP_LABEL: Record<string, string> = {
   CANCELLED: 'Cancelled',
 };
 
-export default function TransporterHome() {
+export default function TransporterDashboard() {
   const router = useRouter();
   const [user, setUserState] = useState<UserDTO | null>(null);
   const [vehicle, setVehicle] = useState<VehicleDTO | null>(null);
-  const [trips, setTrips] = useState<MyTrip[]>([]);
-  const [awaitingDecision, setAwaitingDecision] = useState(0);
-  const [payoutTotal, setPayoutTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<unknown>();
   const [toggling, setToggling] = useState(false);
-  const [newlySelected, setNewlySelected] = useState(0);
+  const [toast, setToast] = useState<string | null>(null);
+  const [toastTone, setToastTone] = useState<'success' | 'error'>('success');
 
-  const load = useCallback(async () => {
-    setError(undefined);
-    try {
+  const dash = useLoader(
+    useCallback(async () => {
       setUserState(await getUser());
-      setVehicle(await api.myVehicle());
-      setTrips(await api.myTrips());
-      const offers = await api.myOffers();
-      setAwaitingDecision(offers.filter((offer) => offer.state === 'INTERESTED').length);
-      const payouts = await api.payouts();
-      setPayoutTotal(payouts.total);
-    } catch (err) {
-      setError(err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load]),
+      const [myVehicle, trips, offers, payouts] = await Promise.all([
+        api.myVehicle(),
+        api.myTrips(),
+        api.myOffers(),
+        api.payouts(),
+      ]);
+      setVehicle(myVehicle);
+      return { vehicle: myVehicle, trips, offers, payouts };
+    }, []),
   );
 
-  const openTrip = trips.find((trip) => OPEN_TRIP_STATES.includes(trip.state));
-  const completed = trips.filter((trip) => trip.state === 'COMPLETED');
+  const trips = dash.data?.trips ?? [];
+  const offers = dash.data?.offers ?? [];
+  const payouts = dash.data?.payouts;
 
-  /**
-   * Live counts. The dashboard joins the open trip's room so a farmer choosing this
-   * driver, a load moving, or capacity freeing up lands here without a pull to
-   * refresh — refetching only on focus meant a driver staring at the screen saw
-   * nothing move.
-   */
+  const openTrip = trips.find((trip) => OPEN_TRIP_STATES.includes(trip.state as never));
+  const completedCount = trips.filter((trip) => trip.state === 'COMPLETED').length;
+
+  // weight this driver has claimed that no farmer has confirmed — not reserved
+  const acceptedKg = acceptedKgFrom(offers);
+  const awaitingFarmer = offers.filter((offer) => offer.state === 'INTERESTED').length;
+
+  const ledger = openTrip
+    ? ledgerFrom(openTrip.capacity, acceptedKg)
+    : emptyLedger(vehicle?.capacityKg ?? 0, acceptedKg);
+
+  const todayEarned = (payouts?.payouts ?? [])
+    .filter((payout) => isToday(payout.createdAt))
+    .reduce((sum, payout) => sum + payout.amount, 0);
+
   useSocket(openTrip ? { type: 'trip', id: openTrip._id } : null, {
-    'offer:selected': () => {
-      setNewlySelected((n) => n + 1);
-      void load();
-    },
-    'shipment:state': () => {
-      void load();
-    },
+    'offer:selected': () => void dash.reconcile(),
+    'shipment:state': () => void dash.reconcile(),
     'trip:capacity': (payload: { capacity: TripCapacity; poolSize: number }) => {
-      setTrips((prev) =>
-        prev.map((trip) =>
+      dash.set((previous) => ({
+        ...previous,
+        trips: previous.trips.map((trip) =>
           trip._id === openTrip?._id
             ? { ...trip, capacity: payload.capacity, poolSize: payload.poolSize }
             : trip,
         ),
-      );
+      }));
     },
   });
 
-  const toggleAvailability = async (online: boolean): Promise<void> => {
+  const verified = vehicle?.verificationStatus === 'VERIFIED';
+  const online = vehicle?.status === 'AVAILABLE';
+
+  const toggleAvailability = async (next: boolean): Promise<void> => {
     if (!vehicle) return;
     setToggling(true);
-    setError(undefined);
     try {
-      const updated = await api.setAvailability(vehicle._id, online ? 'AVAILABLE' : 'OFFLINE');
+      const updated = await api.setAvailability(vehicle._id, next ? 'AVAILABLE' : 'OFFLINE');
       setVehicle(updated);
+      setToastTone('success');
+      setToast(next ? "You're online — loads will appear in Requests" : "You're offline");
     } catch (err) {
-      // KYC_PENDING_REVIEW -> keep the screen, disable the control, say why
-      setError(err);
+      setToastTone('error');
+      setToast(toAppError(err).message);
     } finally {
       setToggling(false);
     }
   };
 
-  if (loading) {
-    return (
-      <Screen>
-        <Loading />
-      </Screen>
-    );
-  }
-
-  const verified = vehicle?.verificationStatus === 'VERIFIED';
-  const online = vehicle?.status === 'AVAILABLE';
-
   return (
-    <Screen>
-      <View style={{ paddingTop: space.md, flexDirection: 'row', alignItems: 'center' }}>
-        <View style={{ flex: 1 }}>
-          <Txt variant="displayLg">{user?.name?.split(' ')[0] ?? 'Driver'}</Txt>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-            <RatingStars value={user?.ratingAvg ?? 0} />
-            <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-              {(user?.ratingAvg ?? 0).toFixed(1)} ({user?.ratingCount ?? 0})
-            </Txt>
-          </View>
-        </View>
-        {vehicle ? <StatusBadge status={vehicle.verificationStatus} /> : null}
-      </View>
-
-      {/* the banner that explains why no loads are arriving */}
-      {vehicle && !verified ? (
-        <Banner tone="warning" style={{ marginTop: space.md }}>
-          <View style={{ flexDirection: 'row', gap: space.sm }}>
-            <MaterialIcons name="hourglass-empty" size={22} color={colors.onWarningContainer} />
-            <View style={{ flex: 1 }}>
-              <Txt variant="labelLg" color={colors.onWarningContainer}>
-                {vehicle.verificationStatus === 'REJECTED'
-                  ? 'Your documents were rejected'
-                  : 'Verification in progress'}
-              </Txt>
-              <Txt
-                variant="bodyMd"
-                color={colors.onWarningContainer}
-                style={{ marginTop: space.xs }}
-              >
-                {vehicle.verificationStatus === 'REJECTED'
-                  ? 'Please re-upload your RC and driving licence.'
-                  : 'The load pool opens to you once your RC and licence are approved.'}
-              </Txt>
-              <Button
-                label="View documents"
-                variant="secondary"
-                icon="description"
-                onPress={() => router.push('/(auth)/kyc')}
-                style={{ marginTop: space.gutter }}
-              />
-            </View>
-          </View>
-        </Banner>
-      ) : null}
-
-      <Card style={{ marginTop: space.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ flex: 1 }}>
-            <Txt variant="headlineMd">{online ? 'Online' : 'Offline'}</Txt>
-            <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-              {verified
-                ? online
-                  ? 'The load pool is open to you'
-                  : 'Go online to see loads near you'
-                : 'Available once your documents are verified'}
-            </Txt>
-          </View>
-          <Switch
-            value={online}
-            disabled={!verified || toggling}
-            onValueChange={(next) => void toggleAvailability(next)}
-            trackColor={{ true: colors.primaryContainer, false: colors.surfaceContainerHigh }}
-            thumbColor={colors.surfaceContainerLowest}
+    <View style={{ flex: 1 }}>
+      <Screen
+        withNav
+        refreshing={dash.refreshing}
+        onRefresh={dash.refresh}
+        header={
+          <AppBar
+            title="Dashboard"
+            unread={awaitingFarmer}
+            onNotifications={() => router.push('/(transporter)/trips')}
           />
-        </View>
-      </Card>
+        }
+      >
+        {dash.loading ? (
+          <>
+            <SkeletonCard lines={2} />
+            <SkeletonCard lines={3} />
+            <SkeletonCard lines={3} />
+          </>
+        ) : dash.error ? (
+          <ErrorView error={dash.error} onRetry={dash.refresh} />
+        ) : (
+          <>
+            {/* why no loads are arriving, when that is the case */}
+            {vehicle && !verified ? (
+              <Banner tone="warning">
+                <View style={{ flexDirection: 'row', gap: space.sm }}>
+                  <MaterialIcons
+                    name="hourglass-empty"
+                    size={22}
+                    color={colors.onWarningContainer}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Txt variant="labelLg" color={colors.onWarningContainer}>
+                      {vehicle.verificationStatus === 'REJECTED'
+                        ? 'Your documents were rejected'
+                        : 'Verification in progress'}
+                    </Txt>
+                    <Txt variant="bodyMd" color={colors.onWarningContainer}>
+                      {vehicle.verificationStatus === 'REJECTED'
+                        ? 'Please re-upload your RC and driving licence.'
+                        : 'The load pool opens to you once your RC and licence are approved.'}
+                    </Txt>
+                    <Button
+                      label="View documents"
+                      variant="secondary"
+                      icon="description"
+                      onPress={() => router.push('/(auth)/kyc')}
+                      style={{ marginTop: space.gutter }}
+                    />
+                  </View>
+                </View>
+              </Banner>
+            ) : null}
 
-      {error ? <ErrorView error={error} onRetry={() => void load()} /> : null}
+            {/* am I available? */}
+            <Card>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.gutter }}>
+                <View
+                  style={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: radius.full,
+                    backgroundColor: online ? colors.secondary : colors.outline,
+                  }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Txt variant="headlineMd" color={online ? colors.primary : colors.onSurface}>
+                    {online ? 'Online' : 'Offline'}
+                  </Txt>
+                  <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                    {verified
+                      ? online
+                        ? 'You are available for loads'
+                        : 'Go online to see loads near you'
+                      : 'Available once your documents are verified'}
+                  </Txt>
+                </View>
+                <Switch
+                  value={online}
+                  disabled={!verified || toggling}
+                  onValueChange={(next) => void toggleAvailability(next)}
+                  trackColor={{ true: colors.primaryContainer, false: colors.surfaceContainerHigh }}
+                  thumbColor={colors.surfaceContainerLowest}
+                />
+              </View>
+            </Card>
 
-      <View style={{ flexDirection: 'row', gap: space.gutter }}>
-        <Card style={{ flex: 1 }}>
-          <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-            Total earned
-          </Txt>
-          <Txt variant="headlineLg">{rupees(payoutTotal)}</Txt>
-        </Card>
-        <Card style={{ flex: 1 }}>
-          <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-            Trips completed
-          </Txt>
-          <Txt variant="headlineLg">{completed.length}</Txt>
-        </Card>
-      </View>
-
-      {/* one vehicle, one open trip — many farmers on it */}
-      {openTrip ? (
-        <Card onPress={() => router.push(`/(transporter)/trips/${openTrip._id}`)}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Txt variant="labelLg">Current trip</Txt>
-            <StatusBadge status={openTrip.state} label={TRIP_LABEL[openTrip.state] ?? openTrip.state} />
-          </View>
-          <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: space.xs }}>
-            {openTrip.poolSize} {openTrip.poolSize === 1 ? 'farmer' : 'farmers'} →{' '}
-            {openTrip.destination.name}
-          </Txt>
-
-          <View
-            style={{
-              flexDirection: 'row',
-              height: 12,
-              borderRadius: radius.full,
-              overflow: 'hidden',
-              backgroundColor: colors.surfaceContainerHigh,
-              marginTop: space.gutter,
-            }}
-          >
-            <View style={{ flex: Math.max(0, openTrip.capacity.loadedKg), backgroundColor: colors.primary }} />
-            <View
+            {/* how much have I earned? */}
+            <Card
               style={{
-                flex: Math.max(0, openTrip.capacity.committedKg - openTrip.capacity.loadedKg),
                 backgroundColor: colors.primaryContainer,
+                borderColor: colors.primaryContainer,
+                borderRadius: radius.xl,
               }}
+            >
+              <Txt variant="bodyMd" color={colors.onPrimaryContainer}>
+                Today's earnings
+              </Txt>
+              <Txt variant="displayLg" color={colors.onPrimary}>
+                {rupees(todayEarned)}
+              </Txt>
+
+              <View style={{ flexDirection: 'row', gap: space.md, marginTop: space.md }}>
+                <Metric
+                  label="Trips completed"
+                  value={String(completedCount)}
+                  tone="onPrimary"
+                />
+                <Metric
+                  label="Paid out so far"
+                  value={rupees(payouts?.total ?? 0)}
+                  tone="onPrimary"
+                />
+                <View style={{ flex: 1 }}>
+                  <Txt variant="labelSm" color={colors.onPrimaryContainer}>
+                    Rating
+                  </Txt>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
+                    <MaterialIcons name="star" size={18} color={colors.tertiaryContainer} />
+                    <Txt variant="headlineMd" color={colors.onPrimary}>
+                      {(user?.ratingAvg ?? 0).toFixed(1)}
+                    </Txt>
+                  </View>
+                </View>
+              </View>
+
+              <Divider />
+              <Button
+                label="View earnings details"
+                variant="secondary"
+                onPress={() => router.push('/(transporter)/earnings')}
+              />
+            </Card>
+
+            {/* how much capacity do I have? */}
+            <Card>
+              <View
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+              >
+                <Txt variant="headlineMd" color={colors.primary}>
+                  Capacity
+                </Txt>
+                <View style={s.capacityPill}>
+                  <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                    {kg(ledger.confirmedKg)} / {kg(ledger.totalKg)}
+                  </Txt>
+                </View>
+              </View>
+
+              <View
+                style={{ flexDirection: 'row', alignItems: 'center', gap: space.gutter, marginTop: space.md }}
+              >
+                <MaterialIcons name="local-shipping" size={32} color={colors.primaryContainer} />
+                <View style={{ flex: 1 }}>
+                  <ProgressTrack
+                    height={12}
+                    segments={ledgerSegments(ledger, {
+                      loaded: colors.primary,
+                      confirmed: colors.primaryContainer,
+                    })}
+                  />
+                </View>
+                <Txt variant="labelLg" color={colors.primary}>
+                  {usedPct(ledger)}%
+                </Txt>
+              </View>
+
+              <Divider />
+
+              {/* the four numbers, never collapsed into one */}
+              <Row label="Vehicle capacity" value={kg(ledger.totalKg)} />
+              <Row label="Confirmed by farmers" value={kg(ledger.confirmedKg)} />
+              <Row label="Currently loaded" value={kg(ledger.loadedKg)} />
+              <Row label="Available" value={kg(ledger.availableKg)} bold />
+
+              {ledger.acceptedKg > 0 ? (
+                <View style={s.acceptedNote}>
+                  <MaterialIcons name="pan-tool-alt" size={16} color={colors.onWarningContainer} />
+                  <Txt variant="labelSm" color={colors.onWarningContainer} style={{ flex: 1 }}>
+                    You have accepted {kg(ledger.acceptedKg)} more, awaiting farmers' decisions.
+                    That space is <Txt variant="labelSm" color={colors.onWarningContainer}>not</Txt>{' '}
+                    reserved until a farmer confirms you.
+                  </Txt>
+                </View>
+              ) : null}
+            </Card>
+
+            {/* do I have a trip? */}
+            <SectionHeader
+              title="Active trip"
+              actionLabel="All trips"
+              onAction={() => router.push('/(transporter)/trips')}
             />
-            <View style={{ flex: Math.max(0, openTrip.capacity.availableKg) }} />
-          </View>
 
-          <Divider />
-          <Row label="Booked in" value={kg(openTrip.capacity.committedKg)} />
-          <Row label="Still fits" value={kg(openTrip.capacity.availableKg)} bold />
-        </Card>
-      ) : null}
+            {openTrip ? (
+              <Card onPress={() => router.push(`/(transporter)/trips/${openTrip._id}`)}>
+                <View
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+                >
+                  <Txt variant="labelLg">{openTrip.destination.name}</Txt>
+                  <StatusBadge
+                    status={openTrip.state}
+                    label={TRIP_LABEL[openTrip.state] ?? openTrip.state}
+                  />
+                </View>
+                <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ marginTop: space.xs }}>
+                  {openTrip.poolSize} {openTrip.poolSize === 1 ? 'farmer' : 'farmers'} aboard ·{' '}
+                  {kg(openTrip.capacity.availableKg)} still free
+                </Txt>
+                <Button
+                  label="Open trip"
+                  icon="navigation"
+                  onPress={() => router.push(`/(transporter)/trips/${openTrip._id}`)}
+                  style={{ marginTop: space.gutter }}
+                />
+              </Card>
+            ) : (
+              <Card raised={false} style={{ alignItems: 'center', paddingVertical: space.lg }}>
+                <MaterialIcons name="route" size={40} color={colors.outline} />
+                <Txt variant="labelLg" style={{ marginTop: space.sm }}>
+                  No trip running
+                </Txt>
+                <Txt
+                  variant="labelSm"
+                  color={colors.onSurfaceVariant}
+                  style={{ textAlign: 'center', marginTop: space.xs }}
+                >
+                  {online
+                    ? 'Accept a load from Requests — your first confirmed farmer starts the trip.'
+                    : 'Go online to start seeing loads on your route.'}
+                </Txt>
+                <Button
+                  label={online ? 'Browse requests' : 'Go online'}
+                  icon={online ? 'local-shipping' : 'wifi'}
+                  onPress={() =>
+                    online ? router.push('/(transporter)/requests') : void toggleAvailability(true)
+                  }
+                  style={{ marginTop: space.gutter, alignSelf: 'stretch' }}
+                />
+              </Card>
+            )}
 
-      {!vehicle ? (
-        <Card>
-          <Txt variant="headlineMd">No vehicle registered</Txt>
-          <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: space.xs }}>
-            Add your vehicle to start claiming loads.
-          </Txt>
-          <Button
-            label="Register my vehicle"
-            onPress={() => router.push('/(auth)/vehicle-register')}
-            style={{ marginTop: space.gutter }}
-          />
-        </Card>
-      ) : (
-        <Card>
-          <Txt variant="labelLg">{vehicle.registrationNumber}</Txt>
-          <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-            {vehicle.vehicleType}
-          </Txt>
-          <Divider />
-          <Row label="Total capacity" value={kg(vehicle.capacityKg)} />
-          <Row label="Rate" value={`${rupees(vehicle.ratePerKm)} / km`} />
-        </Card>
-      )}
+            {/* what should I do next? */}
+            {awaitingFarmer > 0 ? (
+              <Card
+                style={{ borderColor: colors.tertiaryContainer, borderWidth: 2 }}
+                onPress={() => router.push('/(transporter)/trips')}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                  <MaterialIcons name="hourglass-top" size={22} color={colors.tertiary} />
+                  <View style={{ flex: 1 }}>
+                    <Txt variant="labelLg">
+                      {awaitingFarmer} load{awaitingFarmer > 1 ? 's' : ''} awaiting a farmer's
+                      decision
+                    </Txt>
+                    <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                      You accepted these. None is booked until the farmer chooses you.
+                    </Txt>
+                  </View>
+                  <MaterialIcons name="chevron-right" size={22} color={colors.outline} />
+                </View>
+              </Card>
+            ) : null}
+          </>
+        )}
+      </Screen>
 
-      <View style={{ flexDirection: 'row', gap: space.gutter }}>
-        <Card
-          style={{ flex: 1 }}
-          onPress={() => {
-            setNewlySelected(0);
-            router.push('/(transporter)/trips/available');
-          }}
-        >
-          <View
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-          >
-            <MaterialIcons name="local-shipping" size={24} color={colors.primary} />
-            {newlySelected > 0 ? <CountBadge count={newlySelected} /> : null}
-          </View>
-          <Txt variant="labelLg" style={{ marginTop: space.sm }}>
-            Load pool
-          </Txt>
-          <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-            {openTrip ? `${kg(openTrip.capacity.availableKg)} still fits` : 'Claim what suits you'}
-          </Txt>
-        </Card>
-
-        <Card style={{ flex: 1 }} onPress={() => router.push('/(transporter)/offers')}>
-          <View
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-          >
-            <MaterialIcons name="pan-tool-alt" size={24} color={colors.primary} />
-            {awaitingDecision > 0 ? <CountBadge count={awaitingDecision} /> : null}
-          </View>
-          <Txt variant="labelLg" style={{ marginTop: space.sm }}>
-            My claims
-          </Txt>
-          <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-            {awaitingDecision > 0 ? 'Farmers deciding' : 'Nothing pending'}
-          </Txt>
-        </Card>
-      </View>
-
-      <Card onPress={() => router.push('/(transporter)/payouts')}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-          <MaterialIcons name="payments" size={24} color={colors.primary} />
-          <Txt variant="labelLg">Earnings</Txt>
-        </View>
-      </Card>
-
-      <View style={{ height: radius.xl }} />
-    </Screen>
-  );
-}
-
-function CountBadge({ count }: { count: number }) {
-  return (
-    <View
-      style={{
-        minWidth: 22,
-        height: 22,
-        paddingHorizontal: 6,
-        borderRadius: radius.full,
-        backgroundColor: colors.primary,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <Txt variant="labelSm" color={colors.onPrimary}>
-        {String(count)}
-      </Txt>
+      <Toast message={toast} tone={toastTone} onHide={() => setToast(null)} />
+      <VoiceAssistantButton language={user?.language} />
+      <BottomNav role="transporter" active="dashboard" badges={{ trips: awaitingFarmer }} />
     </View>
   );
 }
+
+const s = {
+  capacityPill: {
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: radius.full,
+    paddingHorizontal: space.gutter,
+    paddingVertical: space.xs,
+  },
+  acceptedNote: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    gap: space.sm,
+    backgroundColor: colors.warningContainer,
+    borderRadius: radius.md,
+    padding: space.gutter,
+    marginTop: space.sm,
+  },
+};

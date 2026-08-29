@@ -20,9 +20,8 @@ import type {
   VehicleType,
 } from '@kisanpool/shared';
 import { AppError } from './errors';
+import { API_URL as BASE_URL } from './config';
 import { clearSession, getAccessToken, getRefreshToken, setTokens } from './session';
-
-const BASE_URL = "http://10.193.241.68:4000"
 
 // ---- shapes the pooling screens render ----
 
@@ -78,8 +77,6 @@ export interface PoolEntry {
 }
 
 export type { OfferState, ShipmentState, TripState, TransporterOfferDTO, TripCapacity };
-
-//process.env.EXPO_PUBLIC_API_URL
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
