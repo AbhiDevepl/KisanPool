@@ -14,6 +14,7 @@ import { getUser } from '../../../lib/session';
 import { MANDIS } from '../../../lib/mandis';
 import { Button, Card, Chip, Field, Header, Screen, Txt } from '../../../components/ui';
 import { ErrorView } from '../../../components/ErrorView';
+import { LocationPicker } from '../../../components/LocationPicker';
 import { colors, space } from '../../../theme';
 
 const CROPS = ['Onion', 'Tomato', 'Potato', 'Grapes', 'Other'];
@@ -42,12 +43,18 @@ export default function NewRequest() {
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  /** true once the farmer has explicitly chosen — stops a late profile load stomping it */
+  const [pickupTouched, setPickupTouched] = useState(false);
 
   useEffect(() => {
     void getUser().then((user) => {
-      if (user?.defaultLocation) setPickup(user.defaultLocation);
+      // seed from the saved place ONLY as a starting suggestion; the farmer can
+      // replace it, and a manual choice is never overwritten (the bug was this
+      // value being forced with no way to change it)
+      if (user?.defaultLocation && !pickupTouched) setPickup(user.defaultLocation);
     });
-  }, []);
+  }, [pickupTouched]);
 
   const submit = async (): Promise<void> => {
     if (!pickup || !destination) return;
@@ -110,12 +117,32 @@ export default function NewRequest() {
       <Txt variant="labelLg" color={colors.onSurfaceVariant} style={{ marginBottom: space.sm }}>
         Pickup
       </Txt>
-      <Card>
-        <Txt variant="labelLg">{pickup?.name ?? 'Set a pickup location'}</Txt>
-        <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-          Your default pickup place
-        </Txt>
+      <Card onPress={() => setPickerOpen(true)}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+          <View style={{ flex: 1 }}>
+            <Txt variant="labelLg">{pickup?.name ?? 'Set a pickup location'}</Txt>
+            <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+              {pickup ? 'Tap to search, drop a pin, or use GPS' : 'Choose where the produce is'}
+            </Txt>
+          </View>
+          <Txt variant="labelLg" color={colors.primary}>
+            {pickup ? 'Change' : 'Set'}
+          </Txt>
+        </View>
       </Card>
+
+      <LocationPicker
+        visible={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        initial={pickup}
+        title="Where is the produce?"
+        subtitle="This is where the transporter will collect from."
+        confirmLabel="Use this pickup"
+        onPick={(point) => {
+          setPickup(point);
+          setPickupTouched(true);
+        }}
+      />
 
       <Txt variant="labelLg" color={colors.onSurfaceVariant} style={{ marginBottom: space.sm }}>
         Destination mandi

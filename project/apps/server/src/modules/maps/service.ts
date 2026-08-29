@@ -83,3 +83,87 @@ export async function estimateEtaMinutes(from: Point, to: Point): Promise<number
   const { durationMinutes } = await getDirections(from, to);
   return durationMinutes;
 }
+
+// ---------------------------------------------------------------------------
+// place search — so a farmer can NAME a pickup instead of being pinned to GPS
+// ---------------------------------------------------------------------------
+
+export interface PlaceResult {
+  name: string;
+  lat: number;
+  lng: number;
+  /** 'google' when geocoded, 'local' when served from the offline gazetteer */
+  source: 'google' | 'local';
+}
+
+const placeCache = new Map<string, { value: PlaceResult[]; expires: number }>();
+
+/**
+ * Resolve a typed place to coordinates. Google Geocoding when a key is set,
+ * otherwise the offline gazetteer (`maps/places.ts`) — search must never be dead
+ * just because the Maps key is blank, or the farmer with no usable GPS has no way
+ * to enter their village at all.
+ */
+export async function searchPlaces(
+  query: string,
+  near?: Point | null,
+): Promise<PlaceResult[]> {
+  const q = query.trim();
+  if (q.length < 2) return [];
+
+  const cacheKey = `${q.toLowerCase()}|${near ? `${near.lat.toFixed(2)},${near.lng.toFixed(2)}` : ''}`;
+  const hit = placeCache.get(cacheKey);
+  if (hit && hit.expires > Date.now()) return hit.value;
+
+  const { searchKnownPlaces } = await import('./places');
+  const local: PlaceResult[] = searchKnownPlaces(q, near).map((p) => ({
+    name: p.name,
+    lat: p.lat,
+    lng: p.lng,
+    source: 'local' as const,
+  }));
+
+  let results = local;
+
+  if (config.googleMapsApiKey) {
+    try {
+      const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+      url.searchParams.set('address', q);
+      url.searchParams.set('region', 'in');
+      url.searchParams.set('components', 'country:IN');
+      if (near) url.searchParams.set('bounds', `${near.lat - 1},${near.lng - 1}|${near.lat + 1},${near.lng + 1}`);
+      url.searchParams.set('key', config.googleMapsApiKey);
+
+      const res = await fetch(url);
+      const json = (await res.json()) as {
+        status: string;
+        results?: Array<{
+          formatted_address: string;
+          geometry?: { location?: { lat: number; lng: number } };
+        }>;
+      };
+
+      if (json.status === 'OK' && json.results?.length) {
+        const geocoded: PlaceResult[] = json.results
+          .filter((r) => r.geometry?.location)
+          .slice(0, 6)
+          .map((r) => ({
+            name: r.formatted_address,
+            lat: r.geometry!.location!.lat,
+            lng: r.geometry!.location!.lng,
+            source: 'google' as const,
+          }));
+        // geocoded first, then any local matches Google missed
+        const seen = new Set(geocoded.map((g) => g.name));
+        results = [...geocoded, ...local.filter((l) => !seen.has(l.name))];
+      } else if (json.status !== 'ZERO_RESULTS') {
+        console.warn(`[maps] geocode returned ${json.status} — using local gazetteer`);
+      }
+    } catch (err) {
+      console.warn('[maps] geocode failed, using local gazetteer', err);
+    }
+  }
+
+  placeCache.set(cacheKey, { value: results, expires: Date.now() + CACHE_TTL_MS });
+  return results;
+}

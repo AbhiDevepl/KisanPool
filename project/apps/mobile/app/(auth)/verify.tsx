@@ -11,9 +11,10 @@ import { colors, space } from '../../theme';
 
 export default function Verify() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ role?: Role; language?: Language }>();
+  const params = useLocalSearchParams<{ role?: Role; language?: Language; provider?: string }>();
   const role = (params.role ?? 'FARMER') as Role;
   const language = (params.language ?? 'en') as Language;
+  const isProvider = params.provider === '1';
 
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
@@ -55,7 +56,11 @@ export default function Verify() {
       await api.updateMe({ language });
 
       router.replace(
-        role === 'FARMER' ? '/(auth)/farmer-details' : '/(auth)/vehicle-register',
+        isProvider
+          ? '/(auth)/machine-register'
+          : role === 'FARMER'
+            ? '/(auth)/farmer-details'
+            : '/(auth)/vehicle-register',
       );
     } catch (err) {
       // AUTH_OTP_INVALID -> inline under the field, clear the input, stay here

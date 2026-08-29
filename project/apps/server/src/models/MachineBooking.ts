@@ -71,6 +71,8 @@ const machineBookingSchema = new Schema(
           travelKm: { type: Number, default: 0 },
           travelCost: { type: Number, default: 0 },
           minimumTopUp: { type: Number, default: 0 },
+          /** co-scheduled jobs the round trip splits across — 1 unless grouped (ADR-042) */
+          travelShareCount: { type: Number, default: 1 },
           total: { type: Number, required: true },
           platformFee: { type: Number, default: 0 },
           providerEarning: { type: Number, default: 0 },
@@ -79,6 +81,15 @@ const machineBookingSchema = new Schema(
       ),
       required: true,
     },
+
+    /**
+     * The co-scheduled cluster this hire shares an outing with (ADR-042).
+     *
+     * Undefined for a solo hire. When set, other REQUESTED/CONFIRMED bookings with
+     * the same groupId are served in one provider trip and each one's `quote`
+     * travel term is its share of the round trip, not the whole of it.
+     */
+    groupId: { type: Schema.Types.ObjectId, default: undefined, index: true },
 
     /** set at completion — the work may have taken more or fewer hours than quoted */
     finalAmount: { type: Number, default: undefined },

@@ -12,12 +12,15 @@ import { colors, radius, space } from '../../theme';
 export default function Success() {
   const router = useRouter();
   const [role, setRole] = useState<'FARMER' | 'TRANSPORTER'>('FARMER');
+  const [isProvider, setIsProvider] = useState(false);
 
   useEffect(() => {
     void (async () => {
       const user = await api.me();
       await setUser(user);
       setRole(user.role);
+      // a machinery/service provider signs up as FARMER but owns a machine
+      void api.myMachines().then((m) => setIsProvider(m.length > 0)).catch(() => {});
       // permission asked here, once onboarding has earned the right to ask
       await registerForPush();
     })();
@@ -60,9 +63,11 @@ export default function Success() {
           color={colors.onSurfaceVariant}
           style={{ marginTop: space.md, textAlign: 'center' }}
         >
-          {role === 'FARMER'
-            ? 'Create your first transport request — by tapping, or just by speaking to Servo AI.'
-            : 'Once your documents are verified you will start receiving trip requests near you.'}
+          {isProvider
+            ? 'Your machine is listed. Farmers nearby can now find and book it — requests appear under Farm Services.'
+            : role === 'FARMER'
+              ? 'Create your first transport request — by tapping, or just by speaking to Servo AI.'
+              : 'Once your documents are verified you will start receiving trip requests near you.'}
         </Txt>
       </View>
     </Screen>

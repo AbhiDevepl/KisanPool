@@ -12,6 +12,7 @@ import {
   offersForRequest,
   poolForTransporter,
   selectTransporter,
+  trackTrip,
   tripDetail,
   withdrawOffer,
 } from './service';
@@ -266,6 +267,19 @@ poolRouter.get(
   requireAuth,
   asyncHandler<AuthedRequest>(async (req, res) => {
     ok(res, await tripDetail(req.params.id, req.userId));
+  }),
+);
+
+/**
+ * Live Track hand-off to Google Maps (ADR-042). Read-only: latest transporter
+ * position + destination mandi + a ready directions deep link, plus one
+ * business-state `trackable` flag. Trip-party only.
+ */
+poolRouter.get(
+  '/trips/:id/track',
+  requireAuth,
+  asyncHandler<AuthedRequest>(async (req, res) => {
+    ok(res, await trackTrip(req.params.id, req.userId));
   }),
 );
 

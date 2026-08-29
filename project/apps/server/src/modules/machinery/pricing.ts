@@ -57,6 +57,13 @@ export interface QuoteInput {
   /** the machine's home, and the field it is going to */
   base: Point;
   site: Point;
+  /**
+   * How many co-scheduled nearby jobs this outing is split across (ADR-042).
+   * Defaults to 1 — a solo hire, unchanged. When a provider serves a cluster in
+   * one trip, the round-trip travel divides by this, and ONLY travel: an acre is
+   * an acre and an hour is an hour however many farmers share the drive out.
+   */
+  travelShareCount?: number;
 }
 
 /**
@@ -99,8 +106,10 @@ export async function quoteBooking(input: QuoteInput): Promise<MachineQuoteDTO> 
 
   const { distanceKm } = await getDirections(input.base, input.site);
   const travelKm = Math.round(distanceKm * 10) / 10;
-  // out and back — the machine does not stay in the field
-  const travelCost = money(travelKm * 2 * input.travelRatePerKm);
+  // out and back — the machine does not stay in the field. When the outing is
+  // shared with co-scheduled nearby jobs, this farmer pays only their share of it.
+  const travelShareCount = Math.max(1, Math.floor(input.travelShareCount ?? 1));
+  const travelCost = money((travelKm * 2 * input.travelRatePerKm) / travelShareCount);
 
   const subtotal = money(workCost + travelCost);
   const minimumTopUp = Math.max(0, money(input.minimumCharge - subtotal));
@@ -114,6 +123,7 @@ export async function quoteBooking(input: QuoteInput): Promise<MachineQuoteDTO> 
     travelKm,
     travelCost,
     minimumTopUp,
+    travelShareCount,
     total,
     platformFee: money(total * PLATFORM_COMMISSION_PCT),
     providerEarning: money(total * (1 - PLATFORM_COMMISSION_PCT)),

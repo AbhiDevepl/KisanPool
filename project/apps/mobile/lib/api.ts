@@ -11,6 +11,7 @@ import type {
   DocumentDTO,
   FarmMachineDTO,
   GeoPoint,
+  GroupingAssessmentDTO,
   Language,
   MachineBookingDTO,
   MachineBookingState,
@@ -128,6 +129,7 @@ export type {
   CargoRule,
   DemandClusterDTO,
   FarmMachineDTO,
+  GroupingAssessmentDTO,
   MachineBookingDTO,
   MachineBookingState,
   MachineCategory,
@@ -408,6 +410,25 @@ export const api = {
   pricingHistory: (tripId: string) => request<PricingEventDTO[]>(`/pool/trips/${tripId}/pricing`),
 
   /**
+   * Live Track hand-off (ADR-042): the transporter's latest position + the
+   * destination mandi + a ready Google Maps directions link, and one
+   * business-state `trackable` flag. Refetched on trip:location.
+   */
+  trackTrip: (tripId: string) =>
+    request<{
+      tripId: string;
+      tripState: TripState;
+      trackable: boolean;
+      reason?: string;
+      origin: { lat: number; lng: number } | null;
+      destination: { name: string; lat: number; lng: number };
+      lastSeenAt: string | null;
+      stale: boolean;
+      staleMinutes: number | null;
+      directionsUrl: string | null;
+    }>(`/pool/trips/${tripId}/track`),
+
+  /**
    * Advisory delay / cancellation risk for one trip (ADR-041). Read-only — it
    * never changes the trip. A farmer gets `delay` only; the transporter also
    * gets `cancellation`.
@@ -506,6 +527,12 @@ export const api = {
       `/maps/directions?origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}`,
     ),
 
+  /** Resolve a typed place name to coordinates (village / town / landmark). */
+  searchPlaces: (q: string, near?: { lat: number; lng: number } | null) =>
+    request<Array<{ name: string; lat: number; lng: number; source: 'google' | 'local' }>>(
+      `/maps/places?q=${encodeURIComponent(q)}${near ? `&near=${near.lat},${near.lng}` : ''}`,
+    ),
+
   // ---------- Servo AI ----------
 
   stt: (audio: { uri: string; name: string; type: string }) => {
@@ -563,6 +590,27 @@ export const api = {
   /** Nearby farmers wanting the same machine the same week. */
   machineDemand: (lat: number, lng: number, radiusKm = 40) =>
     request<DemandClusterDTO[]>(`/farm/demand?lat=${lat}&lng=${lng}&radiusKm=${radiusKm}`),
+
+  /**
+   * Could this hire share a provider outing — and its travel cost — with jobs
+   * already booked nearby (ADR-042)? Advisory, read-only.
+   */
+  machineGrouping: (
+    machineId: string,
+    q: { lat: number; lng: number; start: string; end: string; areaAcres?: number },
+  ) =>
+    request<GroupingAssessmentDTO>(
+      `/farm/machines/${machineId}/grouping?lat=${q.lat}&lng=${q.lng}&start=${encodeURIComponent(
+        q.start,
+      )}&end=${encodeURIComponent(q.end)}${q.areaAcres ? `&areaAcres=${q.areaAcres}` : ''}`,
+    ),
+
+  /** Provider action: group not-yet-started bookings so their travel is shared. */
+  groupMachineBookings: (bookingIds: string[]) =>
+    request<{ groupId: string; shareCount: number; bookings: MachineBookingDTO[] }>(
+      '/farm/bookings/group',
+      { method: 'POST', body: { bookingIds } },
+    ),
 
   // ---- the provider's side; any user may own a machine ----
 

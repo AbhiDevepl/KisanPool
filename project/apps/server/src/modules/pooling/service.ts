@@ -828,6 +828,107 @@ export async function advanceTrip(tripId: string, to: TripState, transporterId: 
   return trip;
 }
 
+/**
+ * The Live Track hand-off (ADR-042).
+ *
+ * KisanPool does not reproduce turn-by-turn navigation. This returns the two
+ * coordinates Google Maps needs — the transporter's latest known position and the
+ * trip's actual destination mandi — plus a ready `directions` deep link, and a
+ * single `trackable` decision driven by BUSINESS STATE, not a timer:
+ *
+ *     trip EN_ROUTE / IN_TRANSIT / AT_DESTINATION   → trackable
+ *     this viewer's own load DELIVERED or later      → tracking has ended for them
+ *     trip COMPLETED / CANCELLED                     → tracking is over for everyone
+ *
+ * One trip, one vehicle, one live stream: every authorised farmer on a pooled
+ * trip calls this and gets the same origin and the same destination. Access is the
+ * existing authenticated trip identity — a non-party gets AUTH_FORBIDDEN and no
+ * JWT or internal id ever travels in the Maps URL, only lat/lng.
+ *
+ * `staleMinutes` is a safety signal only: the position may be old, but an old
+ * position on an active trip is still the best the farmer has, so it is labelled,
+ * not withheld.
+ */
+const TRACKABLE_TRIP_STATES: TripState[] = ['EN_ROUTE', 'IN_TRANSIT', 'AT_DESTINATION'];
+const TRACKING_ENDED_FOR_SHIPMENT: ShipmentState[] = [
+  'DELIVERED',
+  'PAYMENT_PENDING',
+  'PAID',
+  'COMPLETED',
+  'CANCELLED',
+];
+/** Past this the last GPS ping is stale enough to warn about — advisory only. */
+const LOCATION_STALE_MINUTES = 20;
+
+export async function trackTrip(tripId: string, viewerId: string) {
+  const trip = await Trip.findById(tripId);
+  if (!trip) throw new ApiError('RESOURCE_NOT_FOUND', 'That trip no longer exists.');
+
+  const shipments = await TripShipment.find({ tripId: trip._id });
+  const isTransporter = String(trip.transporterId) === viewerId;
+  const mine = shipments.find((s) => String(s.farmerId) === viewerId);
+  if (!isTransporter && !mine) {
+    throw new ApiError('AUTH_FORBIDDEN', "You don't have access to this trip.");
+  }
+
+  const destination = {
+    name: trip.destination.name || 'Destination mandi',
+    lat: trip.destination.lat as number,
+    lng: trip.destination.lng as number,
+  };
+
+  let trackable = TRACKABLE_TRIP_STATES.includes(trip.state);
+  let reason: string | undefined;
+  if (['COMPLETED', 'CANCELLED'].includes(trip.state)) {
+    trackable = false;
+    reason = 'This trip has finished.';
+  } else if (trip.state === 'FORMING') {
+    trackable = false;
+    reason = 'The driver is still taking on loads and has not set off.';
+  } else if (mine && TRACKING_ENDED_FOR_SHIPMENT.includes(mine.state)) {
+    trackable = false;
+    reason = 'Your produce has been delivered — live tracking has ended.';
+  }
+
+  const vehicle = await Vehicle.findById(trip.vehicleId);
+  const loc = vehicle?.currentLocation;
+  const origin =
+    loc && loc.lat != null && loc.lng != null
+      ? { lat: loc.lat as number, lng: loc.lng as number }
+      : null;
+  const lastSeenAt =
+    origin && vehicle?.updatedAt ? new Date(vehicle.updatedAt as unknown as Date).toISOString() : null;
+  const staleMinutes = lastSeenAt
+    ? Math.max(0, Math.round((Date.now() - new Date(lastSeenAt).getTime()) / 60000))
+    : null;
+
+  // https://developers.google.com/maps/documentation/urls/get-started#directions-action
+  // origin omitted → Google Maps uses the device's own location, which is a safe
+  // fallback when the driver has not pinged yet.
+  const base = 'https://www.google.com/maps/dir/?api=1';
+  const directionsUrl = trackable
+    ? `${base}${origin ? `&origin=${origin.lat},${origin.lng}` : ''}` +
+      `&destination=${destination.lat},${destination.lng}&travelmode=driving`
+    : null;
+
+  if (trackable && !origin) {
+    reason = 'The driver has not shared a location yet — this will open the route to the mandi.';
+  }
+
+  return {
+    tripId: String(trip._id),
+    tripState: trip.state,
+    trackable,
+    reason,
+    origin,
+    destination,
+    lastSeenAt,
+    stale: staleMinutes != null && staleMinutes > LOCATION_STALE_MINUTES,
+    staleMinutes,
+    directionsUrl,
+  };
+}
+
 /** Full trip view for the transporter — pool, capacity, pickup order. */
 export async function tripDetail(tripId: string, viewerId: string) {
   const trip = await Trip.findById(tripId);

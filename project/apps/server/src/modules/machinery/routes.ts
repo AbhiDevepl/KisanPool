@@ -15,8 +15,12 @@ import {
 import { FarmMachine, MachineBooking, User } from '../../models';
 import {
   advanceBooking,
+  assessGrouping,
+  autoGroupOnRequest,
   demandClusters,
   discoverMachines,
+  groupBookings,
+  groupSummary,
   machineSchedule,
   requestBooking,
 } from './service';
@@ -83,6 +87,36 @@ machineryRouter.get(
       .object({ lat: z.coerce.number(), lng: z.coerce.number(), radiusKm: z.coerce.number().optional() })
       .parse(req.query);
     ok(res, await demandClusters({ lat: q.lat, lng: q.lng }, q.radiusKm ?? 40));
+  }),
+);
+
+/**
+ * Could hiring this machine for this window share a provider outing — and its
+ * travel cost — with jobs already booked nearby (ADR-042)? Read-only, advisory.
+ */
+machineryRouter.get(
+  '/machines/:id/grouping',
+  requireAuth,
+  asyncHandler<AuthedRequest>(async (req, res) => {
+    const q = z
+      .object({
+        lat: z.coerce.number(),
+        lng: z.coerce.number(),
+        start: z.coerce.date(),
+        end: z.coerce.date(),
+        areaAcres: z.coerce.number().positive().optional(),
+      })
+      .parse(req.query);
+    ok(
+      res,
+      await assessGrouping({
+        machineId: req.params.id,
+        site: { lat: q.lat, lng: q.lng },
+        window: { start: q.start, end: q.end },
+        areaAcres: q.areaAcres,
+        excludeFarmerId: req.userId,
+      }),
+    );
   }),
 );
 
@@ -238,6 +272,35 @@ machineryRouter.post(
       notes: body.notes,
     });
 
+    // if this job is a strong fit with a nearby cluster on the same machine, join
+    // it and re-split everyone's travel — the request-time analogue of pooled
+    // reallocation, bounded to not-yet-started bookings (ADR-042)
+    const grouped = await autoGroupOnRequest(String(booking._id));
+    if (grouped) {
+      const fresh = await MachineBooking.findById(booking._id);
+      for (const sibling of grouped.repriced) {
+        emitMachineBookingState(
+          {
+            bookingId: sibling.bookingId,
+            machineId: String(machine._id),
+            state: 'REQUESTED',
+            at: new Date().toISOString(),
+            groupId: grouped.groupId,
+            total: sibling.total,
+          },
+          [sibling.farmerId, String(machine.ownerId)],
+        );
+        if (sibling.total < sibling.previousTotal) {
+          await notifyMachineBooking(
+            sibling.farmerId,
+            sibling.bookingId,
+            'Your travel cost dropped — a nearby farmer booked the same machine',
+          );
+        }
+      }
+      if (fresh) booking.quote = fresh.quote;
+    }
+
     emitMachineBookingRequested({
       bookingId: String(booking._id),
       machineId: String(machine._id),
@@ -251,7 +314,42 @@ machineryRouter.post(
     });
     await notifyMachineBooking(String(machine.ownerId), String(booking._id), machine.title);
 
-    ok(res, booking, 201);
+    ok(res, { ...booking.toJSON(), groupId: grouped?.groupId }, 201);
+  }),
+);
+
+/**
+ * Group two or more not-yet-started bookings on one of the provider's machines so
+ * their outing — and its travel cost — is shared (ADR-042). Provider only.
+ */
+machineryRouter.post(
+  '/bookings/group',
+  requireAuth,
+  asyncHandler<AuthedRequest>(async (req, res) => {
+    const { bookingIds } = z
+      .object({ bookingIds: z.array(z.string()).min(2).max(10) })
+      .parse(req.body);
+
+    const { groupId, shareCount, bookings } = await groupBookings(req.userId, bookingIds);
+
+    for (const b of bookings) {
+      emitMachineBookingState(
+        {
+          bookingId: String(b._id),
+          machineId: String(b.machineId),
+          state: b.state,
+          at: new Date().toISOString(),
+        },
+        [String(b.providerId), String(b.farmerId)],
+      );
+      await notifyMachineBooking(
+        String(b.farmerId),
+        String(b._id),
+        'Your job was grouped with nearby work — travel cost is now shared',
+      );
+    }
+
+    ok(res, { groupId, shareCount, bookings });
   }),
 );
 
@@ -265,6 +363,12 @@ machineryRouter.get(
 
     const bookings = await MachineBooking.find(filter).sort({ createdAt: -1 }).limit(50);
     const machines = await FarmMachine.find({ _id: { $in: bookings.map((b) => b.machineId) } });
+
+    // co-scheduled group summaries, one lookup per distinct group (ADR-042)
+    const groupIds = [...new Set(bookings.map((b) => b.groupId).filter(Boolean).map(String))];
+    const groups = new Map(
+      await Promise.all(groupIds.map(async (gid) => [gid, await groupSummary(gid)] as const)),
+    );
     const people = await User.find({
       _id: { $in: bookings.flatMap((b) => [b.providerId, b.farmerId]) },
     });
@@ -291,6 +395,7 @@ machineryRouter.get(
           ...booking.toJSON(),
           // the farmer reads their own start code; the provider never sees it
           startOtp: role === 'farmer' ? booking.startOtp : undefined,
+          group: booking.groupId ? (groups.get(String(booking.groupId)) ?? undefined) : undefined,
           machine: machine && {
             _id: String(machine._id),
             category: machine.category,

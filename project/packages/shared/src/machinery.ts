@@ -239,9 +239,45 @@ export interface MachineQuoteDTO {
   travelCost: number;
   /** what the minimum charge added, when the job was too small to reach it */
   minimumTopUp: number;
+  /**
+   * How many co-scheduled jobs the round trip is split across (ADR-042).
+   * 1 = a solo hire (unchanged). >1 = the provider serves a cluster of nearby
+   * farmers in one outing, so `travelCost` above is already this farmer's SHARE
+   * of the round trip, not the whole of it.
+   */
+  travelShareCount: number;
   total: number;
   platformFee: number;
   providerEarning: number;
+}
+
+// ---------------------------------------------------------------------------
+// shared-machine utilisation — grouping nearby jobs so travel cost splits
+// ---------------------------------------------------------------------------
+
+export const GROUPING_COMPATIBILITY = ['NONE', 'LOW', 'MEDIUM', 'HIGH'] as const;
+export type GroupingCompatibility = (typeof GROUPING_COMPATIBILITY)[number];
+
+/**
+ * Whether a prospective hire could share a provider's outing with jobs already
+ * booked nearby (ADR-042). Deterministic, explainable — never a black box, and
+ * never a reason to force a grouping that does not make sense.
+ */
+export interface GroupingAssessmentDTO {
+  compatibility: GroupingCompatibility;
+  /** other not-yet-started jobs on this machine that could share the outing */
+  nearbyJobs: number;
+  /** distinct farmers in that cluster */
+  nearbyFarmers: number;
+  /** how many jobs the round trip would split across if this one joined */
+  groupSize: number;
+  reasons: string[];
+  /** this farmer's travel cost run solo */
+  soloTravelCost: number;
+  /** their travel cost as one of `groupSize` — what they would actually pay */
+  sharedTravelCost: number;
+  /** soloTravelCost − sharedTravelCost */
+  projectedSaving: number;
 }
 
 export interface MachineBookingDTO {
@@ -259,6 +295,17 @@ export interface MachineBookingDTO {
   notes?: string;
   state: MachineBookingState;
   quote: MachineQuoteDTO;
+  /** set when this hire shares a provider outing with other nearby jobs (ADR-042) */
+  groupId?: string;
+  /** provider/farmer view of the co-scheduled cluster this job belongs to */
+  group?: {
+    id: string;
+    size: number;
+    combinedTotal: number;
+    combinedProviderEarning: number;
+    windowFrom: string;
+    windowTo: string;
+  };
   /** what the farmer was finally billed — frozen at completion */
   finalAmount?: number;
   /** the farmer reads this out when the machine arrives */
@@ -315,4 +362,8 @@ export interface MachineBookingStateEvent {
   at: string;
   /** present when the state change moved money */
   finalAmount?: number;
+  /** set when the change was a co-scheduling regroup — the quote's travel share moved (ADR-042) */
+  groupId?: string;
+  /** the booking's total after a regroup, so a screen can show the new number */
+  total?: number;
 }

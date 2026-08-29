@@ -126,11 +126,22 @@ Deterministic risk scoring over signals the app already records. **Nothing here 
 
 `RiskAssessment` = `{ kind, level: LOW|MEDIUM|HIGH, score 0–100, reasons[], signals{}, confidence, computedAt }`. `DemandAssessment` uses `level: NORMAL|MEDIUM|HIGH`. Thresholds live once in `packages/shared/src/predictions.ts`.
 
-### Maps (`modules/transport`)
+### Maps (`modules/maps`)
 
 | Method | Path | Query | Returns |
 |---|---|---|---|
 | GET | `/maps/directions` | `origin`, `destination` | Google Directions polyline + ETA, cached per request so a live trip doesn't re-bill on every GPS tick |
+| GET | `/maps/places` | `q` (≥2 chars), `near?` (`lat,lng`) | `[{ name, lat, lng, source }]` — resolves a typed place to coordinates so a farmer can NAME a pickup instead of being pinned to device GPS (ADR-042). Google Geocoding when a key is set, else an offline gazetteer (`maps/places.ts`); `source` says which |
+
+### V2 additions (ADR-042)
+
+| Method | Path | Body / Query | Returns | Auth |
+|---|---|---|---|---|
+| GET | `/pool/trips/:id/track` | — | `{ trackable, reason?, origin, destination, lastSeenAt, stale, staleMinutes, directionsUrl }` — the Live Track hand-off: transporter's latest position + destination mandi + a Google Maps directions deep link. `trackable` is business-state driven (not a timer): false while FORMING, false once the viewer's own load is DELIVERED+, false when COMPLETED/CANCELLED. Pooled trips share one stream. The URL carries only coordinates — no JWT, no ids | trip party |
+| GET | `/farm/machines/:id/grouping` | `lat`, `lng`, `start`, `end`, `areaAcres?` | `GroupingAssessmentDTO` — could this hire share a provider outing (and its travel cost) with not-yet-started jobs already booked nearby? `compatibility` NONE\|LOW\|MEDIUM\|HIGH, `reasons[]`, `soloTravelCost` / `sharedTravelCost` / `projectedSaving`. Advisory — never forces a grouping | any signed-in user |
+| POST | `/farm/bookings/group` | `{ bookingIds: string[] }` (≥2) | `{ groupId, shareCount, bookings }` — group not-yet-started bookings on ONE of the provider's machines so their round-trip travel splits across them. Only travel splits; work cost never does. Refused when the jobs are not actually near/soon | machine owner |
+
+Machinery quotes now carry `travelShareCount` (1 = solo, unchanged; >1 = travel is this farmer's share of a shared outing). `MachineBookingDTO` carries `groupId?` and a `group` summary (`size`, `combinedTotal`, `combinedProviderEarning`, window span). A strongly compatible new `REQUESTED` booking auto-joins a nearby cluster and re-quotes its not-yet-started members. Provider onboarding: role selection has a third "Machinery / service provider" card that creates a FARMER account (ADR-038) and routes to `machine-register`.
 
 ---
 

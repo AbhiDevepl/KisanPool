@@ -431,6 +431,8 @@ export async function advanceBooking(
           areaAcres: booking.areaAcres,
           base: asPoint(machine.baseLocation),
           site: asPoint(booking.location),
+          // a grouped job keeps its shared travel split at completion (ADR-042)
+          travelShareCount: booking.quote.travelShareCount ?? 1,
         },
         { start: booking.startedAt ?? booking.window.start, end: completedAt },
       );
@@ -456,3 +458,4 @@ export async function advanceBooking(
 
 export { DEFAULT_UNIT_FOR };
 export { demandClusters } from './demand';
+export { assessGrouping, autoGroupOnRequest, groupBookings, groupSummary } from './grouping';

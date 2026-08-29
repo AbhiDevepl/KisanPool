@@ -82,6 +82,38 @@ export default function ServiceBookings() {
 
   const needsAnswer = providing.filter((b) => b.state === 'REQUESTED').length;
 
+  /**
+   * Not-yet-grouped REQUESTED jobs on the same machine, same day — candidates the
+   * provider could serve in one outing so travel splits (ADR-042). The server
+   * re-checks the real proximity/window; this is just the affordance.
+   */
+  const groupableClusters = (() => {
+    const buckets = new Map<string, MachineBookingDTO[]>();
+    for (const b of providing) {
+      if (b.state !== 'REQUESTED' || b.groupId) continue;
+      const day = new Date(b.window.start).toDateString();
+      const key = `${b.machineId}|${day}`;
+      buckets.set(key, [...(buckets.get(key) ?? []), b]);
+    }
+    return [...buckets.values()].filter((rows) => rows.length >= 2);
+  })();
+
+  const [grouping, setGrouping] = useState(false);
+  const groupCluster = async (rows: MachineBookingDTO[]): Promise<void> => {
+    setGrouping(true);
+    try {
+      await api.groupMachineBookings(rows.map((r) => r._id));
+      setToastTone('success');
+      setToast('Jobs grouped — travel cost is now shared across them.');
+      data.refresh();
+    } catch (err) {
+      setToastTone('error');
+      setToast(toAppError(err).message);
+    } finally {
+      setGrouping(false);
+    }
+  };
+
   const advance = async (
     booking: MachineBookingDTO,
     to: MachineBookingState,
@@ -191,6 +223,34 @@ export default function ServiceBookings() {
               </Banner>
             ) : null}
 
+            {tab === 'providing'
+              ? groupableClusters.map((rows, i) => (
+                  <Card key={`cluster-${i}`} style={{ borderColor: colors.primary, borderWidth: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                      <MaterialIcons name="groups" size={20} color={colors.primary} />
+                      <Txt variant="labelLg" color={colors.primary} style={{ flex: 1 }}>
+                        {rows.length} requests for {rows[0].machine?.title ?? 'this machine'} on{' '}
+                        {new Date(rows[0].window.start).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                        })}
+                      </Txt>
+                    </View>
+                    <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginTop: space.xs }}>
+                      Serve them in one outing and the travel cost splits across all{' '}
+                      {rows.length} — lower for each farmer, same drive for you.
+                    </Txt>
+                    <Button
+                      label="Group & share travel"
+                      icon="groups"
+                      loading={grouping}
+                      onPress={() => void groupCluster(rows)}
+                      style={{ marginTop: space.gutter }}
+                    />
+                  </Card>
+                ))
+              : null}
+
             {rows.map((booking) => {
               const copy = tab === 'hired' ? BOOKING_COPY[booking.state] : PROVIDER_COPY[booking.state];
               const amount = booking.finalAmount ?? booking.quote.total;
@@ -225,11 +285,40 @@ export default function ServiceBookings() {
                   <Txt variant="labelSm" color={colors.outline}>
                     {UNIT_NOUN[booking.quote.unit](booking.quote.billableUnits)} at{' '}
                     {rupees(booking.quote.rate)} {UNIT_LABEL[booking.quote.unit]}
-                    {booking.quote.travelCost > 0 ? ` + ${rupees(booking.quote.travelCost)} travel` : ''}
+                    {booking.quote.travelCost > 0
+                      ? ` + ${rupees(booking.quote.travelCost)} travel${
+                          booking.quote.travelShareCount > 1
+                            ? ` (shared ${booking.quote.travelShareCount} ways)`
+                            : ''
+                        }`
+                      : ''}
                     {booking.finalAmount != null && booking.finalAmount !== booking.quote.total
                       ? ' · billed at what the work took'
                       : ''}
                   </Txt>
+
+                  {/* co-scheduled cluster this job shares an outing with (ADR-042) */}
+                  {booking.group && booking.group.size > 1 ? (
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: space.sm,
+                        marginTop: space.sm,
+                      }}
+                    >
+                      <MaterialIcons name="groups" size={16} color={colors.primary} />
+                      <Txt variant="labelSm" color={colors.primary} style={{ flex: 1 }}>
+                        {tab === 'providing'
+                          ? `Grouped outing · ${booking.group.size} jobs · ${rupees(
+                              booking.group.combinedProviderEarning,
+                            )} total earning`
+                          : `Shared with ${booking.group.size - 1} nearby ${
+                              booking.group.size - 1 === 1 ? 'job' : 'jobs'
+                            } — travel split ${booking.group.size} ways`}
+                      </Txt>
+                    </View>
+                  ) : null}
 
                   {/* the farmer's start code — never shown to the provider */}
                   {tab === 'hired' && booking.startOtp && booking.state === 'CONFIRMED' ? (

@@ -7,7 +7,12 @@ import type { Role } from '@kisanpool/shared';
 import { Button, Card, Header, Screen, Txt } from '../../components/ui';
 import { colors, radius, space } from '../../theme';
 
+/** The provider path signs up as a FARMER (ADR-038: a provider is anyone who
+ *  owns a machine, not a new role) but goes to machine listing, not produce. */
+type Choice = 'FARMER' | 'TRANSPORTER' | 'PROVIDER';
+
 const ROLE_CARDS: Array<{
+  choice: Choice;
   role: Role;
   native: string;
   english: string;
@@ -15,6 +20,7 @@ const ROLE_CARDS: Array<{
   icon: keyof typeof MaterialIcons.glyphMap;
 }> = [
   {
+    choice: 'FARMER',
     role: 'FARMER',
     native: 'शेतकरी',
     english: 'Farmer',
@@ -22,18 +28,28 @@ const ROLE_CARDS: Array<{
     icon: 'agriculture',
   },
   {
+    choice: 'TRANSPORTER',
     role: 'TRANSPORTER',
     native: 'वाहतूकदार',
     english: 'Transporter',
     blurb: 'I have a vehicle with space to share',
     icon: 'local-shipping',
   },
+  {
+    choice: 'PROVIDER',
+    role: 'FARMER',
+    native: 'यंत्रसेवा',
+    english: 'Machinery / service provider',
+    blurb: 'I have a tractor, harvester or other machine to hire out',
+    icon: 'handyman',
+  },
 ];
 
 export default function RoleSelection() {
   const router = useRouter();
   const params = useLocalSearchParams<{ language?: string }>();
-  const [role, setRole] = useState<Role>('FARMER');
+  const [choice, setChoice] = useState<Choice>('FARMER');
+  const picked = ROLE_CARDS.find((c) => c.choice === choice) ?? ROLE_CARDS[0];
 
   return (
     <Screen
@@ -43,7 +59,11 @@ export default function RoleSelection() {
           onPress={() =>
             router.push({
               pathname: '/(auth)/verify',
-              params: { role, language: params.language ?? 'en' },
+              params: {
+                role: picked.role,
+                language: params.language ?? 'en',
+                ...(choice === 'PROVIDER' ? { provider: '1' } : {}),
+              },
             })
           }
         />
@@ -52,11 +72,11 @@ export default function RoleSelection() {
       <Header title="Who are you?" subtitle="तुम्ही कोण आहात?" onBack={() => router.back()} />
 
       {ROLE_CARDS.map((card) => {
-        const selected = role === card.role;
+        const selected = choice === card.choice;
         return (
           <Card
-            key={card.role}
-            onPress={() => setRole(card.role)}
+            key={card.choice}
+            onPress={() => setChoice(card.choice)}
             style={{
               borderColor: selected ? colors.primary : colors.outlineVariant,
               borderWidth: selected ? 2 : 1,

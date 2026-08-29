@@ -97,6 +97,7 @@ export default function SharedTrip() {
   );
   const [priceNote, setPriceNote] = useState<string | null>(null);
   const [prediction, setPrediction] = useState<TripPredictionDTO | null>(null);
+  const [track, setTrack] = useState<Awaited<ReturnType<typeof api.trackTrip>> | null>(null);
   const [paying, setPaying] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -116,6 +117,8 @@ export default function SharedTrip() {
 
       // advisory delay risk — best-effort, never blocks the trip view
       api.tripPrediction(id).then(setPrediction).catch(() => setPrediction(null));
+      // live-track hand-off state (button enable + latest position)
+      api.trackTrip(id).then(setTrack).catch(() => setTrack(null));
 
       const mine = trip.shipments.find((s) => s.farmerId === user?._id);
       if (mine) {
@@ -137,6 +140,7 @@ export default function SharedTrip() {
     try {
       setDetail(await api.getTrip(id));
       api.tripPrediction(id).then(setPrediction).catch(() => {});
+      api.trackTrip(id).then(setTrack).catch(() => {});
     } catch {
       // the visible state is still valid; the next event or retry will correct it
     }
@@ -203,6 +207,8 @@ export default function SharedTrip() {
               }
             : prev,
         );
+        // a delivered load ends live tracking for that farmer — re-check
+        api.trackTrip(id).then(setTrack).catch(() => {});
       },
 
       'trip:capacity': (payload: TripCapacityEvent) => {
@@ -213,8 +219,22 @@ export default function SharedTrip() {
         void refresh();
       },
 
-      'trip:location': (payload: { lat: number; lng: number; etaMinutes?: number }) =>
-        setLive(payload),
+      'trip:location': (payload: { lat: number; lng: number; etaMinutes?: number }) => {
+        setLive(payload);
+        // keep the Live Track origin and freshness current, cheaply
+        setTrack((prev) =>
+          prev && prev.trackable
+            ? {
+                ...prev,
+                origin: { lat: payload.lat, lng: payload.lng },
+                lastSeenAt: new Date().toISOString(),
+                stale: false,
+                staleMinutes: 0,
+                directionsUrl: `https://www.google.com/maps/dir/?api=1&origin=${payload.lat},${payload.lng}&destination=${prev.destination.lat},${prev.destination.lng}&travelmode=driving`,
+              }
+            : prev,
+        );
+      },
 
       // pushed only when the delay level actually changes (ADR-041)
       'trip:prediction': (payload: TripPredictionEvent) =>
@@ -412,6 +432,39 @@ export default function SharedTrip() {
         polyline={polyline}
         height={260}
       />
+
+      {/* Live Track — hands off to Google Maps for navigation; shown only while
+          the trip is in a trackable state and this farmer's load is not yet
+          delivered (ADR-042). One trip, one vehicle, one stream. */}
+      {track?.trackable && track.directionsUrl ? (
+        <Card style={{ marginTop: space.md }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+            <MaterialIcons name="navigation" size={22} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Txt variant="labelLg">Live Track</Txt>
+              <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                {track.origin
+                  ? `Driver's live position → ${track.destination.name}, in Google Maps`
+                  : `Route to ${track.destination.name}, in Google Maps`}
+                {track.stale && track.staleMinutes != null
+                  ? ` · last seen ${track.staleMinutes} min ago`
+                  : ''}
+              </Txt>
+            </View>
+          </View>
+          <Button
+            label="Open in Google Maps"
+            icon="navigation"
+            variant="secondary"
+            onPress={() => void Linking.openURL(track.directionsUrl as string)}
+            style={{ marginTop: space.sm }}
+          />
+        </Card>
+      ) : track?.reason && !['COMPLETED', 'CANCELLED'].includes(trip.state) ? (
+        <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ marginTop: space.sm }}>
+          {track.reason}
+        </Txt>
+      ) : null}
 
       {live?.etaMinutes != null ? (
         <Card style={{ marginTop: space.md }}>

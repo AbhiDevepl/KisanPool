@@ -39,6 +39,11 @@ npm run seed --silent -- --reset
 python3 tests/09_predictions.py
 
 echo
+echo "########## 6. V2 features: live track hand-off, manual pickup, shared-machine utilisation ##########"
+npm run seed --silent -- --reset
+python3 tests/10_v2_features.py
+
+echo
 echo "########## STALE (pre-pooling API) — see note above ##########"
 echo "########## 1b. core flow: auth, KYC gate, matching, payment, booking ##########"
 python3 tests/01_core_flow.py || echo "  (STALE SUITE — targets the pre-pooling API, see note above)"

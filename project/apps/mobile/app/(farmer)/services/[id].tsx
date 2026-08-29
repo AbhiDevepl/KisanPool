@@ -10,11 +10,11 @@
  * already chosen the machine, the day and the slot on the way here. All that is
  * left is confirming, so a whole extra screen would be ceremony.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Linking, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import type { BookingOperatorMode } from '@kisanpool/shared';
+import type { BookingOperatorMode, GeoPoint } from '@kisanpool/shared';
 import { api } from '../../../lib/api';
 import { toAppError } from '../../../lib/errors';
 import { getUser } from '../../../lib/session';
@@ -49,6 +49,7 @@ import {
 } from '../../../components/ui';
 import { ErrorView } from '../../../components/ErrorView';
 import { TripMap } from '../../../components/TripMap';
+import { LocationPicker } from '../../../components/LocationPicker';
 import { colors, radius, space } from '../../../theme';
 
 export default function MachineDetail() {
@@ -70,6 +71,17 @@ export default function MachineDetail() {
   const [toast, setToast] = useState<string | null>(null);
   const [toastTone, setToastTone] = useState<'success' | 'error'>('success');
   const [bookError, setBookError] = useState<string>();
+  // the FIELD the work is at — seeded from the saved place, but the farmer picks
+  // it: the machine may be for a plot that is not their default location
+  const [site, setSite] = useState<GeoPoint | null>(null);
+  const [siteTouched, setSiteTouched] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  useEffect(() => {
+    void getUser().then((u) => {
+      if (u?.defaultLocation && !siteTouched) setSite(u.defaultLocation);
+    });
+  }, [siteTouched]);
 
   const jobWindow = useMemo(() => {
     const start = params.start ? new Date(params.start) : new Date(Date.now() + 86_400_000);
@@ -83,34 +95,52 @@ export default function MachineDetail() {
     useCallback(async () => {
       const [machine, user] = await Promise.all([api.getMachine(params.id), getUser()]);
       // the quote has to come from the server for the site the work is at, so the
-      // screen re-runs discovery for this one machine rather than doing sums here
-      const site = user?.defaultLocation;
-      const priced = site
+      // screen re-runs discovery for this one machine rather than doing sums here.
+      // The site is the farmer's CHOICE (state), falling back to their saved place.
+      const jobSite = site ?? user?.defaultLocation ?? null;
+      const priced = jobSite
         ? await api.findMachines({
-            lat: site.lat,
-            lng: site.lng,
+            lat: jobSite.lat,
+            lng: jobSite.lng,
             category: machine.category,
             start: jobWindow.start.toISOString(),
             end: jobWindow.end.toISOString(),
             areaAcres: Number(acres) > 0 ? Number(acres) : undefined,
           })
         : [];
+      // could this hire share a provider outing (and its travel cost) with jobs
+      // already booked nearby? Advisory — never forces anything (ADR-042)
+      const grouping = jobSite
+        ? await api
+            .machineGrouping(params.id, {
+              lat: jobSite.lat,
+              lng: jobSite.lng,
+              start: jobWindow.start.toISOString(),
+              end: jobWindow.end.toISOString(),
+              areaAcres: Number(acres) > 0 ? Number(acres) : undefined,
+            })
+            .catch(() => null)
+        : null;
+
       return {
         machine,
-        site,
+        site: jobSite,
         row: priced.find((m) => m._id === params.id) ?? null,
+        grouping,
       };
-    }, [params.id, jobWindow, acres]),
+    }, [params.id, jobWindow, acres, site]),
   );
 
   const machine = detail.data?.machine;
   const row = detail.data?.row;
-  const site = detail.data?.site;
+  const grouping = detail.data?.grouping ?? null;
+  /** the site actually used — the farmer's choice, or the resolved fallback */
+  const effectiveSite = site ?? detail.data?.site ?? null;
   const quote = row?.quote ?? null;
   const needsAcres = machine?.pricing.unit === 'PER_ACRE';
 
   const book = async (): Promise<void> => {
-    if (!machine || !site) return;
+    if (!machine || !effectiveSite) return;
     setBusy(true);
     setBookError(undefined);
     try {
@@ -118,7 +148,7 @@ export default function MachineDetail() {
         machineId: machine._id,
         start: jobWindow.start.toISOString(),
         end: jobWindow.end.toISOString(),
-        location: site,
+        location: effectiveSite,
         operatorMode:
           machine.operatorMode === 'EITHER' ? operatorMode : (machine.operatorMode as BookingOperatorMode),
         workType: workType.trim() || undefined,
@@ -172,7 +202,7 @@ export default function MachineDetail() {
             <Button
               label={quote ? `Request for ${rupees(quote.total)}` : 'Request this machine'}
               icon="event-available"
-              disabled={!site || (needsAcres && !(Number(acres) > 0))}
+              disabled={!effectiveSite || (needsAcres && !(Number(acres) > 0))}
               onPress={() => setBookingOpen(true)}
             />
           ) : (
@@ -236,13 +266,42 @@ export default function MachineDetail() {
           {row ? <Row label="Distance to your field" value={km(row.distanceKm)} bold /> : null}
         </Card>
 
-        {site ? (
+        {/* the field the work is at — the farmer's choice, editable */}
+        <Card onPress={() => setPickerOpen(true)}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+            <MaterialIcons name="place" size={20} color={colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Txt variant="labelLg">{effectiveSite?.name ?? 'Set the field location'}</Txt>
+              <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                Where the machine should come. Tap to search, drop a pin, or use GPS.
+              </Txt>
+            </View>
+            <Txt variant="labelLg" color={colors.primary}>
+              {effectiveSite ? 'Change' : 'Set'}
+            </Txt>
+          </View>
+        </Card>
+
+        {effectiveSite ? (
           <TripMap
             pickup={{ lat: machine.baseLocation.lat, lng: machine.baseLocation.lng, title: 'Machine' }}
-            destination={{ lat: site.lat, lng: site.lng, title: 'Your field' }}
+            destination={{ lat: effectiveSite.lat, lng: effectiveSite.lng, title: 'Your field' }}
             height={180}
           />
         ) : null}
+
+        <LocationPicker
+          visible={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          initial={effectiveSite}
+          title="Where is the work?"
+          subtitle="The field the machine should come to — not necessarily your home village."
+          confirmLabel="Use this field"
+          onPick={(point) => {
+            setSite(point);
+            setSiteTouched(true);
+          }}
+        />
 
         {/* WHY the price is the price */}
         {quote ? (
@@ -265,11 +324,15 @@ export default function MachineDetail() {
             {quote.travelCost > 0 ? (
               <>
                 <Row
-                  label={`Travel — ${km(quote.travelKm)} each way`}
+                  label={`Travel — ${km(quote.travelKm)} each way${
+                    quote.travelShareCount > 1 ? ` · shared ${quote.travelShareCount} ways` : ''
+                  }`}
                   value={rupees(quote.travelCost)}
                 />
                 <Txt variant="labelSm" color={colors.outline}>
-                  The machine has to reach your field and get home again.
+                  {quote.travelShareCount > 1
+                    ? `The provider serves ${quote.travelShareCount} nearby jobs in one outing, so you pay only your share of the drive.`
+                    : 'The machine has to reach your field and get home again.'}
                 </Txt>
               </>
             ) : null}
@@ -301,6 +364,38 @@ export default function MachineDetail() {
               placeholder="e.g. 3"
             />
           </Banner>
+        ) : null}
+
+        {/* shared-machine utilisation — surfaced when this hire could ride along
+            with nearby jobs and split the travel (ADR-042). Advisory only. */}
+        {grouping && grouping.compatibility !== 'NONE' && grouping.projectedSaving > 0 ? (
+          <View
+            style={{
+              backgroundColor: colors.primaryContainer,
+              borderRadius: radius.md,
+              padding: space.gutter,
+              gap: space.xs,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+              <MaterialIcons name="groups" size={20} color={colors.onPrimary} />
+              <Txt variant="labelLg" color={colors.onPrimary} style={{ flex: 1 }}>
+                {grouping.compatibility === 'HIGH'
+                  ? 'You can share this trip'
+                  : 'A nearby job could share this trip'}
+              </Txt>
+            </View>
+            {grouping.reasons.map((reason) => (
+              <Txt key={reason} variant="bodyMd" color={colors.onPrimary}>
+                • {reason}
+              </Txt>
+            ))}
+            <Txt variant="labelSm" color={colors.onPrimaryContainer} style={{ marginTop: space.xs }}>
+              {grouping.compatibility === 'HIGH'
+                ? 'Your quote already reflects the shared travel. Book to lock your slot.'
+                : 'The provider decides whether to group jobs. If they do, your travel cost drops automatically.'}
+            </Txt>
+          </View>
         ) : null}
 
         {/* when the machine is already committed — the calendar, plainly */}

@@ -23,6 +23,8 @@ export function TripMap({
   polyline,
   height = 240,
   onMarkerPress,
+  onPress,
+  draggablePickup = false,
 }: {
   pickup?: MapPoint | null;
   destination?: MapPoint | null;
@@ -31,6 +33,10 @@ export function TripMap({
   polyline?: Array<{ latitude: number; longitude: number }> | null;
   height?: number;
   onMarkerPress?: (index: number) => void;
+  /** tap anywhere on the map — used by the location picker to move the pin */
+  onPress?: (point: { lat: number; lng: number }) => void;
+  /** let the user drag the pickup pin to fine-tune it */
+  draggablePickup?: boolean;
 }) {
   const mapRef = useRef<MapView>(null);
   const points = [pickup, destination, vehicle, ...markers].filter(Boolean) as MapPoint[];
@@ -85,12 +91,31 @@ export function TripMap({
         initialRegion={region}
         showsUserLocation
         toolbarEnabled={false}
+        onPress={
+          onPress
+            ? (e) =>
+                onPress({
+                  lat: e.nativeEvent.coordinate.latitude,
+                  lng: e.nativeEvent.coordinate.longitude,
+                })
+            : undefined
+        }
       >
         {pickup ? (
           <Marker
             coordinate={{ latitude: pickup.lat, longitude: pickup.lng }}
             title={pickup.title ?? 'Pickup'}
             pinColor={colors.primaryContainer}
+            draggable={draggablePickup}
+            onDragEnd={
+              draggablePickup && onPress
+                ? (e) =>
+                    onPress({
+                      lat: e.nativeEvent.coordinate.latitude,
+                      lng: e.nativeEvent.coordinate.longitude,
+                    })
+                : undefined
+            }
           />
         ) : null}
 
