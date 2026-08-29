@@ -27,3 +27,15 @@ uploads/
 .claude-flow/data/
 .claude-flow/logs/
 .claude-flow/sessions/
+
+# agent runtime state — machine-local, and memory.db churns a 600KB binary diff
+# on every run. schema.sql and config.yaml are checked in; the state is not.
+.swarm/memory.db
+.swarm/memory.db-shm
+.swarm/memory.db-wal
+.swarm/backups/
+.claude-flow/daemon-state.json
+.claude-flow/daemon.pid
+.claude-flow/harness-active-policy.json
+.claude-flow/metrics/
+.claude-flow/policy/
