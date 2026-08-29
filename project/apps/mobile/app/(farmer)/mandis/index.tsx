@@ -55,6 +55,22 @@ export default function MandiDiscovery() {
   const [onlyFavourites, setOnlyFavourites] = useState(params.filter === 'favourites');
   const [toast, setToast] = useState<string | null>(null);
   const [mandis, setMandis] = useState<Mandi[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      const [next] = await Promise.all([
+        refreshMandis(origin),
+        getFavourites().then(setFavourites),
+      ]);
+      setMandis(next);
+    } catch {
+      setMandis([]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [origin]);
 
   useEffect(() => {
     void getUser().then((user) => {
@@ -95,6 +111,8 @@ export default function MandiDiscovery() {
     <View style={{ flex: 1 }}>
       <Screen
         withNav
+        refreshing={refreshing}
+        onRefresh={() => void refresh()}
         header={
           <>
             <AppBar
@@ -128,6 +146,7 @@ export default function MandiDiscovery() {
         <TripMap
           pickup={origin ? { ...origin, title: 'You' } : null}
           markers={list.map((mandi) => ({ lat: mandi.lat, lng: mandi.lng, title: mandi.name }))}
+          markerVariant="shop"
           height={200}
           onMarkerPress={(index) => router.push(`/(farmer)/mandis/${list[index].id}`)}
         />

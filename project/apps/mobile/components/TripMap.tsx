@@ -3,11 +3,15 @@
  * (docs/DESIGN.md §9.2). The vehicle marker animates between GPS ticks rather than
  * snapping, since location arrives roughly every 5 seconds.
  */
-import { useEffect, useRef } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useRef } from 'react';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
+import { MaterialIcons } from '@expo/vector-icons';
 import { colors, radius } from '../theme';
 import { Txt } from './ui';
+
+/** distinct blue for the farmer's own location, so it never reads as a mandi */
+const SELF_PIN = '#1e6fd9';
 
 export interface MapPoint {
   lat: number;
@@ -20,6 +24,7 @@ export function TripMap({
   destination,
   vehicle,
   markers = [],
+  markerVariant = 'pin',
   polyline,
   height = 240,
   onMarkerPress,
@@ -28,12 +33,27 @@ export function TripMap({
   destination?: MapPoint | null;
   vehicle?: MapPoint | null;
   markers?: MapPoint[];
+  /** 'shop' draws each marker as a red storefront badge (mandi discovery) */
+  markerVariant?: 'pin' | 'shop';
   polyline?: Array<{ latitude: number; longitude: number }> | null;
   height?: number;
   onMarkerPress?: (index: number) => void;
 }) {
   const mapRef = useRef<MapView>(null);
   const points = [pickup, destination, vehicle, ...markers].filter(Boolean) as MapPoint[];
+
+  const focusSelf = useCallback(() => {
+    if (!pickup) return;
+    mapRef.current?.animateToRegion(
+      {
+        latitude: pickup.lat,
+        longitude: pickup.lng,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      },
+      400,
+    );
+  }, [pickup]);
 
   const region: Region | undefined = points.length
     ? {
@@ -76,16 +96,28 @@ export function TripMap({
           <Marker
             coordinate={{ latitude: pickup.lat, longitude: pickup.lng }}
             title={pickup.title ?? 'Pickup'}
-            pinColor={colors.primaryContainer}
+            pinColor={SELF_PIN}
           />
         ) : null}
 
         {destination ? (
-          <Marker
-            coordinate={{ latitude: destination.lat, longitude: destination.lng }}
-            title={destination.title ?? 'Destination'}
-            pinColor={colors.tertiaryContainer}
-          />
+          markerVariant === 'shop' ? (
+            <Marker
+              coordinate={{ latitude: destination.lat, longitude: destination.lng }}
+              title={destination.title ?? 'Destination'}
+              anchor={{ x: 0.5, y: 0.5 }}
+            >
+              <View style={s.shopPinYellow}>
+                <MaterialIcons name="storefront" size={16} color="#3a2e00" />
+              </View>
+            </Marker>
+          ) : (
+            <Marker
+              coordinate={{ latitude: destination.lat, longitude: destination.lng }}
+              title={destination.title ?? 'Destination'}
+              pinColor={colors.tertiaryContainer}
+            />
+          )
         ) : null}
 
         {vehicle ? (
@@ -98,20 +130,45 @@ export function TripMap({
           />
         ) : null}
 
-        {markers.map((marker, index) => (
-          <Marker
-            key={`${marker.lat}-${marker.lng}-${index}`}
-            coordinate={{ latitude: marker.lat, longitude: marker.lng }}
-            title={marker.title}
-            pinColor={colors.secondary}
-            onPress={() => onMarkerPress?.(index)}
-          />
-        ))}
+        {markers.map((marker, index) =>
+          markerVariant === 'shop' ? (
+            <Marker
+              key={`${marker.lat}-${marker.lng}-${index}`}
+              coordinate={{ latitude: marker.lat, longitude: marker.lng }}
+              title={marker.title}
+              anchor={{ x: 0.5, y: 0.5 }}
+              onPress={() => onMarkerPress?.(index)}
+            >
+              <View style={s.shopPin}>
+                <MaterialIcons name="storefront" size={16} color="#ffffff" />
+              </View>
+            </Marker>
+          ) : (
+            <Marker
+              key={`${marker.lat}-${marker.lng}-${index}`}
+              coordinate={{ latitude: marker.lat, longitude: marker.lng }}
+              title={marker.title}
+              pinColor={colors.secondary}
+              onPress={() => onMarkerPress?.(index)}
+            />
+          ),
+        )}
 
         {polyline?.length ? (
           <Polyline coordinates={polyline} strokeColor={colors.primary} strokeWidth={4} />
         ) : null}
       </MapView>
+
+      {pickup ? (
+        <Pressable
+          onPress={focusSelf}
+          hitSlop={8}
+          accessibilityLabel="Centre map on my location"
+          style={({ pressed }) => [s.focusButton, { opacity: pressed ? 0.7 : 1 }]}
+        >
+          <MaterialIcons name="my-location" size={20} color={SELF_PIN} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -161,5 +218,41 @@ const s = StyleSheet.create({
     backgroundColor: colors.surfaceContainer,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  shopPin: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.error,
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shopPinYellow: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#f5c518',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  focusButton: {
+    position: 'absolute',
+    right: 12,
+    bottom: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
 });

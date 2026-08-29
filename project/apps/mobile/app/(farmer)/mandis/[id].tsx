@@ -154,6 +154,7 @@ export default function MandiDetails() {
         <TripMap
           pickup={origin ? { ...origin, title: 'You' } : null}
           destination={{ lat: mandi.lat, lng: mandi.lng, title: mandi.name }}
+          markerVariant="shop"
           height={180}
         />
 

@@ -56,6 +56,13 @@ export function MandisTab() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
 
+  // saved-mandi table: search + filters + pagination (all client-side)
+  const [q, setQ] = useState('');
+  const [cityFilter, setCityFilter] = useState('');
+  const [stateFilter, setStateFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
+
   // live city/state lookup
   const [placeQuery, setPlaceQuery] = useState('');
   const [places, setPlaces] = useState<Place[]>([]);
@@ -140,6 +147,39 @@ export function MandisTab() {
     await api.setMandiActive(id, active).catch(() => undefined);
     remote.refresh();
   };
+
+  const cities = useMemo(
+    () => [...new Set(saved.map((m) => m.city).filter(Boolean))].sort(),
+    [saved],
+  );
+  const states = useMemo(
+    () => [...new Set(saved.map((m) => m.state).filter(Boolean))].sort(),
+    [saved],
+  );
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return saved.filter((m) => {
+      if (cityFilter && m.city !== cityFilter) return false;
+      if (stateFilter && m.state !== stateFilter) return false;
+      if (!needle) return true;
+      return (
+        m.name.toLowerCase().includes(needle) ||
+        m.city.toLowerCase().includes(needle) ||
+        m.state.toLowerCase().includes(needle) ||
+        m.crops.some((c) => c.toLowerCase().includes(needle))
+      );
+    });
+  }, [saved, q, cityFilter, stateFilter]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  // reset to page 1 whenever the filter narrows
+  useEffect(() => {
+    setPage(1);
+  }, [q, cityFilter, stateFilter]);
 
   const markers: MapMarker[] = [
     ...(picked ? [{ ...picked, color: '#c2410c' }] : []),
@@ -301,15 +341,47 @@ export function MandisTab() {
         ) : null}
       </div>
 
-      <div className="label-lg" style={{ marginBottom: 'var(--s-sm)' }}>
-        Saved mandis
+      <div className="row" style={{ marginBottom: 'var(--s-sm)', gap: 'var(--s-sm)', flexWrap: 'wrap' }}>
+        <div className="label-lg" style={{ marginRight: 'auto' }}>Saved mandis</div>
+        <input
+          className="input"
+          style={{ width: 220 }}
+          placeholder="Search name, city, crop…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <select
+          className="input"
+          style={{ width: 150 }}
+          value={cityFilter}
+          onChange={(e) => setCityFilter(e.target.value)}
+        >
+          <option value="">All cities</option>
+          {cities.map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+        <select
+          className="input"
+          style={{ width: 150 }}
+          value={stateFilter}
+          onChange={(e) => setStateFilter(e.target.value)}
+        >
+          <option value="">All states</option>
+          {states.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
       </div>
+
       {remote.loading ? (
         <SkeletonTable />
       ) : remote.error ? (
         <ErrorBox error={remote.error} onRetry={remote.refresh} />
       ) : saved.length === 0 ? (
         <Empty message="No mandis yet. Click the map above to place the first one." />
+      ) : filtered.length === 0 ? (
+        <Empty message="No mandis match that search or filter." />
       ) : (
         <div className="card table-wrap">
           <table>
@@ -325,7 +397,7 @@ export function MandisTab() {
               </tr>
             </thead>
             <tbody>
-              {saved.map((m) => (
+              {paged.map((m) => (
                 <tr key={m._id}>
                   <td style={{ fontWeight: 600 }}>{m.name}</td>
                   <td>{m.city}</td>
@@ -359,6 +431,36 @@ export function MandisTab() {
               ))}
             </tbody>
           </table>
+          <div
+            className="row"
+            style={{ justifyContent: 'space-between', padding: 'var(--s-sm)', gap: 'var(--s-sm)' }}
+          >
+            <span className="label-sm muted">
+              {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, filtered.length)} of{' '}
+              {filtered.length}
+            </span>
+            <div className="row" style={{ gap: 4 }}>
+              <button
+                className="nav-item"
+                style={{ padding: '2px 10px' }}
+                disabled={safePage <= 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                Prev
+              </button>
+              <span className="label-sm muted">
+                {safePage} / {pageCount}
+              </span>
+              <button
+                className="nav-item"
+                style={{ padding: '2px 10px' }}
+                disabled={safePage >= pageCount}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>
