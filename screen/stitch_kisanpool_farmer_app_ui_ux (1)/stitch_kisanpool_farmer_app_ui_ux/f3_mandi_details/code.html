@@ -1,0 +1,293 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Mandi Details</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed": "#281900",
+                        "on-error-container": "#93000a",
+                        "surface-container-high": "#e6e9e7",
+                        "surface-container-highest": "#e1e3e1",
+                        "secondary-fixed": "#94f990",
+                        "on-secondary-fixed": "#002204",
+                        "on-primary": "#ffffff",
+                        "secondary-container": "#91f78e",
+                        "outline-variant": "#bfcaba",
+                        "surface-bright": "#f8faf8",
+                        "on-secondary-fixed-variant": "#005313",
+                        "on-primary-fixed": "#002204",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed-variant": "#005312",
+                        "on-error": "#ffffff",
+                        "background": "#f8faf8",
+                        "primary-container": "#2e7d32",
+                        "primary-fixed": "#a3f69c",
+                        "on-tertiary-fixed-variant": "#604100",
+                        "primary": "#0d631b",
+                        "secondary-fixed-dim": "#78dc77",
+                        "secondary": "#006e1c",
+                        "tertiary-fixed": "#ffdeac",
+                        "on-surface-variant": "#40493d",
+                        "surface-variant": "#e1e3e1",
+                        "tertiary-fixed-dim": "#ffba38",
+                        "inverse-on-surface": "#eff1ef",
+                        "on-surface": "#191c1b",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary": "#734e00",
+                        "on-secondary-container": "#00731e",
+                        "on-tertiary": "#ffffff",
+                        "surface": "#f8faf8",
+                        "tertiary-container": "#926500",
+                        "on-primary-container": "#cbffc2",
+                        "surface-container": "#eceeec",
+                        "surface-tint": "#1b6d24",
+                        "inverse-primary": "#88d982",
+                        "on-tertiary-container": "#ffefda",
+                        "on-background": "#191c1b",
+                        "on-secondary": "#ffffff",
+                        "surface-container-low": "#f2f4f2",
+                        "outline": "#707a6c",
+                        "surface-dim": "#d8dad9",
+                        "error-container": "#ffdad6",
+                        "primary-fixed-dim": "#88d982",
+                        "inverse-surface": "#2e3130"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "gutter": "12px",
+                        "edge-margin": "16px",
+                        "sm": "8px",
+                        "lg": "24px",
+                        "xl": "32px",
+                        "md": "16px",
+                        "base": "4px"
+                    },
+                    "fontFamily": {
+                        "label-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "bilingual-subtext": ["Inter"],
+                        "body-md": ["Inter"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[data-weight="fill"] {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface antialiased min-h-screen flex flex-col pb-[120px]">
+<!-- Top Navigation (Transactional context, simplified) -->
+<header class="flex items-center justify-between px-edge-margin h-16 w-full max-w-screen-xl mx-auto bg-surface z-10 sticky top-0">
+<button aria-label="Go back" class="p-2 -ml-2 rounded-full hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-on-surface">arrow_back</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-semibold flex-1 text-center truncate">Mandi Details</h1>
+<button aria-label="Favorite" class="p-2 -mr-2 rounded-full hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-primary-container" data-weight="fill">favorite</span>
+</button>
+</header>
+<main class="w-full max-w-screen-md mx-auto">
+<!-- Hero Banner Image -->
+<div class="w-full h-48 md:h-64 relative bg-surface-variant overflow-hidden">
+<img alt="Mandi market yard banner showing trucks and produce in a large open structure under a sunny sky." class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBwetgTbiGy_YigBGeOXAgqTDj89FlGOf3iFfJl8ud_ji-1GPD7szBzZpq7WPcOgMCsmf-9f0dOP7JegYTpCvI_02DzfwCtDYhzIyNttsKm2m6wSaSBMiP6O2LSce_D24GpVOE4TUcVE0uXQRvWY41ZzVFCq4QSviQ1cEohJ-UJbQESZd79i3ZDz8GZ2V81u-BjQ0T_4dTGjKMTfNohgwB-HEE9SRO30K0hbk9tbE16jg-9nIKchtc_9DGCBwGaAKlraQ">
+</div>
+<!-- Mandi Header Info -->
+<div class="px-edge-margin pt-md pb-lg">
+<div class="flex items-center gap-2 mb-1">
+<h2 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg font-bold text-on-surface">Lasalgaon Mandi</h2>
+<span class="bg-secondary-container/30 text-secondary border border-secondary-container px-2 py-1 rounded-full font-label-sm text-[10px] uppercase font-semibold tracking-wider">Recommended</span>
+</div>
+<div class="flex flex-col md:flex-row md:items-center justify-between text-on-surface-variant font-body-md text-body-md gap-2 md:gap-0 mt-sm">
+<span>Lasalgaon, Nashik, Maharashtra</span>
+<span class="flex items-center gap-1 font-medium"><span class="material-symbols-outlined text-[16px]">distance</span> 42 km</span>
+</div>
+<div class="flex items-center gap-3 mt-4">
+<span class="bg-primary-container/10 text-primary-container px-3 py-1 rounded-full font-label-sm font-semibold flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-primary-container block"></span> Open Now
+                </span>
+<span class="font-body-md text-body-md text-on-surface-variant">Closes at 5:30 PM</span>
+<span class="ml-auto font-body-md text-body-md text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[18px]">schedule</span> 1h 15m
+                </span>
+</div>
+</div>
+<!-- Info Grid (Stats) -->
+<div class="px-edge-margin pb-lg">
+<div class="grid grid-cols-3 gap-3">
+<!-- Stat Card 1 -->
+<div class="bg-surface-container-lowest border border-outline-variant/50 rounded-xl p-3 flex flex-col md:flex-row items-center md:justify-center gap-2 text-center md:text-left shadow-sm">
+<div class="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-surface-variant">calendar_month</span>
+</div>
+<div>
+<div class="font-label-sm text-[11px] text-on-surface-variant uppercase tracking-wide">Established</div>
+<div class="font-label-lg font-bold text-on-surface">1975</div>
+</div>
+</div>
+<!-- Stat Card 2 -->
+<div class="bg-surface-container-lowest border border-outline-variant/50 rounded-xl p-3 flex flex-col md:flex-row items-center md:justify-center gap-2 text-center md:text-left shadow-sm">
+<div class="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-surface-variant">map</span>
+</div>
+<div>
+<div class="font-label-sm text-[11px] text-on-surface-variant uppercase tracking-wide">Area</div>
+<div class="font-label-lg font-bold text-on-surface">25 Acres</div>
+</div>
+</div>
+<!-- Stat Card 3 -->
+<div class="bg-surface-container-lowest border border-outline-variant/50 rounded-xl p-3 flex flex-col md:flex-row items-center md:justify-center gap-2 text-center md:text-left shadow-sm">
+<div class="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-surface-variant">group</span>
+</div>
+<div>
+<div class="font-label-sm text-[11px] text-on-surface-variant uppercase tracking-wide">Farmers</div>
+<div class="font-label-lg font-bold text-on-surface">2500+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="w-full h-[1px] bg-outline-variant/30 mb-lg"></div>
+<!-- Market Information Table Section -->
+<div class="px-edge-margin pb-lg">
+<div class="flex items-center justify-between mb-md">
+<h3 class="font-headline-md text-body-lg md:text-headline-md font-bold text-on-surface">Market Information</h3>
+<button class="font-label-sm font-semibold text-primary-container hover:underline decoration-primary-container underline-offset-4">View More</button>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant/50 rounded-xl overflow-hidden shadow-sm">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low/50 border-b border-outline-variant/50">
+<th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant font-medium">Commodity</th>
+<th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant font-medium text-right">Min. Price</th>
+<th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant font-medium text-right">Max. Price</th>
+<th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant font-medium text-right">Modal Price</th>
+<th class="py-3 px-4 font-label-sm text-label-sm text-on-surface-variant font-medium text-center">Trend</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/30 font-body-sm text-[13px] md:text-body-md text-on-surface">
+<tr class="hover:bg-surface-container-lowest/80 transition-colors">
+<td class="py-3 px-4 font-medium">Onion</td>
+<td class="py-3 px-4 text-right">₹1,400</td>
+<td class="py-3 px-4 text-right">₹2,100</td>
+<td class="py-3 px-4 text-right font-semibold">₹1,860</td>
+<td class="py-3 px-4 text-center">
+<span class="material-symbols-outlined text-primary-container text-[18px]">trending_up</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest/80 transition-colors">
+<td class="py-3 px-4 font-medium">Tomato</td>
+<td class="py-3 px-4 text-right">₹900</td>
+<td class="py-3 px-4 text-right">₹1,600</td>
+<td class="py-3 px-4 text-right font-semibold">₹1,250</td>
+<td class="py-3 px-4 text-center">
+<span class="material-symbols-outlined text-primary-container text-[18px]">trending_up</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest/80 transition-colors">
+<td class="py-3 px-4 font-medium">Potato</td>
+<td class="py-3 px-4 text-right">₹1,100</td>
+<td class="py-3 px-4 text-right">₹1,800</td>
+<td class="py-3 px-4 text-right font-semibold">₹1,450</td>
+<td class="py-3 px-4 text-center">
+<span class="material-symbols-outlined text-primary-container text-[18px]">trending_up</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest/80 transition-colors">
+<td class="py-3 px-4 font-medium">Cabbage</td>
+<td class="py-3 px-4 text-right">₹600</td>
+<td class="py-3 px-4 text-right">₹1,000</td>
+<td class="py-3 px-4 text-right font-semibold">₹800</td>
+<td class="py-3 px-4 text-center">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">trending_flat</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest/80 transition-colors">
+<td class="py-3 px-4 font-medium">Cauliflower</td>
+<td class="py-3 px-4 text-right">₹800</td>
+<td class="py-3 px-4 text-right">₹1,400</td>
+<td class="py-3 px-4 text-right font-semibold">₹1,100</td>
+<td class="py-3 px-4 text-center">
+<span class="material-symbols-outlined text-primary-container text-[18px]">trending_up</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p class="font-bilingual-subtext text-on-surface-variant text-center mt-2 opacity-80">* Rates are per quintal (qtl) based on today's modal data.</p>
+</div>
+<div class="w-full h-[1px] bg-outline-variant/30 mb-lg"></div>
+<!-- Value Props Section -->
+<div class="px-edge-margin pb-[100px]"> <!-- Extra bottom padding for fixed CTA -->
+<h3 class="font-headline-md text-body-lg md:text-headline-md font-bold text-on-surface mb-md">Why this mandi?</h3>
+<div class="grid grid-cols-4 gap-2">
+<!-- Prop 1 -->
+<div class="flex flex-col items-center text-center">
+<div class="w-12 h-12 rounded-full bg-primary-container/10 flex items-center justify-center mb-2 border border-primary-container/20">
+<span class="material-symbols-outlined text-primary-container">trending_up</span>
+</div>
+<span class="font-label-sm text-[11px] md:text-label-sm font-medium text-on-surface-variant leading-tight">High<br>Demand</span>
+</div>
+<!-- Prop 2 -->
+<div class="flex flex-col items-center text-center">
+<div class="w-12 h-12 rounded-full bg-primary-container/10 flex items-center justify-center mb-2 border border-primary-container/20">
+<span class="material-symbols-outlined text-primary-container">verified_user</span>
+</div>
+<span class="font-label-sm text-[11px] md:text-label-sm font-medium text-on-surface-variant leading-tight">Good<br>Prices</span>
+</div>
+<!-- Prop 3 -->
+<div class="flex flex-col items-center text-center">
+<div class="w-12 h-12 rounded-full bg-primary-container/10 flex items-center justify-center mb-2 border border-primary-container/20">
+<span class="material-symbols-outlined text-primary-container">payments</span>
+</div>
+<span class="font-label-sm text-[11px] md:text-label-sm font-medium text-on-surface-variant leading-tight">Regular<br>Payments</span>
+</div>
+<!-- Prop 4 -->
+<div class="flex flex-col items-center text-center">
+<div class="w-12 h-12 rounded-full bg-primary-container/10 flex items-center justify-center mb-2 border border-primary-container/20">
+<span class="material-symbols-outlined text-primary-container">groups</span>
+</div>
+<span class="font-label-sm text-[11px] md:text-label-sm font-medium text-on-surface-variant leading-tight">More<br>Buyers</span>
+</div>
+</div>
+</div>
+</main>
+<!-- Fixed Bottom CTA Action -->
+<div class="fixed bottom-0 left-0 right-0 w-full bg-surface-container-lowest border-t border-outline-variant/30 shadow-[0_-4px_16px_rgba(0,0,0,0.05)] z-40 pb-safe">
+<div class="max-w-screen-md mx-auto px-edge-margin py-4 flex flex-col gap-2">
+<button class="w-full bg-primary-container hover:bg-primary-container/90 text-on-primary font-label-lg font-bold py-3 md:py-4 px-6 rounded-xl flex items-center justify-between transition-colors shadow-md shadow-primary-container/20">
+<span class="flex-1 text-center text-[16px]">Select This Mandi</span>
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<div class="flex items-center justify-center gap-1.5 font-label-sm text-on-surface-variant opacity-80">
+<span class="material-symbols-outlined text-[16px] text-primary-container">security</span>
+<span>You can change mandi later before booking</span>
+</div>
+</div>
+</div>
+</body></html>

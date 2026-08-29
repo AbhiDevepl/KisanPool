@@ -1,0 +1,315 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>KisanPool - Mandi Discovery</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed": "#281900",
+                        "on-error-container": "#93000a",
+                        "surface-container-high": "#e6e9e7",
+                        "surface-container-highest": "#e1e3e1",
+                        "secondary-fixed": "#94f990",
+                        "on-secondary-fixed": "#002204",
+                        "on-primary": "#ffffff",
+                        "secondary-container": "#91f78e",
+                        "outline-variant": "#bfcaba",
+                        "surface-bright": "#f8faf8",
+                        "on-secondary-fixed-variant": "#005313",
+                        "on-primary-fixed": "#002204",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed-variant": "#005312",
+                        "on-error": "#ffffff",
+                        "background": "#f8faf8",
+                        "primary-container": "#2e7d32",
+                        "primary-fixed": "#a3f69c",
+                        "on-tertiary-fixed-variant": "#604100",
+                        "primary": "#0d631b",
+                        "secondary-fixed-dim": "#78dc77",
+                        "secondary": "#006e1c",
+                        "tertiary-fixed": "#ffdeac",
+                        "on-surface-variant": "#40493d",
+                        "surface-variant": "#e1e3e1",
+                        "tertiary-fixed-dim": "#ffba38",
+                        "inverse-on-surface": "#eff1ef",
+                        "on-surface": "#191c1b",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary": "#734e00",
+                        "on-secondary-container": "#00731e",
+                        "on-tertiary": "#ffffff",
+                        "surface": "#f8faf8",
+                        "tertiary-container": "#926500",
+                        "on-primary-container": "#cbffc2",
+                        "surface-container": "#eceeec",
+                        "surface-tint": "#1b6d24",
+                        "inverse-primary": "#88d982",
+                        "on-tertiary-container": "#ffefda",
+                        "on-background": "#191c1b",
+                        "on-secondary": "#ffffff",
+                        "surface-container-low": "#f2f4f2",
+                        "outline": "#707a6c",
+                        "surface-dim": "#d8dad9",
+                        "error-container": "#ffdad6",
+                        "primary-fixed-dim": "#88d982",
+                        "inverse-surface": "#2e3130"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "gutter": "12px",
+                        "edge-margin": "16px",
+                        "sm": "8px",
+                        "lg": "24px",
+                        "xl": "32px",
+                        "md": "16px",
+                        "base": "4px"
+                    },
+                    "fontFamily": {
+                        "label-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "bilingual-subtext": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "bilingual-subtext": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        /* Hide scrollbar for IE, Edge and Firefox */
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface antialiased max-w-md mx-auto relative min-h-screen pb-safe">
+<!-- Top App Bar (Contextual for Sub-page) -->
+<header class="flex items-center justify-between px-edge-margin h-16 bg-surface sticky top-0 z-30">
+<button aria-label="Go back" class="p-2 -ml-2 text-on-surface rounded-full hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined text-[24px]">arrow_back</span>
+</button>
+<div class="text-center flex-1">
+<h1 class="font-label-lg text-label-lg text-on-surface">Nearby Mandis</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Find best markets near you</p>
+</div>
+<button aria-label="Favorites" class="p-2 -mr-2 text-on-surface rounded-full hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined text-[24px]">favorite_border</span>
+</button>
+</header>
+<!-- Search & Filter Sticky Container -->
+<div class="sticky top-16 z-20 bg-surface/95 backdrop-blur-sm pb-sm pt-xs">
+<!-- Search Bar -->
+<div class="px-edge-margin mb-md">
+<div class="flex items-center bg-surface-container-lowest border border-outline-variant rounded-lg px-3 h-12 shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
+<span class="material-symbols-outlined text-outline mr-2 text-[20px]">search</span>
+<input class="flex-1 bg-transparent border-none focus:ring-0 font-body-md text-body-md text-on-surface placeholder:text-outline p-0 h-full w-full outline-none" placeholder="Search mandi name or location..." type="text">
+<div class="w-px h-6 bg-outline-variant mx-3"></div>
+<button aria-label="Filter" class="text-on-surface flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">tune</span>
+</button>
+</div>
+</div>
+<!-- Filter Chips -->
+<div class="px-edge-margin flex gap-sm overflow-x-auto no-scrollbar pb-xs">
+<button class="whitespace-nowrap px-4 h-8 rounded-full bg-primary text-on-primary font-label-sm text-label-sm flex-shrink-0 flex items-center justify-center shadow-sm">All</button>
+<button class="whitespace-nowrap px-4 h-8 rounded-full bg-surface-container-lowest border border-outline-variant text-on-surface font-label-sm text-label-sm flex-shrink-0 flex items-center justify-center hover:bg-surface-container-low transition-colors">Vegetables</button>
+<button class="whitespace-nowrap px-4 h-8 rounded-full bg-surface-container-lowest border border-outline-variant text-on-surface font-label-sm text-label-sm flex-shrink-0 flex items-center justify-center hover:bg-surface-container-low transition-colors">Fruits</button>
+<button class="whitespace-nowrap px-4 h-8 rounded-full bg-surface-container-lowest border border-outline-variant text-on-surface font-label-sm text-label-sm flex-shrink-0 flex items-center justify-center hover:bg-surface-container-low transition-colors">Grains</button>
+<button class="whitespace-nowrap px-3 h-8 rounded-full bg-surface-container-lowest border border-outline-variant text-on-surface font-label-sm text-label-sm flex-shrink-0 flex items-center justify-center gap-1 hover:bg-surface-container-low transition-colors">More <span class="material-symbols-outlined text-[16px]">expand_more</span></button>
+</div>
+</div>
+<!-- Map Area -->
+<div class="relative w-full h-[320px] bg-surface-container">
+<img class="w-full h-full object-cover" data-alt="A clean, modern top-down digital map interface showing agricultural regions around Pune, Maharashtra, India. The map uses a light mode aesthetic with soft pastel greens, blues, and greys for terrain and roads. Minimalist design, suitable for a professional logistics application. Bright, even lighting. Includes prominent town names like Alandi, Pimpri Chinchwad, Yawat." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVAAZp4vspAJ57Lg2RQ8wdaYuJMsx1xlWm3bkoCWdFwLU8nNy2bD0WLkcr0XyC29-UaDspBMffDbG9tSA1rYiAD4cCcwJkfm2a9vwuM-mr7IYpyAFbWox1vf9KM_wy6lVmfqxA2NIVgI7syfIA8n34G4z247NJ-LB3FZAjZMQnlTgHvMMf746K0ZA__IXCjT4HcZPxHLAHJALheiOAmK3GiNeO9f-eA5G98VUqkp85jIq01lSsZ4C5">
+<!-- Synthetic Map Overlay Elements for realism -->
+<div class="absolute inset-0 pointer-events-none">
+<!-- User Location -->
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+<div class="w-32 h-32 bg-primary/10 rounded-full animate-pulse flex items-center justify-center">
+<div class="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center">
+<div class="w-4 h-4 bg-[#1A73E8] rounded-full border-2 border-white shadow-md"></div>
+</div>
+</div>
+</div>
+<!-- Mandi Markers (Simulated) -->
+<div class="absolute top-[20%] left-[30%]">
+<div class="w-8 h-8 rounded-full bg-primary border-2 border-surface flex items-center justify-center shadow-md text-on-primary">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">storefront</span>
+</div>
+</div>
+<div class="absolute top-[10%] left-[60%]">
+<div class="w-8 h-8 rounded-full bg-primary border-2 border-surface flex items-center justify-center shadow-md text-on-primary">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">storefront</span>
+</div>
+</div>
+<div class="absolute bottom-[20%] left-[45%]">
+<div class="w-8 h-8 rounded-full bg-primary border-2 border-surface flex items-center justify-center shadow-md text-on-primary">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">storefront</span>
+</div>
+</div>
+</div>
+<!-- Map Controls -->
+<div class="absolute bottom-4 right-4 flex flex-col gap-sm">
+<button aria-label="My Location" class="w-10 h-10 rounded-full bg-surface border border-outline-variant flex items-center justify-center shadow-sm text-on-surface hover:bg-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined text-[20px]">my_location</span>
+</button>
+<button aria-label="Map Layers" class="w-10 h-10 rounded-full bg-surface border border-outline-variant flex items-center justify-center shadow-sm text-on-surface hover:bg-surface-container-lowest transition-colors">
+<span class="material-symbols-outlined text-[20px]">layers</span>
+</button>
+</div>
+</div>
+<!-- Recommended Section -->
+<div class="pt-lg pb-xl bg-surface">
+<div class="px-edge-margin mb-md">
+<div class="flex items-center gap-2 mb-1">
+<span class="material-symbols-outlined text-primary text-[20px]" style="font-variation-settings: 'FILL' 1;">magic_button</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">Recommended Mandis for You</h2>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">Based on your location &amp; produce</p>
+</div>
+<div class="flex flex-col gap-md">
+<!-- Card 1: Lasalgaon -->
+<div class="mx-edge-margin bg-surface-container-lowest border border-outline-variant rounded-xl p-md shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+<div class="flex gap-md">
+<img class="w-[72px] h-[72px] rounded-lg object-cover flex-shrink-0" data-alt="A small, high-quality, professional photograph of the entrance to Lasalgaon Mandi, a bustling agricultural market in India. Featuring a prominent archway, small transport trucks, and vibrant daytime lighting. Light mode aesthetic, earthy tones, highly detailed." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAMwmyOJowSE-4bv2cztIMFsfOSqaz1Pmqgyz-5o-tc7YrxZvmzgousuhzdiT2d73zBfifbh9z_2J89WPfjDlj8pk2z864WpOImL0_KkQXzH16xaL0-BuC5WfQrfSYn0rwwybEmB622YYKNVvHbMseoWSpaIHXvG4bn74EJ0fcua3pbTQsOjRqR4QDQ5hyD319BjDayeEiMohkdXRk1cDlM9ij8-vMSlAUBM0qIPVPf3N-LFgdxwFnD">
+<div class="flex-1 min-w-0 flex flex-col justify-between">
+<!-- Top Row: Title & Star -->
+<div class="flex justify-between items-start mb-1">
+<div class="flex flex-col gap-1 pr-2">
+<h3 class="font-label-lg text-label-lg text-on-surface truncate leading-tight">Lasalgaon Mandi</h3>
+<span class="w-fit px-2 py-0.5 rounded text-[10px] font-semibold bg-secondary-container text-on-secondary-container leading-none">Recommended</span>
+</div>
+<span class="material-symbols-outlined text-tertiary-fixed-dim text-[20px] flex-shrink-0 mt-0.5" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+<!-- Middle Details -->
+<div class="space-y-1 mt-1">
+<div class="flex justify-between items-center text-on-surface-variant">
+<p class="font-body-md text-body-md text-on-surface truncate pr-2">Lasalgaon, Nashik</p>
+<div class="flex items-center gap-xs font-label-sm text-label-sm whitespace-nowrap flex-shrink-0">
+<span class="material-symbols-outlined text-[16px]">directions_car</span> 42 km
+                                </div>
+</div>
+<div class="flex justify-between items-center text-outline">
+<p class="font-label-sm text-label-sm truncate pr-2">• Vegetables, Onion, Tomato</p>
+<div class="flex items-center gap-xs font-label-sm text-label-sm whitespace-nowrap flex-shrink-0">
+<span class="material-symbols-outlined text-[16px]">schedule</span> 1h 15m
+                                </div>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Metrics Row -->
+<div class="mt-3 pt-3 border-t border-outline-variant/50 flex justify-between items-end">
+<div>
+<p class="font-label-sm text-[11px] text-on-surface-variant leading-none mb-1">Avg. Rate</p>
+<p class="font-label-lg text-label-lg text-primary leading-none">₹1,860 <span class="text-label-sm font-normal text-on-surface-variant">/ qtl</span></p>
+</div>
+<div class="flex items-center gap-xs text-primary font-label-sm text-label-sm hover:underline">
+<span class="material-symbols-outlined text-[16px]">trending_up</span> High Demand <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</div>
+</div>
+</div>
+<!-- Card 2: Pune Krushi -->
+<div class="mx-edge-margin bg-surface-container-lowest border border-outline-variant rounded-xl p-md shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+<div class="flex gap-md">
+<img class="w-[72px] h-[72px] rounded-lg object-cover flex-shrink-0" data-alt="A clean, vibrant photograph of Pune Krushi Mandi at daytime. Showing neat rows of produce stalls under a large shed structure. Farmers and traders interacting. Light mode aesthetic, warm natural sunlight, professional logistics tone." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAyoM7wJrHtDbXO13nmmwPa6uUJXrtKuQezMgO86E2Sz9Hjzx34dRjOIp0-PMgn9INWhg-dhKg0ZEamfYrj9P9_y-s8RF64beAcCGCIdh1JK4KE1Zc1JE8AdMtpxAfj0snQzga8lQa53V8FpeUi6ocKCM1PgFoDW9wEIHv4go0mG5jNcGJur4vhwivlrnhLZ--65AihnXJQOhygiTGW00951ZhBUklRcF_39TBs8MBWzKQf8mZmCsQP">
+<div class="flex-1 min-w-0 flex flex-col justify-between">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-label-lg text-label-lg text-on-surface truncate leading-tight pr-2">Pune Krushi Mandi</h3>
+<span class="material-symbols-outlined text-outline text-[20px] flex-shrink-0 mt-0.5">star</span>
+</div>
+<div class="space-y-1 mt-1">
+<div class="flex justify-between items-center text-on-surface-variant">
+<p class="font-body-md text-body-md text-on-surface truncate pr-2">Pune, Maharashtra</p>
+<div class="flex items-center gap-xs font-label-sm text-label-sm whitespace-nowrap flex-shrink-0">
+<span class="material-symbols-outlined text-[16px]">directions_car</span> 18 km
+                                </div>
+</div>
+<div class="flex justify-between items-center text-outline">
+<p class="font-label-sm text-label-sm truncate pr-2">• Vegetables, Flower, Fruits</p>
+<div class="flex items-center gap-xs font-label-sm text-label-sm whitespace-nowrap flex-shrink-0">
+<span class="material-symbols-outlined text-[16px]">schedule</span> 35m
+                                </div>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-3 pt-3 border-t border-outline-variant/50 flex justify-between items-end">
+<div>
+<p class="font-label-sm text-[11px] text-on-surface-variant leading-none mb-1">Avg. Rate</p>
+<p class="font-label-lg text-label-lg text-on-surface leading-none">₹1,720 <span class="text-label-sm font-normal text-on-surface-variant">/ qtl</span></p>
+</div>
+<div class="flex items-center gap-xs text-tertiary font-label-sm text-label-sm hover:underline">
+<span class="material-symbols-outlined text-[16px]">trending_flat</span> Medium Demand <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</div>
+</div>
+</div>
+<!-- Card 3: Daund Mandi -->
+<div class="mx-edge-margin bg-surface-container-lowest border border-outline-variant rounded-xl p-md shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+<div class="flex gap-md">
+<img class="w-[72px] h-[72px] rounded-lg object-cover flex-shrink-0" data-alt="A professional, clear photograph of Daund Mandi yard. Tractors and transport vehicles parked near a large covered trading area. Bright, sunny day, conveying an active agricultural logistics hub. Light mode aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCHhHCECepo915bjkZIiG0vWlbpRiqIY6BDN-MEDOn2-JXB1108BDxRdcbMsjxXcLh2RVdZ3AusgZgi3r5yLZAQctiy1Y0FAKjrfdUG_3CRU4oeCsoifhn3sZuiR6CzEijIchlSZBa9ZntXoylkutUn3wIrimlGnK1jWDaZHAHmQyDvt1e54DyPPeKNm8K2svaElq1YB2w5KYCZbQ4hZIA_bHJEzxRfJWK9ZjEIGxIclm1Kd87eJ5Ur">
+<div class="flex-1 min-w-0 flex flex-col justify-between">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-label-lg text-label-lg text-on-surface truncate leading-tight pr-2">Daund Mandi</h3>
+<span class="material-symbols-outlined text-outline text-[20px] flex-shrink-0 mt-0.5">star</span>
+</div>
+<div class="space-y-1 mt-1">
+<div class="flex justify-between items-center text-on-surface-variant">
+<p class="font-body-md text-body-md text-on-surface truncate pr-2">Daund, Pune</p>
+<div class="flex items-center gap-xs font-label-sm text-label-sm whitespace-nowrap flex-shrink-0">
+<span class="material-symbols-outlined text-[16px]">directions_car</span> 31 km
+                                </div>
+</div>
+<div class="flex justify-between items-center text-outline">
+<p class="font-label-sm text-label-sm truncate pr-2">• Grains, Pulses, Onion</p>
+<div class="flex items-center gap-xs font-label-sm text-label-sm whitespace-nowrap flex-shrink-0">
+<span class="material-symbols-outlined text-[16px]">schedule</span> 50m
+                                </div>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-3 pt-3 border-t border-outline-variant/50 flex justify-between items-end">
+<div>
+<p class="font-label-sm text-[11px] text-on-surface-variant leading-none mb-1">Avg. Rate</p>
+<p class="font-label-lg text-label-lg text-on-surface leading-none">₹1,650 <span class="text-label-sm font-normal text-on-surface-variant">/ qtl</span></p>
+</div>
+<div class="flex items-center gap-xs text-tertiary font-label-sm text-label-sm hover:underline">
+<span class="material-symbols-outlined text-[16px]">trending_flat</span> Medium Demand <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Note: BottomNavBar is intentionally suppressed per Semantic Shell Mandate (Task-Focused sub-page with a 'Back' action). -->
+</body></html>

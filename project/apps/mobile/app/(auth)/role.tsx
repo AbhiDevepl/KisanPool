@@ -1,0 +1,98 @@
+/** f0.2_role_selection — sets User.role, which is permanent for the MVP (ADR-002). */
+import { useState } from 'react';
+import { View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
+import type { Role } from '@kisanpool/shared';
+import { Button, Card, Header, Screen, Txt } from '../../components/ui';
+import { colors, radius, space } from '../../theme';
+
+const ROLE_CARDS: Array<{
+  role: Role;
+  native: string;
+  english: string;
+  blurb: string;
+  icon: keyof typeof MaterialIcons.glyphMap;
+}> = [
+  {
+    role: 'FARMER',
+    native: 'शेतकरी',
+    english: 'Farmer',
+    blurb: 'I want to send my produce to a mandi',
+    icon: 'agriculture',
+  },
+  {
+    role: 'TRANSPORTER',
+    native: 'वाहतूकदार',
+    english: 'Transporter',
+    blurb: 'I have a vehicle with space to share',
+    icon: 'local-shipping',
+  },
+];
+
+export default function RoleSelection() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{ language?: string }>();
+  const [role, setRole] = useState<Role>('FARMER');
+
+  return (
+    <Screen
+      footer={
+        <Button
+          label="Continue"
+          onPress={() =>
+            router.push({
+              pathname: '/(auth)/verify',
+              params: { role, language: params.language ?? 'en' },
+            })
+          }
+        />
+      }
+    >
+      <Header title="Who are you?" subtitle="तुम्ही कोण आहात?" onBack={() => router.back()} />
+
+      {ROLE_CARDS.map((card) => {
+        const selected = role === card.role;
+        return (
+          <Card
+            key={card.role}
+            onPress={() => setRole(card.role)}
+            style={{
+              borderColor: selected ? colors.primary : colors.outlineVariant,
+              borderWidth: selected ? 2 : 1,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+              <View
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: radius.md,
+                  backgroundColor: selected ? colors.primaryContainer : colors.surfaceContainer,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <MaterialIcons
+                  name={card.icon}
+                  size={26}
+                  color={selected ? colors.onPrimary : colors.onSurfaceVariant}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Txt variant="headlineMd">{card.native}</Txt>
+                <Txt variant="bilingualSubtext" color={colors.onSurfaceVariant}>
+                  {card.english} — {card.blurb}
+                </Txt>
+              </View>
+            </View>
+          </Card>
+        );
+      })}
+
+      <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ marginTop: space.sm }}>
+        You can only pick one for now. If you both farm and drive, create a second account later.
+      </Txt>
+    </Screen>
+  );
+}

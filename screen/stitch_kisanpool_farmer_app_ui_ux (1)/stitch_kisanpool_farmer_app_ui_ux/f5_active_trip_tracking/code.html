@@ -1,0 +1,453 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Active Trip / Transparency Tracking</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed": "#281900",
+                    "on-error-container": "#93000a",
+                    "surface-container-high": "#e6e9e7",
+                    "surface-container-highest": "#e1e3e1",
+                    "secondary-fixed": "#94f990",
+                    "on-secondary-fixed": "#002204",
+                    "on-primary": "#ffffff",
+                    "secondary-container": "#91f78e",
+                    "outline-variant": "#bfcaba",
+                    "surface-bright": "#f8faf8",
+                    "on-secondary-fixed-variant": "#005313",
+                    "on-primary-fixed": "#002204",
+                    "error": "#ba1a1a",
+                    "on-primary-fixed-variant": "#005312",
+                    "on-error": "#ffffff",
+                    "background": "#f8faf8",
+                    "primary-container": "#2e7d32",
+                    "primary-fixed": "#a3f69c",
+                    "on-tertiary-fixed-variant": "#604100",
+                    "primary": "#0d631b",
+                    "secondary-fixed-dim": "#78dc77",
+                    "secondary": "#006e1c",
+                    "tertiary-fixed": "#ffdeac",
+                    "on-surface-variant": "#40493d",
+                    "surface-variant": "#e1e3e1",
+                    "tertiary-fixed-dim": "#ffba38",
+                    "inverse-on-surface": "#eff1ef",
+                    "on-surface": "#191c1b",
+                    "surface-container-lowest": "#ffffff",
+                    "tertiary": "#734e00",
+                    "on-secondary-container": "#00731e",
+                    "on-tertiary": "#ffffff",
+                    "surface": "#f8faf8",
+                    "tertiary-container": "#926500",
+                    "on-primary-container": "#cbffc2",
+                    "surface-container": "#eceeec",
+                    "surface-tint": "#1b6d24",
+                    "inverse-primary": "#88d982",
+                    "on-tertiary-container": "#ffefda",
+                    "on-background": "#191c1b",
+                    "on-secondary": "#ffffff",
+                    "surface-container-low": "#f2f4f2",
+                    "outline": "#707a6c",
+                    "surface-dim": "#d8dad9",
+                    "error-container": "#ffdad6",
+                    "primary-fixed-dim": "#88d982",
+                    "inverse-surface": "#2e3130"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "xs": "4px",
+                    "gutter": "12px",
+                    "edge-margin": "16px",
+                    "sm": "8px",
+                    "lg": "24px",
+                    "xl": "32px",
+                    "md": "16px",
+                    "base": "4px"
+            },
+            "fontFamily": {
+                    "label-lg": [
+                            "Inter"
+                    ],
+                    "headline-md": [
+                            "Inter"
+                    ],
+                    "label-sm": [
+                            "Inter"
+                    ],
+                    "display-lg": [
+                            "Inter"
+                    ],
+                    "body-lg": [
+                            "Inter"
+                    ],
+                    "headline-lg": [
+                            "Inter"
+                    ],
+                    "bilingual-subtext": [
+                            "Inter"
+                    ],
+                    "body-md": [
+                            "Inter"
+                    ]
+            },
+            "fontSize": {
+                    "label-lg": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "letterSpacing": "0.01em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "headline-md": [
+                            "20px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "label-sm": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "display-lg": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "body-lg": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-lg": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "bilingual-subtext": [
+                            "13px",
+                            {
+                                    "lineHeight": "18px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "body-md": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "400"
+                            }
+                    ]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface h-screen flex flex-col antialiased selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopAppBar (Transactional - Hidden Navigation Shells per instructions) -->
+<header class="flex items-center justify-between px-edge-margin h-16 w-full max-w-screen-xl mx-auto bg-surface border-b border-surface-container-low shrink-0 sticky top-0 z-10">
+<button class="p-2 -ml-2 rounded-full hover:bg-surface-container-low transition-colors text-on-surface-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-2xl">arrow_back</span>
+</button>
+<div class="flex flex-col items-center flex-1">
+<h1 class="font-headline-md text-headline-md text-on-surface">Active Trip</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-0.5">Trip ID: KP-240525-0012</p>
+</div>
+<div class="flex items-center gap-2">
+<button class="flex flex-col items-center justify-center text-primary p-1 hover:bg-surface-container-low rounded-lg transition-colors min-w-[56px]">
+<span class="material-symbols-outlined text-[20px] mb-0.5">support_agent</span>
+<span class="font-label-sm text-[10px] leading-tight">Support</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant p-1 hover:bg-surface-container-low rounded-lg transition-colors min-w-[56px]">
+<span class="material-symbols-outlined text-[20px] mb-0.5">share</span>
+<span class="font-label-sm text-[10px] leading-tight">Share</span>
+</button>
+</div>
+</header>
+<main class="flex-1 overflow-y-auto pb-safe">
+<div class="max-w-screen-xl mx-auto w-full flex flex-col md:flex-row h-full">
+<!-- Map Section (Left on Desktop, Top on Mobile) -->
+<section class="w-full md:w-1/2 lg:w-3/5 h-[40vh] md:h-full relative flex-shrink-0 bg-surface-container-low border-b md:border-b-0 md:border-r border-outline-variant/30">
+<!-- Status Bar Overlay -->
+<div class="absolute top-4 left-4 right-4 z-10 flex justify-between items-start pointer-events-none">
+<div class="bg-primary-container/20 border border-primary-container/30 rounded-full px-3 py-1 flex items-center gap-1.5 backdrop-blur-sm shadow-sm pointer-events-auto">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="font-label-sm text-label-sm text-primary font-semibold">In Progress</span>
+</div>
+<div class="bg-surface/90 backdrop-blur-md border border-outline-variant/30 rounded-full px-3 py-1.5 flex items-center gap-2 shadow-sm pointer-events-auto">
+<span class="material-symbols-outlined text-primary text-[18px]">sensors</span>
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">Live</span>
+</div>
+</div>
+<!-- Destination Header Overlay -->
+<div class="absolute top-16 left-4 right-4 z-10 bg-surface/95 backdrop-blur-md rounded-xl p-3 shadow-md border border-surface-container-high pointer-events-auto text-center">
+<h2 class="font-label-lg text-label-lg text-on-surface flex items-center justify-center gap-2">
+                        Pune (Your Location) <span class="material-symbols-outlined text-[16px] text-on-surface-variant">arrow_forward</span> Lasalgaon Mandi
+                    </h2>
+<p class="font-body-md text-[13px] text-on-surface-variant mt-1">Expected Arrival: 02:35 PM</p>
+</div>
+<!-- Map Placeholder -->
+<div class="w-full h-full relative overflow-hidden bg-[#e5e1d8]">
+<img class="w-full h-full object-cover absolute inset-0 opacity-80" data-alt="A detailed map view showing a route from Pune to Lasalgaon Mandi. The route line is a bright, solid green. A marker indicates the current location of a truck, and a red pin marks the destination. The map style is clean, modern, light mode with subtle terrain features and soft grey roads." data-location="Maharashtra" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCK0JPBvl00Zajs_EdCISQFYopwgJnbwVH-R-lH9n3ezbjMTwChk3rUy3wBE42UcJIhgNmtmU9v_PJg30pge_6y_5IuH41ylTiaIMqNwk_AkV170ODmJICDxBibdceVNbqoZRX1BOss03pft--NSnsaR2FoGn1QaimWlD2JYEgQuca62nv1MeMEIVY2NGxfDkOOGjnZADsw1rWnHZ0-dMVuyQKQk3b-Iwv3fb7pVVpV90wEuSCZVv4q">
+<!-- Interactive Map Elements Overlay (Mockup) -->
+<div class="absolute inset-0 pointer-events-none">
+<!-- Truck Marker -->
+<div class="absolute top-[45%] left-[30%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-auto drop-shadow-md">
+<div class="bg-surface rounded-full p-1.5 shadow-lg border border-outline-variant/50 relative z-10">
+<img class="w-6 h-6 object-contain" data-alt="A small, modern flat illustration of a blue commercial truck." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBj6Nb0AAve-lESt3Qbmm-QSzg-NjmS8z3xDULmqmHQ8nm2Pu9CtIMJSdwnBLpm4HF0PTpqNEPdT_Gb_409E5lBFKT-sYHyYfGM0oclcm0Vmt0yHkGgQljXmEdx3V5v_3IXMQ4sJM1d9nUNFTSdoA6uxxiekH2iDbgzdW1rd1-xrbL3pCOXTPQDAvNwkuImxxApbcMM-za79RssZyLqbA1h8Q1cOYN0BcbYA5IAyATlVcJ3lP8M42RD">
+</div>
+<div class="bg-primary text-on-primary font-label-sm text-[10px] px-2 py-0.5 rounded-full mt-1 shadow-sm whitespace-nowrap">
+                                 En Route
+                             </div>
+</div>
+<!-- Destination Marker -->
+<div class="absolute top-[60%] right-[15%] -translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-auto drop-shadow-md">
+<span class="material-symbols-outlined text-error text-[32px]" style="font-variation-settings: 'FILL' 1;">location_on</span>
+<div class="bg-surface/90 backdrop-blur-sm text-on-surface font-label-sm text-[11px] px-2 py-1 rounded-md mt-1 shadow-sm whitespace-nowrap border border-outline-variant/30 text-center leading-tight">
+                                 Lasalgaon<br>Mandi
+                             </div>
+</div>
+</div>
+</div>
+<!-- FAB Overlay -->
+<button class="absolute bottom-6 right-4 z-10 bg-surface rounded-full p-3 shadow-md border border-surface-container-high hover:bg-surface-container-lowest transition-colors text-on-surface">
+<span class="material-symbols-outlined">my_location</span>
+</button>
+</section>
+<!-- Details Section (Right on Desktop, Bottom on Mobile) -->
+<section class="w-full md:w-1/2 lg:w-2/5 p-edge-margin flex flex-col gap-lg bg-surface">
+<!-- Progress Stepper -->
+<div class="w-full py-2">
+<div class="flex items-center justify-between relative">
+<!-- Connecting Line Background -->
+<div class="absolute left-[5%] right-[5%] top-3 h-1 bg-surface-container-high -z-10 rounded-full"></div>
+<!-- Connecting Line Active (Fills to step 4) -->
+<div class="absolute left-[5%] right-[25%] top-3 h-1 bg-primary -z-10 rounded-full"></div>
+<!-- Step 1: Confirmed -->
+<div class="flex flex-col items-center flex-1 z-0">
+<div class="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<span class="font-label-sm text-[10px] text-primary mt-2 text-center leading-tight whitespace-nowrap">Request Confirmed</span>
+<span class="font-label-sm text-[9px] text-on-surface-variant mt-0.5">09:15 AM</span>
+</div>
+<!-- Step 2: Driver Assigned -->
+<div class="flex flex-col items-center flex-1 z-0">
+<div class="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<span class="font-label-sm text-[10px] text-primary mt-2 text-center leading-tight whitespace-nowrap">Driver Assigned</span>
+<span class="font-label-sm text-[9px] text-on-surface-variant mt-0.5">09:25 AM</span>
+</div>
+<!-- Step 3: Pickup -->
+<div class="flex flex-col items-center flex-1 z-0">
+<div class="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-sm">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">local_shipping</span>
+</div>
+<span class="font-label-sm text-[10px] text-primary mt-2 text-center leading-tight whitespace-nowrap">Pickup in Progress</span>
+<span class="font-label-sm text-[9px] text-on-surface-variant mt-0.5">10:10 AM</span>
+</div>
+<!-- Step 4: En Route (Active) -->
+<div class="flex flex-col items-center flex-1 z-0">
+<div class="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center shadow-md ring-4 ring-primary-container/20">
+<div class="w-2.5 h-2.5 bg-on-primary rounded-full"></div>
+</div>
+<span class="font-label-sm text-[10px] text-on-surface font-semibold mt-2 text-center leading-tight whitespace-nowrap">En Route to Mandi</span>
+<span class="font-label-sm text-[9px] text-primary font-medium mt-0.5">10:20 AM</span>
+</div>
+<!-- Step 5: Arriving Soon (Pending) -->
+<div class="flex flex-col items-center flex-1 z-0 opacity-50">
+<div class="w-6 h-6 rounded-full bg-surface-container-high text-on-surface-variant border border-outline-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+<span class="font-label-sm text-[10px] text-on-surface-variant mt-2 text-center leading-tight whitespace-nowrap">Arriving Soon</span>
+<span class="font-label-sm text-[9px] text-on-surface-variant mt-0.5">02:35 PM</span>
+</div>
+</div>
+</div>
+<hr class="border-surface-container-high">
+<!-- Driver & Vehicle Card (Bento Style) -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+<!-- Driver Info -->
+<div class="bg-surface-container-lowest border border-outline-variant/50 rounded-xl p-md shadow-[0px_4px_12px_rgba(0,0,0,0.02)] flex flex-col justify-between">
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-full bg-surface-container-low overflow-hidden border border-outline-variant/30 flex-shrink-0">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of an Indian male truck driver, smiling slightly, wearing a casual shirt, shot against a neutral bright background in a modern light-mode style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDFSjCrFnhEX76gz0IYfVm_GccMThRZ0PWCmdMxULQvLxXS5TpxcK1yWAZWQpzqKsjAV-cf_KHhQ4O3i5_aI_oRjPlkeBvG-RczjBJesMKt_AwfvBQcJgQaIK3WZQ72wJekmV-3OjJECVeqOpVJRyAqdOS_G11_28qy31ANJJw8E_y39A-qONTjhulbpxxZpZbvjAoUptixkDN9NCgDpNv4PFXwtvVhgt0Gwq4VqBbN1g2iKTAcN363">
+</div>
+<div>
+<h3 class="font-label-lg text-label-lg text-on-surface">Mahesh J.</h3>
+<div class="flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[14px] text-tertiary-fixed-dim" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="font-label-sm text-[13px] text-on-surface-variant">4.8 <span class="text-outline">(126)</span></span>
+</div>
+</div>
+</div>
+<button class="flex items-center gap-1.5 px-3 py-1.5 border border-primary text-primary rounded-full hover:bg-primary/5 transition-colors">
+<span class="material-symbols-outlined text-[16px]">call</span>
+<span class="font-label-sm text-label-sm font-semibold">Call</span>
+</button>
+</div>
+<div class="mt-4 pt-3 border-t border-outline-variant/30 flex items-center gap-3">
+<div class="w-10 h-8 bg-surface-container-low rounded flex items-center justify-center overflow-hidden border border-outline-variant/30 shrink-0">
+<img class="w-full h-full object-contain mix-blend-multiply" data-alt="A small side profile image of a Tata 407 light commercial truck, clean, on a white background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuATU3ENGo_8LiQhk9wybv9gh8_xgd2Uds9wROKoAjHx7ZlsIB4aUiWR8kGqFGtK_W8Rw2udaeVHN7jutOaId0Xqky4vP2numS9QosEUNh7weAjF--syAyDLsxGIieW3KRdkOg98VT5X15ZgtFjph9WvXc_9ws4CVTK4qk4entUNmTNHNEb4akOzTx4pm8UifeX2x5iZjEY8dmaRk0LELF9Rg14XPZ1oshkdMQNsvtRbzDUSlpvxhC5Y">
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface font-semibold">Tata 407</p>
+<p class="font-body-md text-[12px] text-on-surface-variant flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[12px]">badge</span> MH15 AB 1234
+                                 </p>
+</div>
+</div>
+</div>
+<!-- Trip Details List -->
+<div class="bg-surface-container-lowest border border-outline-variant/50 rounded-xl p-md shadow-[0px_4px_12px_rgba(0,0,0,0.02)] flex flex-col gap-3">
+<h3 class="font-label-lg text-label-lg text-on-surface mb-1">Trip Details</h3>
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">route</span>
+<span class="font-body-md text-body-md text-[13px]">Total Distance</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface">92 km</span>
+</div>
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">account_circle</span>
+<span class="font-body-md text-body-md text-[13px]">Your Share (60%)</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface">₹2,250</span>
+</div>
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">payments</span>
+<span class="font-body-md text-body-md text-[13px]">Total Trip Cost</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface">₹3,750</span>
+</div>
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">schedule</span>
+<span class="font-body-md text-body-md text-[13px]">Booking Time</span>
+</div>
+<span class="font-label-lg text-[13px] text-on-surface font-medium text-right">Today, 09:15 AM</span>
+</div>
+<button class="mt-2 w-full flex items-center justify-center gap-1 py-2 border border-outline-variant rounded-lg text-primary hover:bg-primary/5 transition-colors">
+<span class="font-label-sm text-[13px] font-semibold">View Cost Breakdown</span>
+<span class="material-symbols-outlined text-[18px]">expand_more</span>
+</button>
+</div>
+</div>
+<!-- Pooled Capacity & Farmers -->
+<div class="bg-surface-container-low rounded-xl p-md border border-outline-variant/30">
+<div class="flex justify-between items-end mb-2">
+<span class="font-body-md text-[13px] text-on-surface-variant">Capacity Used</span>
+<span class="font-label-lg text-[13px] text-on-surface">2.6 / 4.0 Ton <span class="text-primary ml-1">(65%)</span></span>
+</div>
+<div class="w-full bg-surface-container-highest rounded-full h-2 mb-4 overflow-hidden flex">
+<div class="bg-primary h-full" style="width: 40%"></div>
+<div class="bg-primary/60 h-full border-l border-surface" style="width: 25%"></div>
+</div>
+<div class="flex items-center justify-between border-t border-outline-variant/30 pt-3">
+<span class="font-body-md text-[13px] text-on-surface-variant">Pooled Farmers</span>
+<div class="flex -space-x-2">
+<div class="w-8 h-8 rounded-full border-2 border-surface overflow-hidden bg-surface-container-highest">
+<img class="w-full h-full object-cover" data-alt="Small avatar of an Indian male farmer, wearing a turban, smiling." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCEF-PZk-7ghdJa1HEZU9FcgHrenwi3DONPOf4vH0NuSjGTEMwd3Qp3yXVZTYbyWbj0Qlvg-B237CfC7DC1yM_3uE5eT0Bkqix6XrB0m6bTDoJ2UWpggSPOGsv4m0ylsGLGij9dNQpgHA1o9Q37s8mp8F0YwC2NhggK_MvFl2AGiXecJYuRkPr3Clw60YDoybpLOy5X1X7hs-ZgpM6koYW6-uwIsQc5UjgHwrFtomGQyC9QlakbkHxd">
+</div>
+<div class="w-8 h-8 rounded-full border-2 border-surface overflow-hidden bg-surface-container-highest">
+<img class="w-full h-full object-cover" data-alt="Small avatar of an Indian female farmer, looking professional." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCH-I2vLWpKR6xA4Ez3nfHMWb7T7GeMA7nNBbZCsY9UdII237i18ytwhijfStYc4fomb7y8Ti5HhHlH6RF5VUO0eSiouukc1UhOx3Edfo3YfaMIR1wzz-hhKDb2ymD0sZCER1rwoyMgjLoWntzfzgQ7RpKKU2ULLKxIEB_ye9MT9hsOSkpWDIh5raRaCcK8tgDVanOkCIpRClAzCVRf3JRRGR5iAlxGuextvzWUUBtN_-6VSR6m77Eq">
+</div>
+<div class="w-8 h-8 rounded-full border-2 border-surface bg-surface-container-high flex items-center justify-center text-on-surface-variant font-label-sm text-[10px]">
+                                +1
+                            </div>
+</div>
+</div>
+</div>
+<!-- Trip Transparency Grid -->
+<div>
+<h3 class="font-label-lg text-label-lg text-on-surface mb-3 px-1">Trip Transparency</h3>
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-sm">
+<div class="bg-surface-bright border border-outline-variant/40 rounded-lg p-3 flex flex-col gap-1.5 shadow-sm">
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">sync_alt</span>
+<span class="font-body-md text-[11px] text-on-surface-variant leading-tight mt-1">Return Trip (Estimated)</span>
+<span class="font-label-sm text-[13px] text-on-surface">Today, 05:30 PM</span>
+</div>
+<div class="bg-surface-bright border border-outline-variant/40 rounded-lg p-3 flex flex-col gap-1.5 shadow-sm">
+<span class="material-symbols-outlined text-primary text-[20px]">payments</span>
+<span class="font-body-md text-[11px] text-on-surface-variant leading-tight mt-1">Expected Return</span>
+<span class="font-label-sm text-[13px] text-on-surface">₹1,500</span>
+</div>
+<div class="bg-surface-bright border border-outline-variant/40 rounded-lg p-3 flex flex-col gap-1.5 shadow-sm">
+<span class="material-symbols-outlined text-on-surface-variant text-[20px]">receipt_long</span>
+<span class="font-body-md text-[11px] text-on-surface-variant leading-tight mt-1">Billing Status</span>
+<span class="font-label-sm text-[12px] text-on-surface leading-tight">Generated at Completion</span>
+</div>
+</div>
+</div>
+<!-- Bottom Help / Safety Area -->
+<div class="mt-4 mb-2">
+<h3 class="font-label-lg text-[13px] text-on-surface-variant mb-2 px-1">Need Help?</h3>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+<button class="bg-surface border border-outline-variant rounded-lg py-2.5 flex items-center justify-center gap-2 hover:bg-surface-container-low transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[18px] text-primary">call</span>
+<span class="font-label-sm text-[13px] text-on-surface">Call Driver</span>
+</button>
+<button class="bg-surface border border-outline-variant rounded-lg py-2.5 flex items-center justify-center gap-2 hover:bg-surface-container-low transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[18px] text-primary">chat</span>
+<span class="font-label-sm text-[13px] text-on-surface">Chat</span>
+</button>
+<button class="bg-error-container/20 border border-error/30 rounded-lg py-2.5 flex items-center justify-center gap-2 hover:bg-error-container/40 transition-colors shadow-sm md:col-span-2">
+<span class="material-symbols-outlined text-[18px] text-error">report_problem</span>
+<span class="font-label-sm text-[13px] text-error">Report Issue</span>
+</button>
+</div>
+<!-- AI Assistant Banner -->
+<div class="bg-surface-container-lowest border border-outline-variant/50 rounded-xl p-2 flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-3 pl-2">
+<div class="w-8 h-8 bg-primary-container/20 rounded-full flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">smart_toy</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-sm text-[11px] text-on-surface-variant font-semibold uppercase tracking-wider">AI Assistant</span>
+<span class="font-body-md text-[13px] text-on-surface">Ask anything about your trip</span>
+</div>
+</div>
+<button class="w-10 h-10 bg-primary rounded-full text-on-primary flex items-center justify-center hover:bg-primary/90 transition-colors shadow-md">
+<span class="material-symbols-outlined text-[20px]">mic</span>
+</button>
+</div>
+</div>
+<div class="flex items-center justify-center gap-2 text-on-surface-variant py-2 bg-surface-container-low/50 rounded-lg border border-outline-variant/20">
+<span class="material-symbols-outlined text-[16px]">lock</span>
+<span class="font-bilingual-subtext text-bilingual-subtext">Your safety is our priority. All trips are monitored.</span>
+</div>
+</section>
+</div>
+</main>
+</body></html>

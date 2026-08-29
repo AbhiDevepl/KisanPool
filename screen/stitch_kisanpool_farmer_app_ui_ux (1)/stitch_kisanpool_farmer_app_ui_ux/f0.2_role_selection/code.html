@@ -1,0 +1,187 @@
+<!DOCTYPE html><html lang="mr"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>KisanPool - Role Selection</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-container": "#00731e",
+                        "on-primary-fixed-variant": "#005312",
+                        "surface": "#f8faf8",
+                        "on-primary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed-variant": "#005313",
+                        "secondary": "#006e1c",
+                        "on-secondary": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "surface-container-lowest": "#ffffff",
+                        "background": "#f8faf8",
+                        "tertiary-fixed-dim": "#ffba38",
+                        "on-primary-container": "#cbffc2",
+                        "surface-dim": "#d8dad9",
+                        "error": "#ba1a1a",
+                        "surface-container-high": "#e6e9e7",
+                        "on-tertiary-fixed": "#281900",
+                        "tertiary-container": "#926500",
+                        "on-background": "#191c1b",
+                        "on-error": "#ffffff",
+                        "on-surface": "#191c1b",
+                        "surface-container-highest": "#e1e3e1",
+                        "tertiary": "#734e00",
+                        "on-secondary-fixed": "#002204",
+                        "outline": "#707a6c",
+                        "secondary-fixed": "#94f990",
+                        "secondary-container": "#91f78e",
+                        "on-primary-fixed": "#002204",
+                        "on-tertiary-container": "#ffefda",
+                        "surface-variant": "#e1e3e1",
+                        "primary-fixed-dim": "#88d982",
+                        "inverse-on-surface": "#eff1ef",
+                        "inverse-surface": "#2e3130",
+                        "outline-variant": "#bfcaba",
+                        "primary-fixed": "#a3f69c",
+                        "primary-container": "#2e7d32",
+                        "surface-container": "#eceeec",
+                        "secondary-fixed-dim": "#78dc77",
+                        "on-error-container": "#93000a",
+                        "surface-bright": "#f8faf8",
+                        "on-tertiary-fixed-variant": "#604100",
+                        "on-surface-variant": "#40493d",
+                        "surface-tint": "#1b6d24",
+                        "primary": "#0d631b",
+                        "tertiary-fixed": "#ffdeac",
+                        "surface-container-low": "#f2f4f2",
+                        "inverse-primary": "#88d982"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "16px",
+                        "xl": "32px",
+                        "lg": "24px",
+                        "xs": "4px",
+                        "base": "4px",
+                        "edge-margin": "16px",
+                        "sm": "8px",
+                        "gutter": "12px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "bilingual-subtext": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "bilingual-subtext": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.filled {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-md antialiased md:max-w-md md:mx-auto md:border md:border-outline-variant md:shadow-lg md:my-8 relative overflow-hidden">
+<!-- Linear Flow: Suppressing BottomNavBar and SideNav -->
+<!-- TopAppBar -->
+<header class="flex items-center justify-between px-edge-margin h-14 w-full bg-background top-0 sticky z-10 transition-transform">
+<button class="p-2 -ml-2 rounded-full hover:bg-surface-container-low active:scale-95 transition-transform text-on-surface">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<div class="flex-1 text-center">
+<!-- Empty space for centering if needed, or minimal branding -->
+</div>
+<div class="w-10"></div> <!-- Spacer for balance -->
+</header>
+<main class="flex-1 px-edge-margin pb-xl pt-4 flex flex-col">
+<!-- Header Section -->
+<div class="text-center mb-8">
+<h1 class="font-headline-lg text-headline-lg text-on-background mb-2">चला सुरुवात करूया!</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">आपली भूमिका निवडा</p>
+<p class="font-bilingual-subtext text-bilingual-subtext text-on-surface-variant mt-1">Choose your role to continue</p>
+</div>
+<!-- Role Selection Cards -->
+<div class="flex flex-col gap-4 flex-1">
+<!-- Farmer Card (Active State) -->
+<button class="relative w-full rounded-xl p-0 overflow-hidden text-left border-2 border-primary-container bg-surface-container-lowest shadow-sm active:scale-[0.98] transition-transform duration-200 group">
+<div class="absolute top-4 right-4 bg-primary-container text-on-primary rounded-full p-1 shadow-sm opacity-100 transition-opacity">
+<span class="material-symbols-outlined filled text-sm" style="font-size: 16px;">check</span>
+</div>
+<div class="flex items-center h-32 w-full">
+<div class="w-1/3 h-full bg-surface-container-low relative overflow-hidden rounded-l-xl">
+<!-- Abstract representation for Farmer -->
+<div class="absolute inset-0 bg-gradient-to-br from-[#e8f5e9] to-[#c8e6c9]"></div>
+<span class="material-symbols-outlined text-primary-container absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" style="font-size: 48px;">agriculture</span>
+</div>
+<div class="w-2/3 p-4 flex flex-col justify-center h-full">
+<h2 class="font-headline-md text-headline-md text-on-background mb-1">शेतकरी</h2>
+<p class="font-bilingual-subtext text-bilingual-subtext text-on-surface-variant mb-1">Farmer</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant line-clamp-2 leading-snug">
+                            माल पाठवा आणि जवळच्या वाहनांसोबत जोडा.
+                        </p>
+</div>
+</div>
+</button>
+<!-- Transporter Card (Inactive State) -->
+<button class="relative w-full rounded-xl p-0 overflow-hidden text-left border border-outline-variant bg-surface hover:bg-surface-container-low active:scale-[0.98] transition-all duration-200 group">
+<div class="absolute top-4 right-4 bg-surface-container-high text-on-surface-variant rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-sm" style="font-size: 16px;">arrow_forward</span>
+</div>
+<div class="flex items-center h-32 w-full opacity-80 group-hover:opacity-100 transition-opacity">
+<div class="w-1/3 h-full bg-surface-container relative overflow-hidden rounded-l-xl">
+<!-- Abstract representation for Transporter -->
+<div class="absolute inset-0 bg-gradient-to-br from-[#e0e0e0] to-[#bdbdbd]"></div>
+<span class="material-symbols-outlined text-on-surface-variant absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" style="font-size: 48px;">local_shipping</span>
+</div>
+<div class="w-2/3 p-4 flex flex-col justify-center h-full">
+<h2 class="font-headline-md text-headline-md text-on-background mb-1">वाहतूकदार</h2>
+<p class="font-bilingual-subtext text-bilingual-subtext text-on-surface-variant mb-1">Transporter</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant line-clamp-2 leading-snug">
+                            आपली वाहन क्षमता शेअर करा आणि जास्त कमवा.
+                        </p>
+</div>
+</div>
+</button>
+</div>
+<!-- Trust Badge / Footer Info -->
+<div class="flex items-center justify-center gap-2 mt-8 mb-4 text-on-surface-variant opacity-80">
+<span class="material-symbols-outlined text-primary" style="font-size: 18px;">verified_user</span>
+<p class="font-label-sm text-label-sm">सुरक्षित, विश्वासार्ह आणि पारदर्शक प्लॅटफॉर्म</p>
+</div>
+</main>
+<!-- Fixed Bottom CTA -->
+<div class="p-edge-margin bg-background border-t border-outline-variant/30 pb-safe">
+<button class="w-full h-12 bg-primary-container text-on-primary rounded-full font-label-lg text-label-lg flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-md">
+<span>पुढे जा</span>
+<span class="material-symbols-outlined" style="font-size: 20px;">arrow_forward</span>
+</button>
+</div>
+</body></html>

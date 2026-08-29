@@ -1,0 +1,204 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>KisanPool Onboarding</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed": "#281900",
+                        "on-error-container": "#93000a",
+                        "surface-container-high": "#e6e9e7",
+                        "surface-container-highest": "#e1e3e1",
+                        "secondary-fixed": "#94f990",
+                        "on-secondary-fixed": "#002204",
+                        "on-primary": "#ffffff",
+                        "secondary-container": "#91f78e",
+                        "outline-variant": "#bfcaba",
+                        "surface-bright": "#f8faf8",
+                        "on-secondary-fixed-variant": "#005313",
+                        "on-primary-fixed": "#002204",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed-variant": "#005312",
+                        "on-error": "#ffffff",
+                        "background": "#f8faf8",
+                        "primary-container": "#2e7d32",
+                        "primary-fixed": "#a3f69c",
+                        "on-tertiary-fixed-variant": "#604100",
+                        "primary": "#0d631b",
+                        "secondary-fixed-dim": "#78dc77",
+                        "secondary": "#006e1c",
+                        "tertiary-fixed": "#ffdeac",
+                        "on-surface-variant": "#40493d",
+                        "surface-variant": "#e1e3e1",
+                        "tertiary-fixed-dim": "#ffba38",
+                        "inverse-on-surface": "#eff1ef",
+                        "on-surface": "#191c1b",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary": "#734e00",
+                        "on-secondary-container": "#00731e",
+                        "on-tertiary": "#ffffff",
+                        "surface": "#f8faf8",
+                        "tertiary-container": "#926500",
+                        "on-primary-container": "#cbffc2",
+                        "surface-container": "#eceeec",
+                        "surface-tint": "#1b6d24",
+                        "inverse-primary": "#88d982",
+                        "on-tertiary-container": "#ffefda",
+                        "on-background": "#191c1b",
+                        "on-secondary": "#ffffff",
+                        "surface-container-low": "#f2f4f2",
+                        "outline": "#707a6c",
+                        "surface-dim": "#d8dad9",
+                        "error-container": "#ffdad6",
+                        "primary-fixed-dim": "#88d982",
+                        "inverse-surface": "#2e3130"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "gutter": "12px",
+                        "edge-margin": "16px",
+                        "sm": "8px",
+                        "lg": "24px",
+                        "xl": "32px",
+                        "md": "16px",
+                        "base": "4px"
+                    },
+                    "fontFamily": {
+                        "label-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "bilingual-subtext": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "bilingual-subtext": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md h-screen w-screen overflow-hidden flex items-center justify-center">
+<!-- Screen 1: Welcome / Language Selection -->
+<div class="w-full h-full max-w-md mx-auto relative flex flex-col bg-on-surface" id="screen-welcome">
+<div class="absolute inset-0 z-0">
+<div class="w-full h-full bg-cover bg-bottom opacity-50 mix-blend-overlay" data-alt="A lush, green terraced agricultural landscape bathed in warm sunrise light. Rolling hills of crops with a tractor plowing a field and a transport truck on a winding dirt road. A highly detailed, realistic, vibrant agricultural scene representing logistics and farming. The mood is optimistic and natural. Soft atmospheric perspective in the distance." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDkt9wIlyIkt2tiULaCVKBTEtRQmTPBEuvybLf7VgjoZwarixSQGZjmC-FJ2dBd31egsE1L7oWAjE_HWgUzfWBspKOSlkJErEnJLIGdr_sREW7_wtPo2d48nE_PvL3Ehsng0N4X0t4xlP5V1_w1_jPvG1xMGol4bONeowz3VCdDGHtSHpPj-Vp6xTut6hLjLyIOLrlAgnneweUgNQ8xOQOsDBh7Ny8S2e5vqwgCqSk4aZZ4NpyRHI9y')"></div>
+<div class="absolute inset-0 bg-gradient-to-b from-[#003B15]/90 via-[#003B15]/70 to-[#001D0A]/90"></div>
+</div>
+<div class="relative z-10 flex-1 flex flex-col items-center justify-center p-edge-margin">
+<img alt="KisanPool Logo" class="w-48 mb-xs" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYe53UxIwzII8ZohVxz80suEZO_QZIbXaPthucPEljBMyMwkIRgc--ZZAd32q4zSTBuzgy_x7BogkkPkxk_gfYWBcl84CRGw2B16GW4U5JW2e3oLz_He67rb_rmW6NwoiFfUuPAD4p0tvACJJlXJzT4mLj_g4P0l6p5qNTDthKxApfipZBXHkKsYBySB4mLFBAaPCHcViri6xc-pukc_vhXLye3X56uAZy2ckgW6F1q4No0gEocdkUz_QwzhyaJqgJYw">
+<h1 class="font-display-lg text-display-lg text-on-primary mb-sm">KisanPool</h1>
+<p class="font-body-lg text-body-lg text-on-primary mb-xl">Sahaj. Surakshit. Smart.</p>
+<p class="font-body-md text-body-md text-on-primary/80 text-center max-w-[250px]">Connecting farmers and transporters for smarter and fairer journeys.</p>
+</div>
+<div class="relative z-10 w-full p-edge-margin pb-xl flex flex-col gap-sm">
+<p class="text-center font-label-sm text-label-sm text-on-primary/70 mb-sm">भाषा निवडा / Choose Language</p>
+<div class="flex gap-sm">
+<button class="flex-1 py-3 px-4 bg-primary-container text-on-primary font-label-lg text-label-lg rounded-lg border border-primary-container hover:bg-primary transition-colors text-center" onclick="nextScreen('screen-role')">मराठी</button>
+<button class="flex-1 py-3 px-4 bg-transparent text-on-primary border border-on-primary/30 font-label-lg text-label-lg rounded-lg hover:bg-white/10 transition-colors text-center" onclick="nextScreen('screen-role')">हिंदी</button>
+<button class="flex-1 py-3 px-4 bg-transparent text-on-primary border border-on-primary/30 font-label-lg text-label-lg rounded-lg hover:bg-white/10 transition-colors text-center" onclick="nextScreen('screen-role')">English</button>
+</div>
+</div>
+</div>
+<!-- Screen 2: Role Selection -->
+<div class="w-full h-full max-w-md mx-auto bg-surface hidden flex-col" id="screen-role">
+<div class="flex items-center p-edge-margin">
+<button class="p-2 -ml-2 rounded-full hover:bg-surface-container-highest transition-colors" onclick="prevScreen('screen-welcome')">
+<span class="material-symbols-outlined text-on-surface">arrow_back</span>
+</button>
+</div>
+<div class="flex-1 p-edge-margin flex flex-col pt-4">
+<div class="text-center mb-xl">
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-xs">चला सुरुवात करूया!</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant">आपली भूमिका निवडा</p>
+<p class="font-bilingual-subtext text-bilingual-subtext text-outline mt-1">Choose your role to continue</p>
+</div>
+<div class="flex flex-col gap-md">
+<!-- Farmer Role Card -->
+<button class="flex items-center p-md bg-surface-container-lowest border border-outline-variant rounded-xl hover:border-primary hover:shadow-md transition-all group text-left relative overflow-hidden" onclick="nextScreen('screen-mobile')">
+<div class="absolute inset-0 bg-gradient-to-r from-primary-container/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="w-20 h-20 rounded-full bg-surface-container mr-md flex-shrink-0 relative overflow-hidden border-2 border-surface">
+<img class="w-full h-full object-cover" data-alt="A portrait illustration of an Indian farmer smiling, wearing a traditional pagdi, standing in a lush green field with a tractor in the background. Warm natural lighting, professional flat vector illustration style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAMHJPYU7xgsacQeWey6bvIT1rGVuQt6P81ieLVVqUhbhhFZFUlyCmpSiDAZLBQ0WzKlV4RL4g7H98nj5_pJGh9gd5mFLJ63Zj8LhlBKYLbWVwzeLPcsSUDu91EhPl1DiC91x_JZhlw-Ay7WYdFCdcp2GjGz-y1QwtknlRqiAR6FVX1wPbTKrIayvXj13eiMRixDoxlOg1eCUE71nMl6tIC-UBhFWe9jWFPhMekhgSaNJQlzv5WRwtS">
+</div>
+<div class="flex-1 z-10">
+<h3 class="font-headline-md text-headline-md text-primary mb-xs">शेतकरी</h3>
+<p class="font-bilingual-subtext text-bilingual-subtext text-on-surface-variant mb-1">Farmer</p>
+<p class="font-label-sm text-label-sm text-outline">माल पाठवा आणि जवळच्या वाहनांसोबत जोडा.</p>
+</div>
+<div class="w-8 h-8 rounded-full bg-primary-container/20 group-hover:bg-primary-container flex items-center justify-center transition-colors ml-sm flex-shrink-0 z-10">
+<span class="material-symbols-outlined text-primary group-hover:text-on-primary text-sm">arrow_forward</span>
+</div>
+</button>
+<!-- Transporter Role Card -->
+<button class="flex items-center p-md bg-surface-container-lowest border border-outline-variant rounded-xl hover:border-primary hover:shadow-md transition-all group text-left relative overflow-hidden mt-sm" onclick="nextScreen('screen-mobile')">
+<div class="absolute inset-0 bg-gradient-to-r from-primary-container/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="w-20 h-20 rounded-full bg-surface-container mr-md flex-shrink-0 relative overflow-hidden border-2 border-surface">
+<img class="w-full h-full object-cover" data-alt="A portrait illustration of an Indian transport driver smiling, standing next to a modern green logistics truck. Professional, reliable appearance. Clean, modern flat vector illustration style, well-lit." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAMVnQS3yzpEdYnqjWFq-BGzkF4-tWtEThXCseTsveT7WRx1LSdRdKsfvWzVuxWJqefQCy53wKBnRqYCCT2FHtBLH7qsYrKsc2Z__o177bBidrLyB4LJCGCJqEu47iUv__ZSXTlNeL70-fU-C0z4SvVVFVPK9L_wopgz2b89d6ekU_fU-bujy5u2hiOd95LZSKFmTcp52GdzeEVVIgI4hM1VERwz22dT79ys_L-2fQI8yO0JBwk4xLN">
+</div>
+<div class="flex-1 z-10">
+<h3 class="font-headline-md text-headline-md text-primary mb-xs">वाहतूकदार</h3>
+<p class="font-bilingual-subtext text-bilingual-subtext text-on-surface-variant mb-1">Transporter</p>
+<p class="font-label-sm text-label-sm text-outline">आपली वाहन क्षमता शेअर करा आणि जास्त कमवा.</p>
+</div>
+<div class="w-8 h-8 rounded-full bg-primary-container/20 group-hover:bg-primary-container flex items-center justify-center transition-colors ml-sm flex-shrink-0 z-10">
+<span class="material-symbols-outlined text-primary group-hover:text-on-primary text-sm">arrow_forward</span>
+</div>
+</button>
+</div>
+<div class="mt-auto pt-xl pb-md flex items-center justify-center gap-2 text-outline">
+<span class="material-symbols-outlined text-sm">verified_user</span>
+<span class="font-label-sm text-label-sm">सुरक्षित, विश्वासार्ह आणि पारदर्शक प्लॅटफॉर्म</span>
+</div>
+</div>
+</div>
+<!-- Navigation Script -->
+<script>
+        function nextScreen(screenId) {
+            document.querySelectorAll('body > div').forEach(el => el.classList.add('hidden'));
+            const target = document.getElementById(screenId);
+            if(target) {
+                target.classList.remove('hidden');
+                target.classList.add('flex');
+            }
+        }
+        function prevScreen(screenId) {
+            document.querySelectorAll('body > div').forEach(el => el.classList.add('hidden'));
+            const target = document.getElementById(screenId);
+            if(target) {
+                target.classList.remove('hidden');
+                target.classList.add('flex');
+            }
+        }
+    </script>
+</body></html>

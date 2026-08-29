@@ -1,0 +1,134 @@
+#!/bin/sh
+# killport — free one or more TCP ports.
+#
+#   killport 4000            terminate whatever is listening on :4000
+#   killport 4000 8081 5173  several at once
+#   killport -9 4000         skip the graceful stop, SIGKILL immediately
+#   killport -l 4000         list what is holding the port, kill nothing
+#
+# Plain sh with no runtime to boot, so it returns as fast as `ss` can answer.
+
+set -u
+
+SIG_FIRST=TERM
+LIST_ONLY=0
+QUIET=0
+ME=$$
+
+usage() {
+  cat <<'USAGE'
+killport — free a TCP port
+
+  killport <port> [port...]   stop whatever is listening on those ports
+  killport -9 <port>          SIGKILL straight away, no graceful stop
+  killport -l <port>          list holders only, kill nothing
+  killport -q <port>          quiet; exit status only
+  killport -h                 this help
+
+Exit status: 0 if the port is free when it returns, 1 if something survived.
+USAGE
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -9|--force) SIG_FIRST=KILL; shift ;;
+    -l|--list)  LIST_ONLY=1; shift ;;
+    -q|--quiet) QUIET=1; shift ;;
+    -h|--help)  usage; exit 0 ;;
+    --) shift; break ;;
+    -*) echo "killport: unknown option $1" >&2; usage >&2; exit 2 ;;
+    *) break ;;
+  esac
+done
+
+[ $# -eq 0 ] && { usage >&2; exit 2; }
+
+say() { [ "$QUIET" -eq 1 ] || printf '%s\n' "$*"; }
+
+# ss is fastest and always present on modern Linux; the others are fallbacks.
+pids_on() {
+  port=$1
+  if command -v ss >/dev/null 2>&1; then
+    ss -lptnH "sport = :$port" 2>/dev/null | grep -o 'pid=[0-9]*' | cut -d= -f2
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -ti "tcp:$port" -sTCP:LISTEN 2>/dev/null
+  elif command -v fuser >/dev/null 2>&1; then
+    fuser -n tcp "$port" 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+$'
+  else
+    echo "killport: need ss, lsof or fuser" >&2
+    exit 3
+  fi
+}
+
+name_of() { ps -o comm= -p "$1" 2>/dev/null || echo '?'; }
+args_of() { ps -o args= -p "$1" 2>/dev/null | cut -c1-70; }
+
+status=0
+
+for port in "$@"; do
+  case "$port" in
+    ''|*[!0-9]*) echo "killport: '$port' is not a port number" >&2; status=1; continue ;;
+  esac
+
+  pids=$(pids_on "$port" | sort -u)
+
+  if [ -z "$pids" ]; then
+    say "port $port: free"
+    continue
+  fi
+
+  if [ "$LIST_ONLY" -eq 1 ]; then
+    for pid in $pids; do
+      say "port $port: pid $pid  $(name_of "$pid")  $(args_of "$pid")"
+    done
+    continue
+  fi
+
+  killed=''
+  for pid in $pids; do
+    # never take down this script or its shell
+    [ "$pid" = "$ME" ] && continue
+    [ "$pid" = "1" ] && { echo "killport: refusing to signal pid 1" >&2; status=1; continue; }
+
+    # read the name first — after the signal lands there is nothing left to ask
+    pname=$(name_of "$pid")
+
+    if kill -"$SIG_FIRST" "$pid" 2>/dev/null; then
+      killed="$killed $pid"
+      say "port $port: sent SIG$SIG_FIRST to pid $pid ($pname)"
+    else
+      echo "killport: could not signal pid $pid (try sudo?)" >&2
+      status=1
+    fi
+  done
+
+  [ -z "$killed" ] && continue
+
+  # give a graceful stop up to ~1s, checking often so the common case returns fast
+  if [ "$SIG_FIRST" = TERM ]; then
+    i=0
+    while [ $i -lt 20 ]; do
+      [ -z "$(pids_on "$port")" ] && break
+      sleep 0.05
+      i=$((i + 1))
+    done
+  fi
+
+  remaining=$(pids_on "$port" | sort -u)
+  if [ -n "$remaining" ]; then
+    for pid in $remaining; do
+      [ "$pid" = "$ME" ] && continue
+      kill -KILL "$pid" 2>/dev/null && say "port $port: pid $pid ignored SIGTERM, sent SIGKILL"
+    done
+    sleep 0.1
+  fi
+
+  if [ -n "$(pids_on "$port")" ]; then
+    echo "killport: port $port is still in use" >&2
+    status=1
+  else
+    say "port $port: free"
+  fi
+done
+
+exit $status

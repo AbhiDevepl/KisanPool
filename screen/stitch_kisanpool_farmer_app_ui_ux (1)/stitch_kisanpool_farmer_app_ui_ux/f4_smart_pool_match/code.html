@@ -1,0 +1,497 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+<title>Smart Pool Match</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed": "#281900",
+                        "on-error-container": "#93000a",
+                        "surface-container-high": "#e6e9e7",
+                        "surface-container-highest": "#e1e3e1",
+                        "secondary-fixed": "#94f990",
+                        "on-secondary-fixed": "#002204",
+                        "on-primary": "#ffffff",
+                        "secondary-container": "#91f78e",
+                        "outline-variant": "#bfcaba",
+                        "surface-bright": "#f8faf8",
+                        "on-secondary-fixed-variant": "#005313",
+                        "on-primary-fixed": "#002204",
+                        "error": "#ba1a1a",
+                        "on-primary-fixed-variant": "#005312",
+                        "on-error": "#ffffff",
+                        "background": "#f8faf8",
+                        "primary-container": "#2e7d32",
+                        "primary-fixed": "#a3f69c",
+                        "on-tertiary-fixed-variant": "#604100",
+                        "primary": "#0d631b",
+                        "secondary-fixed-dim": "#78dc77",
+                        "secondary": "#006e1c",
+                        "tertiary-fixed": "#ffdeac",
+                        "on-surface-variant": "#40493d",
+                        "surface-variant": "#e1e3e1",
+                        "tertiary-fixed-dim": "#ffba38",
+                        "inverse-on-surface": "#eff1ef",
+                        "on-surface": "#191c1b",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary": "#734e00",
+                        "on-secondary-container": "#00731e",
+                        "on-tertiary": "#ffffff",
+                        "surface": "#f8faf8",
+                        "tertiary-container": "#926500",
+                        "on-primary-container": "#cbffc2",
+                        "surface-container": "#eceeec",
+                        "surface-tint": "#1b6d24",
+                        "inverse-primary": "#88d982",
+                        "on-tertiary-container": "#ffefda",
+                        "on-background": "#191c1b",
+                        "on-secondary": "#ffffff",
+                        "surface-container-low": "#f2f4f2",
+                        "outline": "#707a6c",
+                        "surface-dim": "#d8dad9",
+                        "error-container": "#ffdad6",
+                        "primary-fixed-dim": "#88d982",
+                        "inverse-surface": "#2e3130"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xs": "4px",
+                        "gutter": "12px",
+                        "edge-margin": "16px",
+                        "sm": "8px",
+                        "lg": "24px",
+                        "xl": "32px",
+                        "md": "16px",
+                        "base": "4px"
+                    },
+                    "fontFamily": {
+                        "label-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "bilingual-subtext": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "bilingual-subtext": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill-icon {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface antialiased pb-24 md:pb-8">
+<!-- Top App Bar (Suppressing Bottom Navigation as this is a transactional task) -->
+<header class="bg-surface sticky top-0 z-40">
+<div class="flex items-center justify-between px-edge-margin h-16 w-full max-w-screen-xl mx-auto border-b border-surface-variant md:border-none">
+<button aria-label="Go back" class="text-on-surface-variant hover:bg-surface-container-low transition-colors p-2 rounded-full">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<div class="text-center flex-1">
+<h1 class="font-headline-md text-headline-md text-on-surface">Smart Pool Match</h1>
+<p class="font-bilingual-subtext text-bilingual-subtext text-on-surface-variant">Mandi: Lasalgaon Mandi, Nashik</p>
+</div>
+<button aria-label="How it works" class="text-primary hover:bg-primary-container/10 transition-colors p-2 rounded-full flex flex-col items-center gap-1">
+<span class="material-symbols-outlined text-[20px]">info</span>
+<span class="text-[10px] font-medium hidden md:block">How it works</span>
+</button>
+</div>
+</header>
+<main class="w-full max-w-screen-md mx-auto px-edge-margin mt-lg space-y-lg">
+<!-- Hero Notification -->
+<div class="bg-[#0f4d22] text-white rounded-xl p-md flex items-center justify-between shadow-md">
+<div>
+<h2 class="font-headline-md text-headline-md">Great Match Found!</h2>
+<p class="font-body-md text-body-md opacity-90 mt-1">Share ride, save more &amp; earn better</p>
+</div>
+<div class="bg-[#1f6b35] px-sm py-xs rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-[#ffba38]">star</span>
+<span class="font-label-sm text-label-sm text-white">Top 3 Matches</span>
+</div>
+</div>
+<!-- Match Cards List -->
+<div class="space-y-md">
+<!-- Match 1: Best Match (Highlighted) -->
+<div class="relative bg-surface-container-lowest rounded-xl border border-primary-container shadow-md overflow-hidden">
+<!-- Rank Badge -->
+<div class="absolute top-0 left-0 bg-[#c3e6cb] text-[#155724] font-bold px-3 py-1 rounded-br-xl rounded-tl-xl z-10 flex items-center gap-1">
+<span class="text-lg">1</span>
+<span class="font-label-sm text-label-sm bg-[#28a745] text-white px-2 py-0.5 rounded-full ml-1">Best Match</span>
+</div>
+<div class="p-md pt-lg">
+<!-- Driver & Vehicle Info -->
+<div class="flex items-start justify-between border-b border-surface-variant pb-md mb-md">
+<div class="flex items-center gap-sm w-1/3">
+<div class="w-12 h-12 rounded-full overflow-hidden border-2 border-surface-variant bg-surface-container flex-shrink-0">
+<img alt="Driver Mahesh J." class="w-full h-full object-cover" data-alt="A detailed headshot of a professional Indian male truck driver looking reliable and friendly, wearing a simple shirt, set against a bright, modern agricultural logistics background with soft natural lighting and a clean corporate aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA619D-7RNnmzDi8J0PBoF8eOzFyOyY2zEiKDdutrOfkjTxQxsMiGzsEUKcDhDKCW7tDlVO3KWiZipOYzmTV2WorSpQ6CAN7eNPYrNm2Cv04Q73Z_Snn15IBOwR4oLuEbGoyrkTz8yQbDRyKkTn4TEIRBRVWfJnH7jPjY4PaLrXcq5P1aYINwg2nxYWK8U1MzLJaReVGTnhIxI2nPVpoKME9Dry6FdppswzloHejo13OuiVbFz1jXx6">
+</div>
+<div>
+<h3 class="font-label-lg text-label-lg text-on-surface">Mahesh J.</h3>
+<div class="flex items-center gap-1 mt-0.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px] text-tertiary-fixed-dim fill-icon">star</span>
+<span class="font-label-sm text-label-sm">4.8 (126)</span>
+</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant mt-1">MH15 AB 1234</div>
+</div>
+</div>
+<!-- Logistics Details -->
+<div class="w-1/3 text-center border-l border-r border-surface-variant px-sm flex flex-col justify-center">
+<div class="flex items-center justify-center gap-1 text-on-surface-variant mb-1">
+<span class="material-symbols-outlined text-[16px]">local_shipping</span>
+<span class="font-label-sm text-label-sm">Tata 407</span>
+</div>
+<div class="text-on-surface-variant text-[11px]">Open Truck</div>
+<div class="mt-2 text-left">
+<div class="flex justify-between items-center text-[11px] text-on-surface-variant mb-1">
+<span>Available Capacity</span>
+<span class="font-semibold text-primary">65% (2.6 Ton)</span>
+</div>
+<div class="w-full bg-surface-container-high rounded-full h-1.5">
+<div class="bg-primary h-1.5 rounded-full" style="width: 65%"></div>
+</div>
+</div>
+</div>
+<!-- Score & Match Stats -->
+<div class="w-1/3 flex flex-col items-end text-right">
+<div class="flex items-center gap-1 text-primary">
+<span class="material-symbols-outlined text-[20px] text-primary">eco</span>
+<span class="font-headline-md text-headline-md font-bold text-primary">92%</span>
+</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant mt-0.5">Match Score</div>
+<div class="mt-2">
+<span class="font-headline-md text-headline-md text-on-surface">2</span>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Farmers Pooled</div>
+</div>
+</div>
+</div>
+<!-- Cost Details -->
+<div class="flex items-center justify-between">
+<div class="flex flex-col gap-1 w-1/3">
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]">distance</span>
+<span class="font-label-sm text-label-sm">Pickup Distance</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface ml-5">4.2 km</span>
+<div class="flex items-center gap-1 text-on-surface-variant mt-1">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+<span class="font-label-sm text-label-sm">ETA to You</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface ml-5">18 min</span>
+</div>
+<div class="w-1/3 flex flex-col justify-center border-l border-r border-surface-variant px-sm py-xs">
+<div class="flex justify-between items-center mb-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Total Trip Cost</span>
+<span class="font-label-lg text-label-lg text-on-surface font-semibold line-through text-on-surface-variant opacity-70 ml-2">₹3,750</span>
+</div>
+<div class="flex justify-between items-center mb-1 bg-primary-container/10 p-1 rounded">
+<span class="font-label-sm text-label-sm text-primary font-medium">Farmer Share (60%)</span>
+<span class="font-label-lg text-label-lg text-primary font-bold">₹2,250</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Transporter Share (40%)</span>
+<span class="font-label-lg text-label-lg text-on-surface">₹1,500</span>
+</div>
+</div>
+<div class="w-1/3 flex flex-col items-end gap-2">
+<button class="bg-primary text-white w-full py-2 px-4 rounded-lg font-label-lg text-label-lg flex items-center justify-center gap-1 hover:bg-[#0a4f15] transition-colors shadow-sm">
+                                Select <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+<div class="flex items-center gap-1 text-primary bg-primary-container/10 px-2 py-0.5 rounded-full">
+<span class="material-symbols-outlined text-[12px]">savings</span>
+<span class="text-[10px] font-semibold">Most Saving</span>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-low px-md py-sm border-t border-surface-variant text-[11px] text-on-surface-variant flex items-center gap-1">
+<span class="font-medium">Route:</span> Your Location <span class="material-symbols-outlined text-[12px]">arrow_forward</span> Lasalgaon Mandi
+                </div>
+</div>
+<!-- Match 2 (Standard) -->
+<div class="relative bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden">
+<div class="absolute top-0 left-0 bg-surface-variant text-on-surface-variant font-bold px-3 py-1 rounded-br-xl rounded-tl-xl z-10 flex items-center gap-1">
+<span class="text-lg">2</span>
+</div>
+<div class="p-md pt-lg">
+<!-- Driver & Vehicle Info -->
+<div class="flex items-start justify-between border-b border-surface-variant pb-md mb-md">
+<div class="flex items-center gap-sm w-1/3">
+<div class="w-12 h-12 rounded-full overflow-hidden border border-surface-variant bg-surface-container flex-shrink-0">
+<img alt="Driver Ramesh P." class="w-full h-full object-cover" data-alt="A detailed headshot of a younger Indian male driver with a slight smile, set against an agricultural logistics background, bright, modern, trustworthy." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAlJ0TDRbWE-LUOtaw-z-2KoSRsLwoNVTpfiuL2C0R2RSDNCCN5n5HTVJgTJsovfSJtVUibQz4eC_F6kVhnWMMAfIjU0bklU5BVU1cc8cNUiO5mLJ1mgnmToqXsi4kx5OiJzKEqnYK0Nnut_o5MWzLEHrvkkZ8vob9Qmhur8b2Pebbc4rRtHjBrtSY70uFWGFhpVEtNZyn3arvqPkpmm5VU-uGiDkgaaHIxycWKUzxnXSVXmo4hL07Z">
+</div>
+<div>
+<h3 class="font-label-lg text-label-lg text-on-surface">Ramesh P.</h3>
+<div class="flex items-center gap-1 mt-0.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px] text-tertiary-fixed-dim fill-icon">star</span>
+<span class="font-label-sm text-label-sm">4.6 (98)</span>
+</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant mt-1">MH12 XY 5678</div>
+</div>
+</div>
+<!-- Logistics Details -->
+<div class="w-1/3 text-center border-l border-r border-surface-variant px-sm flex flex-col justify-center">
+<div class="flex items-center justify-center gap-1 text-on-surface-variant mb-1">
+<span class="material-symbols-outlined text-[16px]">local_shipping</span>
+<span class="font-label-sm text-label-sm text-[11px]">Mahindra Bolero</span>
+</div>
+<div class="text-on-surface-variant text-[11px]">Pickup</div>
+<div class="mt-2 text-left">
+<div class="flex justify-between items-center text-[11px] text-on-surface-variant mb-1">
+<span>Available Capacity</span>
+<span class="font-semibold text-primary">60% (1.8 Ton)</span>
+</div>
+<div class="w-full bg-surface-container-high rounded-full h-1.5">
+<div class="bg-primary h-1.5 rounded-full" style="width: 60%"></div>
+</div>
+</div>
+</div>
+<!-- Score & Match Stats -->
+<div class="w-1/3 flex flex-col items-end text-right">
+<div class="flex items-center gap-1 text-[#43a047]">
+<span class="material-symbols-outlined text-[20px]">eco</span>
+<span class="font-headline-md text-headline-md font-bold">85%</span>
+</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant mt-0.5">Match Score</div>
+<div class="mt-2">
+<span class="font-headline-md text-headline-md text-on-surface">3</span>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Farmers Pooled</div>
+</div>
+</div>
+</div>
+<!-- Cost Details -->
+<div class="flex items-center justify-between">
+<div class="flex flex-col gap-1 w-1/3">
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]">distance</span>
+<span class="font-label-sm text-label-sm">Pickup Distance</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface ml-5">5.8 km</span>
+<div class="flex items-center gap-1 text-on-surface-variant mt-1">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+<span class="font-label-sm text-label-sm">ETA to You</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface ml-5">22 min</span>
+</div>
+<div class="w-1/3 flex flex-col justify-center border-l border-r border-surface-variant px-sm py-xs">
+<div class="flex justify-between items-center mb-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Total Trip Cost</span>
+<span class="font-label-lg text-label-lg text-on-surface font-semibold line-through text-on-surface-variant opacity-70 ml-2">₹4,200</span>
+</div>
+<div class="flex justify-between items-center mb-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">Farmer Share (60%)</span>
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">₹2,520</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Transporter Share (40%)</span>
+<span class="font-label-lg text-label-lg text-on-surface">₹1,680</span>
+</div>
+</div>
+<div class="w-1/3 flex flex-col items-end justify-center">
+<button class="bg-white border border-outline text-primary w-full py-2 px-4 rounded-lg font-label-lg text-label-lg hover:bg-surface-container-low transition-colors">
+                                Select
+                             </button>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-lowest px-md py-sm border-t border-surface-variant text-[11px] text-on-surface-variant flex items-center gap-1">
+<span class="font-medium">Route:</span> Your Location <span class="material-symbols-outlined text-[12px]">arrow_forward</span> Lasalgaon Mandi
+                </div>
+</div>
+<!-- Match 3 (Standard) -->
+<div class="relative bg-surface-container-lowest rounded-xl border border-outline-variant shadow-sm overflow-hidden opacity-90">
+<div class="absolute top-0 left-0 bg-surface-variant text-on-surface-variant font-bold px-3 py-1 rounded-br-xl rounded-tl-xl z-10 flex items-center gap-1">
+<span class="text-lg">3</span>
+</div>
+<div class="p-md pt-lg">
+<!-- Driver & Vehicle Info -->
+<div class="flex items-start justify-between border-b border-surface-variant pb-md mb-md">
+<div class="flex items-center gap-sm w-1/3">
+<div class="w-12 h-12 rounded-full overflow-hidden border border-surface-variant bg-surface-container flex-shrink-0">
+<img alt="Driver Suresh K." class="w-full h-full object-cover" data-alt="A detailed headshot of an older experienced Indian male driver with a mustache, set against an agricultural logistics background, bright, modern, trustworthy." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1IBQk0hH2XqfOx6tIJoe98kRTvJfl2L3Lioa82H0emv3Vc2m9oQZhrkT9cnmXeFUmX-ifrbl3XxnaC_J04s7KXl74_PwfZCMutqaZqSX0XwpyMzbq9WQQTKHIWzP5WPtKgefBxa3REBiqRztqAC9OatZ1UuJA4sLt_WPcOrI9MmnFWfzdMtQj1frpd9i-pnX6T3CtNsFCFjSGDmCk0dErJ67vqdQPwrvkSpHzvTs-Zb4fsGHHP5Rf">
+</div>
+<div>
+<h3 class="font-label-lg text-label-lg text-on-surface">Suresh K.</h3>
+<div class="flex items-center gap-1 mt-0.5 text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px] text-tertiary-fixed-dim fill-icon">star</span>
+<span class="font-label-sm text-label-sm">4.4 (72)</span>
+</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant mt-1">MH15 CD 8899</div>
+</div>
+</div>
+<!-- Logistics Details -->
+<div class="w-1/3 text-center border-l border-r border-surface-variant px-sm flex flex-col justify-center">
+<div class="flex items-center justify-center gap-1 text-on-surface-variant mb-1">
+<span class="material-symbols-outlined text-[16px]">local_shipping</span>
+<span class="font-label-sm text-label-sm text-[11px]">Eicher 11.10</span>
+</div>
+<div class="text-on-surface-variant text-[11px]">Truck</div>
+<div class="mt-2 text-left">
+<div class="flex justify-between items-center text-[11px] text-on-surface-variant mb-1">
+<span>Available Capacity</span>
+<span class="font-semibold text-primary">80% (4.2 Ton)</span>
+</div>
+<div class="w-full bg-surface-container-high rounded-full h-1.5">
+<div class="bg-primary h-1.5 rounded-full" style="width: 80%"></div>
+</div>
+</div>
+</div>
+<!-- Score & Match Stats -->
+<div class="w-1/3 flex flex-col items-end text-right">
+<div class="flex items-center gap-1 text-[#66bb6a]">
+<span class="material-symbols-outlined text-[20px]">eco</span>
+<span class="font-headline-md text-headline-md font-bold">78%</span>
+</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant mt-0.5">Match Score</div>
+<div class="mt-2">
+<span class="font-headline-md text-headline-md text-on-surface">1</span>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Farmer Pooled</div>
+</div>
+</div>
+</div>
+<!-- Cost Details -->
+<div class="flex items-center justify-between">
+<div class="flex flex-col gap-1 w-1/3">
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]">distance</span>
+<span class="font-label-sm text-label-sm">Pickup Distance</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface ml-5">7.1 km</span>
+<div class="flex items-center gap-1 text-on-surface-variant mt-1">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+<span class="font-label-sm text-label-sm">ETA to You</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface ml-5">28 min</span>
+</div>
+<div class="w-1/3 flex flex-col justify-center border-l border-r border-surface-variant px-sm py-xs">
+<div class="flex justify-between items-center mb-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Total Trip Cost</span>
+<span class="font-label-lg text-label-lg text-on-surface font-semibold line-through text-on-surface-variant opacity-70 ml-2">₹4,600</span>
+</div>
+<div class="flex justify-between items-center mb-1">
+<span class="font-label-sm text-label-sm text-on-surface-variant font-medium">Farmer Share (60%)</span>
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">₹2,760</span>
+</div>
+<div class="flex justify-between items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Transporter Share (40%)</span>
+<span class="font-label-lg text-label-lg text-on-surface">₹1,840</span>
+</div>
+</div>
+<div class="w-1/3 flex flex-col items-end justify-center">
+<button class="bg-white border border-outline text-primary w-full py-2 px-4 rounded-lg font-label-lg text-label-lg hover:bg-surface-container-low transition-colors">
+                                Select
+                             </button>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-lowest px-md py-sm border-t border-surface-variant text-[11px] text-on-surface-variant flex items-center gap-1">
+<span class="font-medium">Route:</span> Your Location <span class="material-symbols-outlined text-[12px]">arrow_forward</span> Lasalgaon Mandi
+                </div>
+</div>
+</div>
+</main>
+<!-- Bottom Action Sheet (Cost Breakdown & CTA) -->
+<div class="fixed bottom-0 left-0 right-0 bg-surface-container-lowest border-t border-outline-variant shadow-[0_-4px_24px_rgba(0,0,0,0.08)] z-50 rounded-t-2xl pb-safe">
+<div class="max-w-screen-md mx-auto p-md">
+<div class="flex flex-col md:flex-row gap-md mb-md">
+<!-- Cost Breakdown Chart Area -->
+<div class="flex-1 bg-surface-container-low rounded-xl p-md flex items-center gap-md">
+<!-- Fake Donut Chart -->
+<div class="relative w-16 h-16 flex-shrink-0">
+<svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+<!-- Background Circle (Transporter 40%) -->
+<path class="text-surface-variant" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="6"></path>
+<!-- Foreground Circle (Farmer 60%) -->
+<path class="text-primary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="60, 100" stroke-width="6"></path>
+</svg>
+<div class="absolute inset-0 flex items-center justify-center font-bold text-xs">60%</div>
+</div>
+<div class="flex-1 space-y-2">
+<div class="flex justify-between items-center text-sm">
+<div class="flex items-center gap-1.5">
+<div class="w-3 h-3 rounded-full bg-primary"></div>
+<span class="font-medium">Farmer Share (You)</span>
+</div>
+<span class="font-bold">₹2,250</span>
+</div>
+<div class="flex justify-between items-center text-sm">
+<div class="flex items-center gap-1.5">
+<div class="w-3 h-3 rounded-full bg-surface-variant"></div>
+<span class="text-on-surface-variant">Transporter Share</span>
+</div>
+<span class="text-on-surface-variant">₹1,500</span>
+</div>
+<div class="border-t border-outline-variant pt-2 flex justify-between items-center font-semibold mt-1">
+<span>Total Trip Cost</span>
+<span>₹3,750</span>
+</div>
+</div>
+</div>
+<!-- Savings & Why Pool -->
+<div class="flex-1 space-y-sm">
+<div class="bg-tertiary-fixed-dim/10 border border-tertiary-fixed-dim/20 rounded-xl p-sm flex items-center justify-between">
+<div class="flex items-center gap-2 text-[#b07d00]">
+<span class="material-symbols-outlined text-[24px]">savings</span>
+<div>
+<div class="font-bold text-sm">You Save</div>
+<div class="text-xs">Compared to non-pooled ride</div>
+</div>
+</div>
+<div class="font-headline-md font-bold text-[#b07d00]">₹750</div>
+</div>
+<div class="bg-primary-container/5 rounded-xl p-sm flex justify-between items-start text-xs text-on-surface-variant">
+<ul class="space-y-1">
+<li class="font-semibold text-primary mb-1 text-sm">Why Pool?</li>
+<li class="flex items-center gap-1"><span class="material-symbols-outlined text-[12px] text-primary">check</span> Lower cost for you</li>
+<li class="flex items-center gap-1"><span class="material-symbols-outlined text-[12px] text-primary">check</span> Better earnings for transporter</li>
+<li class="flex items-center gap-1"><span class="material-symbols-outlined text-[12px] text-primary">check</span> Eco-friendly &amp; community support</li>
+</ul>
+<span class="material-symbols-outlined text-[24px] text-primary/30 mt-2 mr-2">park</span>
+</div>
+</div>
+</div>
+<!-- Actions -->
+<div class="flex items-center justify-between gap-md">
+<button class="flex items-center gap-1 text-primary font-medium text-sm px-2 hover:bg-surface-container-low rounded p-2 transition-colors">
+<span class="material-symbols-outlined text-[18px]">local_offer</span>
+                    Have a Referral Code?
+                </button>
+<button class="text-primary font-medium text-sm px-4 py-2 hidden md:block hover:bg-surface-container-low rounded transition-colors">
+                    Apply Code
+                </button>
+<button class="flex-1 bg-primary text-white py-3 px-6 rounded-xl font-label-lg text-label-lg flex items-center justify-center gap-2 hover:bg-[#0a4f15] transition-colors shadow-md">
+                    Continue to Book
+                    <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+</body></html>

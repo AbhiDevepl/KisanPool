@@ -1,0 +1,142 @@
+/*
+ * The same design system the apps use — the Farmer set, "Agri-Logistics Standard"
+ * (docs/DESIGN.md, ADR-017). Inter only; primary #0d631b, secondary #2e7d32;
+ * radii 8px buttons/inputs, 16px cards, 24px banners. No Premium tokens.
+ */
+:root {
+  --primary: #0d631b;
+  --on-primary: #ffffff;
+  --primary-container: #2e7d32;
+  --on-primary-container: #cbffc2;
+  --secondary-container: #91f78e;
+  --on-secondary-container: #00731e;
+  --tertiary-container: #ffefda;
+  --on-tertiary-container: #604100;
+  --error: #ba1a1a;
+  --error-container: #ffdad6;
+  --on-error-container: #93000a;
+  --info-container: #dbe9ff;
+  --on-info-container: #0b3a75;
+
+  --surface: #f8faf8;
+  --surface-lowest: #ffffff;
+  --surface-low: #f2f4f2;
+  --surface-container: #eceeec;
+  --surface-high: #e6e9e7;
+  --on-surface: #191c1b;
+  --on-surface-variant: #40493d;
+  --outline: #707a6c;
+  --outline-variant: #bfcaba;
+
+  --r-sm: 4px;
+  --r-base: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+
+  --s-xs: 4px;
+  --s-sm: 8px;
+  --s-gutter: 12px;
+  --s-md: 16px;
+  --s-lg: 24px;
+  --s-xl: 32px;
+
+  --shadow-1: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-2: 0 8px 24px rgba(46, 125, 50, 0.15);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  background: var(--surface);
+  color: var(--on-surface);
+  font-size: 16px;
+  line-height: 24px;
+}
+
+button { font-family: inherit; cursor: pointer; }
+input, select { font-family: inherit; font-size: 16px; }
+
+/* type scale — docs/DESIGN.md §2 */
+.display-lg { font-size: 32px; font-weight: 700; line-height: 40px; letter-spacing: -0.02em; }
+.headline-lg { font-size: 24px; font-weight: 600; line-height: 32px; }
+.headline-md { font-size: 20px; font-weight: 600; line-height: 28px; }
+.body-lg { font-size: 16px; font-weight: 400; line-height: 24px; }
+.body-md { font-size: 14px; font-weight: 400; line-height: 20px; }
+.label-lg { font-size: 14px; font-weight: 600; line-height: 20px; letter-spacing: 0.01em; }
+.label-sm { font-size: 12px; font-weight: 500; line-height: 16px; }
+.muted { color: var(--on-surface-variant); }
+
+.card {
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  padding: var(--s-md);
+}
+
+.btn {
+  min-height: 40px;
+  padding: 0 var(--s-md);
+  border-radius: var(--r-base);
+  border: 0;
+  background: var(--primary-container);
+  color: var(--on-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.secondary { background: var(--surface-lowest); color: var(--primary); border: 1px solid var(--primary); }
+.btn.danger { background: var(--error-container); color: var(--on-error-container); }
+.btn.ghost { background: transparent; color: var(--primary); }
+
+.input {
+  min-height: 40px;
+  width: 100%;
+  padding: 0 var(--s-gutter);
+  border-radius: var(--r-base);
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-lowest);
+  color: var(--on-surface);
+}
+.input:focus { outline: none; border-color: var(--primary-container); }
+
+.badge {
+  display: inline-block;
+  padding: var(--s-xs) var(--s-sm);
+  border-radius: var(--r-md);
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--surface-high);
+  color: var(--on-surface-variant);
+  white-space: nowrap;
+}
+.badge.good { background: var(--secondary-container); color: var(--on-secondary-container); }
+.badge.warn { background: var(--tertiary-container); color: var(--on-tertiary-container); }
+.badge.bad { background: var(--error-container); color: var(--on-error-container); }
+.badge.info { background: var(--info-container); color: var(--on-info-container); }
+
+table { width: 100%; border-collapse: collapse; }
+th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+  padding: var(--s-sm) var(--s-gutter);
+  border-bottom: 1px solid var(--outline-variant);
+  white-space: nowrap;
+}
+td {
+  padding: var(--s-gutter);
+  border-bottom: 1px solid var(--surface-container);
+  font-size: 14px;
+  vertical-align: middle;
+}
+tr:last-child td { border-bottom: 0; }
+
+.table-wrap { overflow-x: auto; }
+.row { display: flex; align-items: center; gap: var(--s-sm); }
+.stack { display: flex; flex-direction: column; gap: var(--s-gutter); }
+.grid { display: grid; gap: var(--s-gutter); }

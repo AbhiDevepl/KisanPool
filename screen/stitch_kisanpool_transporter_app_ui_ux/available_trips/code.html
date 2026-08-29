@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Available Trip Requests - KisanPool</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&amp;family=Be+Vietnam+Pro:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-tint": "#466640",
+                        "tertiary": "#012410",
+                        "surface-container-highest": "#e1e3e0",
+                        "on-background": "#191c1b",
+                        "primary-fixed": "#c7edbc",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-container": "#1b3a18",
+                        "on-secondary-fixed-variant": "#23501e",
+                        "background": "#f8faf7",
+                        "on-surface-variant": "#434840",
+                        "on-primary-container": "#81a579",
+                        "inverse-primary": "#abd1a1",
+                        "surface-container": "#eceeeb",
+                        "on-secondary-fixed": "#002201",
+                        "surface-container-low": "#f2f4f1",
+                        "secondary-fixed": "#bcf0ae",
+                        "outline-variant": "#c3c8bd",
+                        "secondary": "#3b6934",
+                        "on-primary-fixed": "#032104",
+                        "primary": "#052405",
+                        "secondary-fixed-dim": "#a1d494",
+                        "surface-bright": "#f8faf7",
+                        "secondary-container": "#b9eeab",
+                        "on-tertiary-fixed": "#00210e",
+                        "tertiary-container": "#183a24",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-container": "#3f6d38",
+                        "error": "#ba1a1a",
+                        "on-primary": "#ffffff",
+                        "surface": "#f8faf7",
+                        "on-error-container": "#93000a",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#2c4e36",
+                        "on-surface": "#191c1b",
+                        "inverse-surface": "#2e312f",
+                        "primary-fixed-dim": "#abd1a1",
+                        "outline": "#73796f",
+                        "on-primary-fixed-variant": "#2e4e2a",
+                        "inverse-on-surface": "#eff1ee",
+                        "surface-container-high": "#e7e9e6",
+                        "surface-dim": "#d8dbd8",
+                        "on-secondary": "#ffffff",
+                        "surface-variant": "#e1e3e0",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#80a488",
+                        "tertiary-fixed": "#c5eccc",
+                        "tertiary-fixed-dim": "#aad0b1"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "container-padding": "16px",
+                        "xl": "32px",
+                        "xs": "4px",
+                        "lg": "24px",
+                        "md": "16px",
+                        "card-gap": "12px",
+                        "sm": "8px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Manrope"],
+                        "body-md": ["Be Vietnam Pro"],
+                        "headline-lg": ["Manrope"],
+                        "headline-xl": ["Manrope"],
+                        "body-lg": ["Be Vietnam Pro"],
+                        "label-lg": ["Be Vietnam Pro"],
+                        "label-sm": ["Be Vietnam Pro"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-xl": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-lg": ["14px", { "lineHeight": "18px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-filled {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom scrollbar for horizontal lists */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background antialiased min-h-screen flex flex-col font-body-md pb-24 md:pb-0">
+<!-- Top App Bar -->
+<header class="bg-surface dark:bg-on-background flex justify-between items-center px-container-padding h-16 w-full docked full-width top-0 sticky z-50">
+<div class="flex items-center gap-4">
+<button class="text-on-surface hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors rounded-full p-2 -ml-2 active:scale-95 duration-100 hidden md:block">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<button class="text-on-surface hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors rounded-full p-2 -ml-2 active:scale-95 duration-100 md:hidden">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<div class="flex flex-col">
+<h1 class="font-headline-md text-headline-md text-primary dark:text-primary-fixed-dim">Trip Requests</h1>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Choose best loads for you</span>
+</div>
+</div>
+<button class="text-on-surface hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors rounded-full p-2 -mr-2 active:scale-95 duration-100">
+<span class="material-symbols-outlined">filter_alt</span>
+</button>
+</header>
+<!-- Desktop Navigation Drawer (Hidden on Mobile) -->
+<aside class="hidden md:flex bg-surface dark:bg-surface-dim shadow-xl h-full w-80 rounded-r-lg fixed inset-y-0 left-0 z-[60] flex-col p-4 transform -translate-x-full lg:translate-x-0 transition-transform duration-300">
+<div class="flex items-center gap-4 mb-8 p-4">
+<div class="w-12 h-12 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-headline-md">
+                RP
+            </div>
+<div>
+<h2 class="font-headline-md text-headline-md text-primary dark:text-primary-fixed">Rahul Patil</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Verified Transporter</p>
+<p class="font-label-sm text-label-sm text-outline mt-1">MH-12-AB-1234</p>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-2">
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all opacity-80" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-lg text-label-lg">Home</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 bg-secondary-container text-on-secondary-container rounded-lg font-bold hover:bg-surface-container-high transition-all opacity-80" href="#">
+<span class="material-symbols-outlined">local_shipping</span>
+<span class="font-label-lg text-label-lg">Requests</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all opacity-80" href="#">
+<span class="material-symbols-outlined">route</span>
+<span class="font-label-lg text-label-lg">My Trips</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all opacity-80" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span class="font-label-lg text-label-lg">Earnings</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-all opacity-80" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-lg text-label-lg">Profile</span>
+</a>
+</nav>
+</aside>
+<main class="flex-1 w-full max-w-3xl mx-auto lg:ml-80 lg:max-w-none lg:px-container-padding transition-all duration-300 relative z-10 flex flex-col gap-md lg:gap-lg">
+<!-- Filter Pills -->
+<div class="px-container-padding py-2 flex gap-3 overflow-x-auto hide-scrollbar shrink-0 sticky top-16 z-40 bg-background/90 backdrop-blur-sm -mx-container-padding lg:mx-0 lg:px-0">
+<button class="bg-primary-container text-on-primary-container px-4 py-2 rounded-full font-label-lg text-label-lg whitespace-nowrap shadow-sm">
+                All Requests
+            </button>
+<button class="bg-surface text-on-surface-variant border border-outline-variant px-4 py-2 rounded-full font-label-lg text-label-lg whitespace-nowrap hover:bg-surface-container-low transition-colors">
+                Nearby
+            </button>
+<button class="bg-surface text-on-surface-variant border border-outline-variant px-4 py-2 rounded-full font-label-lg text-label-lg whitespace-nowrap flex items-center gap-1 hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined text-[18px] text-tertiary">star</span> Favourite
+            </button>
+</div>
+<!-- Map View -->
+<div class="px-container-padding lg:px-0 shrink-0">
+<div class="w-full h-48 md:h-64 rounded-DEFAULT overflow-hidden relative shadow-sm border border-outline-variant bg-surface-container">
+<!-- Using placeholder for map image as requested -->
+<img alt="Map showing nearby pickup locations" class="absolute inset-0 w-full h-full object-cover opacity-80 mix-blend-multiply" data-alt="A clean, modern digital map interface highlighting an agricultural region in India, showing precise green pin markers for transport pickup locations connected by faint routing lines on a light, minimal background. Premium mobile UI styling." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDE0CevBwnaUmRi5YJvpmO2KqHXqrnVJPv-AaID1OsY_MUz-nxrpJ6CjMEQoaiM3nql_eZG0Npt4AaWGFe7VMIA_FifZKM1SIkGGIz3NHhjjuMXj0-r4GsXbpWxoWmRpY0uLCYuHzFCZwERvjn3bBnHO6m8xBWnV8Uzyooy2SRa1dofCM3HPG1fSl4EXvwrP0U7Ncv5Hu2RvM7ApnwHpEFU7rg4vVJR24hTqXPw8s57KtTmWBy9sb9mgb3-KNP90ojqqg"/>
+<!-- Map Overlay Gradient -->
+<div class="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent"></div>
+<!-- Capacity Indicator overlay -->
+<div class="absolute bottom-3 left-3 bg-surface/90 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-outline-variant shadow-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-primary">local_shipping</span>
+<span class="font-label-sm text-label-sm text-on-surface">Remaining: <strong>1.4 Ton</strong></span>
+</div>
+</div>
+</div>
+<!-- List Header -->
+<div class="px-container-padding lg:px-0 flex justify-between items-center shrink-0 mt-2">
+<h2 class="font-headline-md text-headline-md text-on-background">5 Requests Nearby</h2>
+<div class="flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm cursor-pointer hover:text-primary transition-colors">
+                Sort by: Distance <span class="material-symbols-outlined text-[18px]">expand_more</span>
+</div>
+</div>
+<!-- Request Cards List -->
+<div class="px-container-padding lg:px-0 flex flex-col gap-card-gap pb-6">
+<!-- Card 1 -->
+<div class="bg-surface rounded-DEFAULT p-md border border-outline-variant shadow-sm flex flex-col gap-md">
+<div class="flex justify-between items-start">
+<div class="flex gap-3">
+<div class="w-10 h-10 rounded-full bg-primary-container/10 flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined icon-filled">person</span>
+</div>
+<div>
+<h3 class="font-headline-md text-[16px] leading-[24px] text-on-surface">Rahul Patil</h3>
+<p class="font-body-md text-on-surface-variant text-[13px]">Vegetables (Onion)</p>
+</div>
+</div>
+<div class="text-right">
+<span class="font-label-sm text-label-sm text-secondary block">High Match</span>
+<span class="font-headline-md text-headline-md text-secondary flex items-center justify-end gap-1">
+<span class="material-symbols-outlined text-[16px]">eco</span> 92%
+                        </span>
+</div>
+</div>
+<!-- Route -->
+<div class="relative pl-6 py-1">
+<div class="absolute left-[7px] top-[10px] bottom-[10px] w-[2px] bg-outline-variant rounded-full"></div>
+<div class="absolute left-0 top-[6px] w-4 h-4 rounded-full bg-primary-container flex items-center justify-center z-10 border-2 border-surface">
+<div class="w-1.5 h-1.5 bg-surface rounded-full"></div>
+</div>
+<div class="absolute left-0 bottom-[6px] w-4 h-4 rounded-full bg-tertiary flex items-center justify-center z-10 border-2 border-surface">
+<span class="material-symbols-outlined text-[10px] text-on-primary">location_on</span>
+</div>
+<p class="font-label-lg text-label-lg text-on-surface mb-2">Pimpri, Pune</p>
+<p class="font-label-lg text-label-lg text-on-surface">Lasalgaon Mandi, Nashik</p>
+</div>
+<!-- Metrics -->
+<div class="grid grid-cols-3 gap-2 bg-surface-container-low rounded-lg p-2 mt-1">
+<div>
+<span class="font-label-sm text-[11px] text-on-surface-variant flex items-center gap-1 mb-0.5"><span class="material-symbols-outlined text-[14px]">route</span> Distance</span>
+<span class="font-label-lg text-label-lg text-on-surface">42 km</span>
+</div>
+<div>
+<span class="font-label-sm text-[11px] text-on-surface-variant flex items-center gap-1 mb-0.5"><span class="material-symbols-outlined text-[14px]">scale</span> Load</span>
+<span class="font-label-lg text-label-lg text-on-surface">1.2 Ton</span>
+</div>
+<div>
+<span class="font-label-sm text-[11px] text-on-surface-variant flex items-center gap-1 mb-0.5"><span class="material-symbols-outlined text-[14px]">payments</span> Earning</span>
+<span class="font-label-lg text-label-lg text-primary">₹950</span>
+</div>
+</div>
+<!-- Actions -->
+<div class="flex gap-3 pt-2 border-t border-surface-variant">
+<button class="flex-1 border border-outline py-2.5 rounded-lg font-label-lg text-label-lg text-on-surface hover:bg-surface-container-low transition-colors text-center">
+                        Details
+                    </button>
+<button class="flex-1 bg-primary-container text-on-primary py-2.5 rounded-lg font-label-lg text-label-lg hover:bg-primary transition-colors text-center shadow-sm">
+                        Accept
+                    </button>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface rounded-DEFAULT p-md border border-outline-variant shadow-sm flex flex-col gap-md">
+<div class="flex justify-between items-start">
+<div class="flex gap-3">
+<div class="w-10 h-10 rounded-full bg-secondary-container/30 flex items-center justify-center text-secondary shrink-0">
+<span class="material-symbols-outlined icon-filled">person</span>
+</div>
+<div>
+<h3 class="font-headline-md text-[16px] leading-[24px] text-on-surface">Suresh Jadhav</h3>
+<p class="font-body-md text-on-surface-variant text-[13px]">Tomato</p>
+</div>
+</div>
+<div class="text-right">
+<span class="font-label-sm text-label-sm text-secondary block">Good Match</span>
+<span class="font-headline-md text-headline-md text-secondary flex items-center justify-end gap-1">
+<span class="material-symbols-outlined text-[16px]">eco</span> 86%
+                        </span>
+</div>
+</div>
+<!-- Route -->
+<div class="relative pl-6 py-1">
+<div class="absolute left-[7px] top-[10px] bottom-[10px] w-[2px] bg-outline-variant rounded-full"></div>
+<div class="absolute left-0 top-[6px] w-4 h-4 rounded-full bg-primary-container flex items-center justify-center z-10 border-2 border-surface">
+<div class="w-1.5 h-1.5 bg-surface rounded-full"></div>
+</div>
+<div class="absolute left-0 bottom-[6px] w-4 h-4 rounded-full bg-tertiary flex items-center justify-center z-10 border-2 border-surface">
+<span class="material-symbols-outlined text-[10px] text-on-primary">location_on</span>
+</div>
+<p class="font-label-lg text-label-lg text-on-surface mb-2">Chinchwad, Pune</p>
+<p class="font-label-lg text-label-lg text-on-surface">Lasalgaon Mandi, Nashik</p>
+</div>
+<!-- Metrics -->
+<div class="grid grid-cols-3 gap-2 bg-surface-container-low rounded-lg p-2 mt-1">
+<div>
+<span class="font-label-sm text-[11px] text-on-surface-variant flex items-center gap-1 mb-0.5"><span class="material-symbols-outlined text-[14px]">route</span> Distance</span>
+<span class="font-label-lg text-label-lg text-on-surface">48 km</span>
+</div>
+<div>
+<span class="font-label-sm text-[11px] text-on-surface-variant flex items-center gap-1 mb-0.5"><span class="material-symbols-outlined text-[14px]">scale</span> Load</span>
+<span class="font-label-lg text-label-lg text-on-surface">1.5 Ton</span>
+</div>
+<div>
+<span class="font-label-sm text-[11px] text-on-surface-variant flex items-center gap-1 mb-0.5"><span class="material-symbols-outlined text-[14px]">payments</span> Earning</span>
+<span class="font-label-lg text-label-lg text-primary">₹1,050</span>
+</div>
+</div>
+<!-- Actions -->
+<div class="flex gap-3 pt-2 border-t border-surface-variant">
+<button class="flex-1 border border-outline py-2.5 rounded-lg font-label-lg text-label-lg text-on-surface hover:bg-surface-container-low transition-colors text-center">
+                        Details
+                    </button>
+<button class="flex-1 bg-primary-container text-on-primary py-2.5 rounded-lg font-label-lg text-label-lg hover:bg-primary transition-colors text-center shadow-sm">
+                        Accept
+                    </button>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface rounded-DEFAULT p-md border border-outline-variant shadow-sm flex flex-col gap-md opacity-75">
+<div class="flex justify-between items-start">
+<div class="flex gap-3">
+<div class="w-10 h-10 rounded-full bg-outline-variant/30 flex items-center justify-center text-outline shrink-0">
+<span class="material-symbols-outlined icon-filled">person</span>
+</div>
+<div>
+<h3 class="font-headline-md text-[16px] leading-[24px] text-on-surface">Vikram Shinde</h3>
+<p class="font-body-md text-on-surface-variant text-[13px]">Potato</p>
+</div>
+</div>
+<div class="text-right">
+<span class="font-label-sm text-label-sm text-tertiary-container block">Medium Match</span>
+<span class="font-headline-md text-headline-md text-tertiary-container flex items-center justify-end gap-1">
+<span class="material-symbols-outlined text-[16px]">eco</span> 72%
+                        </span>
+</div>
+</div>
+<!-- Route -->
+<div class="relative pl-6 py-1">
+<div class="absolute left-[7px] top-[10px] bottom-[10px] w-[2px] bg-outline-variant rounded-full"></div>
+<div class="absolute left-0 top-[6px] w-4 h-4 rounded-full bg-outline flex items-center justify-center z-10 border-2 border-surface">
+<div class="w-1.5 h-1.5 bg-surface rounded-full"></div>
+</div>
+<div class="absolute left-0 bottom-[6px] w-4 h-4 rounded-full bg-outline flex items-center justify-center z-10 border-2 border-surface">
+<span class="material-symbols-outlined text-[10px] text-on-primary">location_on</span>
+</div>
+<p class="font-label-lg text-label-lg text-on-surface mb-2">Akurdi, Pune</p>
+<p class="font-label-lg text-label-lg text-on-surface">Lasalgaon Mandi, Nashik</p>
+</div>
+<!-- Actions -->
+<div class="flex gap-3 pt-2 border-t border-surface-variant">
+<button class="flex-1 border border-outline py-2.5 rounded-lg font-label-lg text-label-lg text-on-surface hover:bg-surface-container-low transition-colors text-center">
+                        Details
+                    </button>
+<button class="flex-1 bg-surface-container-highest text-on-surface py-2.5 rounded-lg font-label-lg text-label-lg text-center cursor-not-allowed">
+                        Accept
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Nav Bar (Mobile Only) -->
+<nav class="md:hidden border-t border-outline-variant dark:border-outline bg-surface dark:bg-on-background shadow-lg fixed bottom-0 left-0 w-full flex justify-around items-center py-2 px-1 pb-safe z-50 rounded-t-lg">
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:bg-surface-container dark:hover:bg-surface-container-high px-2 py-1 rounded-xl transition-colors" href="#">
+<span class="material-symbols-outlined mb-1">dashboard</span>
+<span class="font-label-sm text-[10px]">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-primary dark:text-secondary-fixed font-bold bg-secondary-container/20 dark:bg-primary-container/30 rounded-xl px-2 py-1 scale-90 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined mb-1 icon-filled">local_shipping</span>
+<span class="font-label-sm text-[10px]">Requests</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:bg-surface-container dark:hover:bg-surface-container-high px-2 py-1 rounded-xl transition-colors" href="#">
+<span class="material-symbols-outlined mb-1">route</span>
+<span class="font-label-sm text-[10px]">My Trips</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:bg-surface-container dark:hover:bg-surface-container-high px-2 py-1 rounded-xl transition-colors" href="#">
+<span class="material-symbols-outlined mb-1">payments</span>
+<span class="font-label-sm text-[10px]">Earnings</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:bg-surface-container dark:hover:bg-surface-container-high px-2 py-1 rounded-xl transition-colors" href="#">
+<span class="material-symbols-outlined mb-1">person</span>
+<span class="font-label-sm text-[10px]">Profile</span>
+</a>
+</nav>
+</body></html>

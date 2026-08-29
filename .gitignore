@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+
+# builds
+dist/
+build/
+.expo/
+apps/admin/dist/
+
+# secrets — never commit these
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# runtime artefacts — uploaded KYC documents and delivery photos live here
+uploads/
+*.log
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/

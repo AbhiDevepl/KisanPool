@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Active Trip - KisanPool</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&amp;family=Be+Vietnam+Pro:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-tint": "#466640",
+                        "tertiary": "#012410",
+                        "surface-container-highest": "#e1e3e0",
+                        "on-background": "#191c1b",
+                        "primary-fixed": "#c7edbc",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-container": "#1b3a18",
+                        "on-secondary-fixed-variant": "#23501e",
+                        "background": "#f8faf7",
+                        "on-surface-variant": "#434840",
+                        "on-primary-container": "#81a579",
+                        "inverse-primary": "#abd1a1",
+                        "surface-container": "#eceeeb",
+                        "on-secondary-fixed": "#002201",
+                        "surface-container-low": "#f2f4f1",
+                        "secondary-fixed": "#bcf0ae",
+                        "outline-variant": "#c3c8bd",
+                        "secondary": "#3b6934",
+                        "on-primary-fixed": "#032104",
+                        "primary": "#052405",
+                        "secondary-fixed-dim": "#a1d494",
+                        "surface-bright": "#f8faf7",
+                        "secondary-container": "#b9eeab",
+                        "on-tertiary-fixed": "#00210e",
+                        "tertiary-container": "#183a24",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-container": "#3f6d38",
+                        "error": "#ba1a1a",
+                        "on-primary": "#ffffff",
+                        "surface": "#f8faf7",
+                        "on-error-container": "#93000a",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#2c4e36",
+                        "on-surface": "#191c1b",
+                        "inverse-surface": "#2e312f",
+                        "primary-fixed-dim": "#abd1a1",
+                        "outline": "#73796f",
+                        "on-primary-fixed-variant": "#2e4e2a",
+                        "inverse-on-surface": "#eff1ee",
+                        "surface-container-high": "#e7e9e6",
+                        "surface-dim": "#d8dbd8",
+                        "on-secondary": "#ffffff",
+                        "surface-variant": "#e1e3e0",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#80a488",
+                        "tertiary-fixed": "#c5eccc",
+                        "tertiary-fixed-dim": "#aad0b1"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "1rem",
+                        "lg": "2rem",
+                        "xl": "3rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "container-padding": "16px",
+                        "xl": "32px",
+                        "xs": "4px",
+                        "lg": "24px",
+                        "md": "16px",
+                        "card-gap": "12px",
+                        "sm": "8px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Manrope"],
+                        "body-md": ["Be Vietnam Pro"],
+                        "headline-lg": ["Manrope"],
+                        "headline-xl": ["Manrope"],
+                        "body-lg": ["Be Vietnam Pro"],
+                        "label-lg": ["Be Vietnam Pro"],
+                        "label-sm": ["Be Vietnam Pro"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-xl": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-lg": ["14px", { "lineHeight": "18px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col pb-[80px]">
+<!-- Contextual Nav - Active Trip -->
+<header class="bg-surface sticky top-0 z-40 px-container-padding h-16 flex items-center justify-between border-b border-surface-container-high md:hidden">
+<button class="w-10 h-10 flex items-center justify-center text-on-surface rounded-full hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<div class="flex flex-col items-center">
+<h1 class="font-headline-md text-headline-md text-on-surface">Active Trip</h1>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Trip ID: KP-240525-0012</span>
+</div>
+<div class="flex gap-2">
+<button class="w-10 h-10 flex items-center justify-center text-on-surface rounded-full hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined">call</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center text-on-surface rounded-full hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined">headset_mic</span>
+</button>
+</div>
+</header>
+<!-- Desktop TopAppBar Shell (Hidden on Mobile) -->
+<div class="hidden md:flex justify-between items-center px-container-padding h-16 w-full bg-surface shadow-sm sticky top-0 z-50">
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 flex items-center justify-center text-on-surface rounded-full hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<span class="font-headline-lg text-headline-lg font-bold text-primary">KisanPool</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="font-label-lg text-label-lg text-on-surface font-bold bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full">Active Trip</span>
+<button class="w-10 h-10 flex items-center justify-center text-on-surface rounded-full hover:bg-surface-container-low transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</div>
+</div>
+<main class="flex-1 p-container-padding flex flex-col gap-lg max-w-3xl mx-auto w-full">
+<!-- Status Header Card -->
+<div class="bg-primary-container text-on-primary-container rounded-lg p-md shadow-md flex justify-between items-center">
+<div class="flex flex-col gap-1">
+<h2 class="font-headline-md text-headline-md text-white">On the way to Next Pickup</h2>
+<span class="font-body-md text-body-md text-secondary-fixed">1st Pickup Completed</span>
+</div>
+<div class="flex flex-col items-end gap-1">
+<span class="font-label-sm text-label-sm text-secondary-fixed flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">schedule</span> ETA to Next
+                </span>
+<span class="font-headline-md text-headline-md text-white">25 min</span>
+</div>
+</div>
+<!-- Route Details -->
+<div class="bg-surface-container-lowest rounded-lg p-md shadow-sm border border-outline-variant/30 flex flex-col gap-card-gap">
+<div class="flex justify-between items-center">
+<div class="flex flex-col gap-1">
+<span class="font-headline-md text-headline-md">Pimpri, Pune</span>
+</div>
+<span class="material-symbols-outlined text-outline">arrow_forward</span>
+<div class="flex flex-col gap-1 text-right">
+<span class="font-headline-md text-headline-md">Lasalgaon Mandi, Nashik</span>
+</div>
+</div>
+<div class="text-center font-label-sm text-label-sm text-outline">Total Distance: 92 km</div>
+<div class="w-full h-48 rounded-md bg-surface-container overflow-hidden relative">
+<img alt="Map view showing the route from Pimpri to Lasalgaon Mandi with pickup points marked." class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBeohToZXqgTVfAjkSdh5x_mEMV5swiV-1ErJGWWTpFe1J1SI77amBfUtp8F-sMZfqNQntoy9GoIRIixrR_iIKzP0yNgjvvl6bsxItiRlDiadzmENR8fOhXWyWTEtM_WYGQrpqPc6bMJWhNACqmy1w-kOS2WAygULPExQp-TleJNRWauQN6rWuZl1QAlEFSLeHHOEn4OTmf3tLWT-nh4v-M7kHNPPco0fiiMpn36JVszeGGgEsTDLN3pm6gcHmZ8zNBZA"/>
+</div>
+</div>
+<!-- Trip Progress Stepper -->
+<div class="bg-surface-container-lowest rounded-lg p-md shadow-sm border border-outline-variant/30">
+<h3 class="font-label-lg text-label-lg text-on-surface mb-md">Trip Progress</h3>
+<div class="flex items-center justify-between relative px-2">
+<!-- Line -->
+<div class="absolute top-1/2 left-0 w-full h-[2px] bg-surface-variant -z-10 -translate-y-1/2">
+<div class="h-full bg-primary-container w-[40%] transition-all duration-500"></div>
+</div>
+<!-- Steps -->
+<div class="flex flex-col items-center gap-1 relative z-10 bg-surface-container-lowest px-1">
+<div class="w-6 h-6 rounded-full bg-primary-container text-white flex items-center justify-center">
+<span class="material-symbols-outlined text-[14px]">check</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface">Requested</span>
+</div>
+<div class="flex flex-col items-center gap-1 relative z-10 bg-surface-container-lowest px-1">
+<div class="w-6 h-6 rounded-full bg-primary-container text-white flex items-center justify-center">
+<span class="material-symbols-outlined text-[14px]">check</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface text-center">Pickup 1<br/><span class="text-outline text-[10px]">09:15 AM</span></span>
+</div>
+<div class="flex flex-col items-center gap-1 relative z-10 bg-surface-container-lowest px-1">
+<div class="w-6 h-6 rounded-full border-2 border-primary-container bg-surface-container-lowest flex items-center justify-center">
+<div class="w-2 h-2 rounded-full bg-primary-container"></div>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface font-bold text-center">Pickup 2<br/><span class="text-primary-container text-[10px]">Upcoming</span></span>
+</div>
+<div class="flex flex-col items-center gap-1 relative z-10 bg-surface-container-lowest px-1">
+<div class="w-6 h-6 rounded-full bg-surface-variant flex items-center justify-center"></div>
+<span class="font-label-sm text-label-sm text-outline text-center">En Route<br/><span class="text-[10px]">Pending</span></span>
+</div>
+<div class="flex flex-col items-center gap-1 relative z-10 bg-surface-container-lowest px-1">
+<div class="w-6 h-6 rounded-full bg-surface-variant flex items-center justify-center"></div>
+<span class="font-label-sm text-label-sm text-outline">Destination</span>
+</div>
+</div>
+</div>
+<!-- Capacity Management -->
+<div class="bg-surface-container-lowest rounded-lg p-md shadow-sm border border-outline-variant/30 flex flex-col gap-sm">
+<div class="flex justify-between items-end">
+<h3 class="font-label-lg text-label-lg text-on-surface">Load / Capacity</h3>
+<span class="font-headline-md text-headline-md text-on-surface">2.6 / 4.0 Ton</span>
+</div>
+<div class="w-full bg-surface-variant h-4 rounded-full overflow-hidden flex">
+<div class="bg-primary-container h-full transition-all duration-500" style="width: 65%;"></div>
+</div>
+<div class="flex justify-between items-center text-label-sm text-outline">
+<span>65% Used</span>
+<span>1.4 Ton Available</span>
+</div>
+<div class="mt-xs bg-error-container text-on-error-container rounded-md p-2 flex items-center gap-2 font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">warning</span>
+<span>Overload Limit: 4.5 Ton. Do not exceed.</span>
+</div>
+</div>
+<!-- Farmer List -->
+<div class="flex flex-col gap-card-gap">
+<h3 class="font-label-lg text-label-lg text-on-surface px-1">Farmers / Load</h3>
+<!-- Farmer 1 (Completed) -->
+<div class="bg-surface-container-lowest rounded-lg p-md shadow-sm border border-outline-variant/30 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Profile picture of a male Indian farmer in casual clothing, smiling gently in a bright outdoor setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAM_f1sSoBtdQWvBTQec8prAoWFcr1ag7l7_pvAxeapPmH4pV2x9XQJsP9dmQv3GsiKCxrWE2y7jvnko2qauiwbaJKZXfuvHhkCBF5hwEhJotsAMLUaAe58-HUJw87s8D9RrmmVACrhGnCXaNpmBKU6J99zcCLhgVKrnbaz0LP_HGmF2n83QZfvwhA1NY9-9TwQuGt8hOLzTwSQ75BIBQnTavpVQeCmemYKXj9ubUJ5woYxQ_ka4emx"/>
+</div>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface">Rahul Patil</span>
+<span class="font-body-md text-body-md text-outline">Onion</span>
+</div>
+</div>
+<div class="flex flex-col items-end gap-1">
+<span class="font-headline-md text-headline-md text-on-surface">1.2 Ton</span>
+<span class="font-label-sm text-label-sm text-primary-container flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">check_circle</span> Picked Up
+                    </span>
+</div>
+</div>
+<!-- Farmer 2 (Upcoming) -->
+<div class="bg-surface-container-lowest rounded-lg p-md shadow-sm border border-primary-container/30 flex items-center justify-between relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary-container"></div>
+<div class="flex items-center gap-3 ml-2">
+<div class="w-10 h-10 rounded-full bg-surface-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Profile picture of a male Indian farmer looking professional, well-lit, outdoors." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBfEEWNGwUBvbZ866xmTgmKzM6nX-lx4aXBXDoxion3s-MN7OA1tMlJMLIajDNPHtp7pdWM_ODDxuNtocpung1sUVKBlsfYmqW-l9azwonqzEpVYXWSH0U9NvGxO-B0yfUOU2QePn4iJ6LD0r2phQc0Ik9ZOePvUWGYzbWtdn8ACBy1-hAU5PunbV1WE7wHWpKKC4BPfbOv5b5aj1vIZv603mO3l0XDOtTBwfq1F_88SobJ108gJKYC"/>
+</div>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface">Suresh Jadhav</span>
+<span class="font-body-md text-body-md text-outline">Tomato</span>
+</div>
+</div>
+<div class="flex flex-col items-end gap-1">
+<span class="font-headline-md text-headline-md text-on-surface">1.4 Ton</span>
+<span class="font-label-sm text-label-sm text-primary-container font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">navigation</span> Next Pickup
+                    </span>
+</div>
+</div>
+<!-- Farmer 3 (Pending) -->
+<div class="bg-surface-container-lowest rounded-lg p-md shadow-sm border border-outline-variant/30 flex items-center justify-between opacity-70">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-variant overflow-hidden flex items-center justify-center text-outline">
+<span class="material-symbols-outlined">person</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface">Vikram Shinde</span>
+<span class="font-body-md text-body-md text-outline">Potato</span>
+</div>
+</div>
+<div class="flex flex-col items-end gap-1">
+<span class="font-headline-md text-headline-md text-on-surface">1.0 Ton</span>
+<span class="font-label-sm text-label-sm text-outline flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">schedule</span> Pending
+                    </span>
+</div>
+</div>
+</div>
+<!-- Bottom Actions -->
+<div class="flex gap-4 mt-sm">
+<button class="flex-1 bg-surface-container-lowest border border-outline text-on-surface font-label-lg text-label-lg py-3 rounded-lg shadow-sm hover:bg-surface-variant transition-colors">
+                View Details
+            </button>
+<button class="flex-1 bg-primary-container text-white font-label-lg text-label-lg py-3 rounded-lg shadow-sm hover:bg-tertiary-container transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[20px]">headset_mic</span>
+                Reach Support
+            </button>
+</div>
+<div class="bg-surface-container-low text-on-surface-variant p-sm rounded-md text-center font-label-sm text-label-sm flex items-center justify-center gap-2 mt-sm border border-surface-variant">
+<span class="material-symbols-outlined text-secondary text-[16px]">verified_user</span>
+            Follow safe load limits for a smooth &amp; safe trip.
+        </div>
+</main>
+<!-- Navigation suppressed for linear operational journey flow -->
+</body></html>

@@ -1,0 +1,558 @@
+/**
+ * shared_trip — one vehicle, many farmers, one mandi.
+ *
+ * The trip and each farmer's shipment advance on separate state machines: the
+ * driver may have collected two loads and still be en route to a third, so a
+ * single status field could never describe this screen (packages/shared pooling.ts).
+ * It also publishes vehicle:location every ~5s, which is what moves every farmer's map.
+ */
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Linking, Modal, Pressable, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+import type { Socket } from 'socket.io-client';
+import {
+  canTransitionShipment,
+  canTransitionTrip,
+  type ShipmentState,
+  type TripState,
+} from '@kisanpool/shared';
+import { api } from '../../../../lib/api';
+import { connectTripSocket } from '../../../../lib/socket';
+import { getUser } from '../../../../lib/session';
+import { toAppError } from '../../../../lib/errors';
+import { kg, rupees } from '../../../../lib/format';
+import {
+  Banner,
+  Button,
+  Card,
+  Divider,
+  EmptyState,
+  Field,
+  Header,
+  Loading,
+  Row,
+  Screen,
+  StatusBadge,
+  Txt,
+} from '../../../../components/ui';
+import { ErrorView } from '../../../../components/ErrorView';
+import { TripMap } from '../../../../components/TripMap';
+import { ChatSheet } from '../../../../components/ChatSheet';
+import { colors, radius, space } from '../../../../theme';
+
+const GPS_INTERVAL_MS = 5000;
+
+type TripDetail = Awaited<ReturnType<typeof api.getTrip>>;
+type Shipment = TripDetail['shipments'][number];
+
+const SHIPMENT_LABEL: Record<ShipmentState, string> = {
+  ASSIGNED: 'To collect',
+  EN_ROUTE: 'On the way',
+  ARRIVED: 'At pickup',
+  PICKED_UP: 'Loaded',
+  IN_TRANSIT: 'In transit',
+  DELIVERED: 'Delivered',
+  PAYMENT_PENDING: 'Awaiting payment',
+  PAID: 'Paid',
+  COMPLETED: 'Done',
+  CANCELLED: 'Cancelled',
+};
+
+const TRIP_LABEL: Record<TripState, string> = {
+  FORMING: 'Taking loads',
+  EN_ROUTE: 'Collecting',
+  IN_TRANSIT: 'To the mandi',
+  AT_DESTINATION: 'At the mandi',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
+};
+
+/** The one step forward from each shipment state — the rest of the machine is the server's. */
+const SHIPMENT_NEXT: Partial<Record<ShipmentState, { to: ShipmentState; label: string }>> = {
+  ASSIGNED: { to: 'EN_ROUTE', label: 'Heading to this pickup' },
+  EN_ROUTE: { to: 'ARRIVED', label: 'I have arrived' },
+  ARRIVED: { to: 'PICKED_UP', label: 'Collect with the farmer’s code' },
+  PICKED_UP: { to: 'IN_TRANSIT', label: 'Loaded — moving on' },
+  IN_TRANSIT: { to: 'DELIVERED', label: 'Delivered at the mandi' },
+};
+
+const TRIP_NEXT: Partial<Record<TripState, { to: TripState; label: string }>> = {
+  FORMING: { to: 'EN_ROUTE', label: 'Start the trip — no more loads' },
+  EN_ROUTE: { to: 'IN_TRANSIT', label: 'All collected — drive to the mandi' },
+  IN_TRANSIT: { to: 'AT_DESTINATION', label: 'Arrived at the mandi' },
+};
+
+export default function SharedTrip() {
+  const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
+
+  const [detail, setDetail] = useState<TripDetail | null>(null);
+  const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
+  const [myId, setMyId] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>();
+  /** an action failure belongs on the row that failed, not over the whole trip */
+  const [actionError, setActionError] = useState<{ key: string; message: string } | null>(null);
+  const [otpFor, setOtpFor] = useState<Shipment | null>(null);
+  const [otp, setOtp] = useState('');
+  const [otpError, setOtpError] = useState<string>();
+  const [freedSpace, setFreedSpace] = useState(false);
+  const [pricingMoved, setPricingMoved] = useState(false);
+  const socketRef = useRef<Socket | null>(null);
+
+  const load = useCallback(async () => {
+    setError(undefined);
+    try {
+      setDetail(await api.getTrip(id));
+      setMyId((await getUser())?._id ?? '');
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    let socket: Socket | null = null;
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    void (async () => {
+      socket = await connectTripSocket(id);
+      socketRef.current = socket;
+      if (!socket) return;
+
+      socket.on('shipment:state', () => void load());
+      socket.on('trip:capacity', () => void load());
+      socket.on('trip:pricing_updated', () => {
+        setPricingMoved(true);
+        void load();
+      });
+      socket.on('chat:message', () =>
+        setChatOpen((open) => {
+          if (!open) setUnread((count) => count + 1);
+          return open;
+        }),
+      );
+
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== 'granted') return;
+
+      // publish GPS every ~5s so every farmer aboard sees the vehicle move
+      interval = setInterval(() => {
+        void (async () => {
+          const current = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          const point = { lat: current.coords.latitude, lng: current.coords.longitude };
+          setPosition(point);
+          socket?.emit('vehicle:location', { tripId: id, ...point });
+        })();
+      }, GPS_INTERVAL_MS);
+    })();
+
+    return () => {
+      if (interval) clearInterval(interval);
+      socket?.disconnect();
+      socketRef.current = null;
+    };
+  }, [id, load]);
+
+  const advanceShipment = async (
+    shipment: Shipment,
+    to: ShipmentState,
+    code?: string,
+  ): Promise<void> => {
+    setBusy(shipment._id);
+    setActionError(null);
+    setOtpError(undefined);
+    try {
+      await api.setShipmentState(shipment._id, to, code);
+      if (to === 'DELIVERED') setFreedSpace(true);
+      setOtpFor(null);
+      setOtp('');
+      await load();
+    } catch (err) {
+      const message = toAppError(err).message;
+      // a wrong pickup code keeps the sheet open with the reason on the input
+      if (to === 'PICKED_UP' && toAppError(err).code === 'VALIDATION_ERROR') {
+        setOtpError('That code is not correct. Ask the farmer to read it again.');
+      } else {
+        setOtpFor(null);
+        setActionError({ key: shipment._id, message });
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const advanceTrip = async (to: TripState): Promise<void> => {
+    setBusy('trip');
+    setActionError(null);
+    try {
+      await api.setTripState(id, to);
+      await load();
+    } catch (err) {
+      setActionError({ key: 'trip', message: toAppError(err).message });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Screen>
+        <Header title="Trip" onBack={() => router.back()} />
+        <Loading />
+      </Screen>
+    );
+  }
+
+  if (!detail) {
+    return (
+      <Screen>
+        <Header title="Trip" onBack={() => router.back()} />
+        <ErrorView error={error} onRetry={() => void load()} />
+      </Screen>
+    );
+  }
+
+  const { trip, shipments } = detail;
+  const capacity = trip.capacity;
+  const tripNext = TRIP_NEXT[trip.state];
+  const canAddMore = ['FORMING', 'EN_ROUTE'].includes(trip.state) && capacity.availableKg > 0;
+
+  return (
+    <Screen
+      footer={
+        tripNext && canTransitionTrip(trip.state, tripNext.to) ? (
+          <Button
+            label={tripNext.label}
+            loading={busy === 'trip'}
+            onPress={() => void advanceTrip(tripNext.to)}
+          />
+        ) : trip.state === 'AT_DESTINATION' ? (
+          <Button
+            label="Finish and bill"
+            icon="check-circle"
+            onPress={() => router.push(`/(transporter)/trips/${id}/complete`)}
+          />
+        ) : trip.state === 'COMPLETED' ? (
+          <Button
+            label="Rate the farmers"
+            icon="star"
+            onPress={() => router.push(`/(transporter)/trips/${id}/rate`)}
+          />
+        ) : null
+      }
+    >
+      <Header
+        title="Your trip"
+        subtitle={`${shipments.length} ${shipments.length === 1 ? 'farmer' : 'farmers'} → ${trip.destination.name}`}
+        onBack={() => router.back()}
+        right={<StatusBadge status={trip.state} label={TRIP_LABEL[trip.state]} />}
+      />
+
+      <TripMap
+        destination={{ ...trip.destination, title: trip.destination.name }}
+        vehicle={position ? { ...position, title: 'You' } : null}
+        markers={shipments
+          .filter((shipment) => shipment.state !== 'CANCELLED')
+          .map((shipment) => ({
+            lat: shipment.pickup.lat,
+            lng: shipment.pickup.lng,
+            title: `${shipment.pickupSequence + 1}. ${shipment.farmer?.name ?? 'Farmer'}`,
+          }))}
+        height={240}
+      />
+
+      {error ? <ErrorView error={error} onRetry={() => void load()} /> : null}
+
+      {actionError?.key === 'trip' ? (
+        <Banner tone="error" style={{ marginTop: space.md }}>
+          <Txt variant="labelLg" color={colors.onErrorContainer}>
+            Cannot do that yet
+          </Txt>
+          <Txt variant="bodyMd" color={colors.onErrorContainer}>
+            {actionError.message}
+          </Txt>
+        </Banner>
+      ) : null}
+
+      <Card style={{ marginTop: space.md }}>
+        <Txt variant="labelLg">Load on board</Txt>
+        <View
+          style={{
+            flexDirection: 'row',
+            height: 12,
+            borderRadius: radius.full,
+            overflow: 'hidden',
+            backgroundColor: colors.surfaceContainerHigh,
+            marginTop: space.gutter,
+          }}
+        >
+          <View style={{ flex: Math.max(0, capacity.loadedKg), backgroundColor: colors.primary }} />
+          <View
+            style={{
+              flex: Math.max(0, capacity.committedKg - capacity.loadedKg),
+              backgroundColor: colors.primaryContainer,
+            }}
+          />
+          <View style={{ flex: Math.max(0, capacity.availableKg) }} />
+        </View>
+
+        <Divider />
+        <Row label="Total capacity" value={kg(capacity.totalKg)} />
+        <Row label="Committed" value={kg(capacity.committedKg)} />
+        <Row label="In the vehicle now" value={kg(capacity.loadedKg)} />
+        <Row label="Still free" value={kg(capacity.availableKg)} bold />
+      </Card>
+
+      {/* a delivery hands the space back — the pool is where it gets used again */}
+      {canAddMore ? (
+        <Banner tone={freedSpace ? 'primary' : 'info'}>
+          <View style={{ flexDirection: 'row', gap: space.sm }}>
+            <MaterialIcons
+              name="local-shipping"
+              size={20}
+              color={freedSpace ? colors.onPrimary : colors.onInfoContainer}
+            />
+            <View style={{ flex: 1 }}>
+              <Txt variant="labelLg" color={freedSpace ? colors.onPrimary : colors.onInfoContainer}>
+                {freedSpace ? 'Space just freed up' : `${kg(capacity.availableKg)} still fits`}
+              </Txt>
+              <Button
+                label="Open the load pool"
+                variant="secondary"
+                icon="add"
+                onPress={() => router.push('/(transporter)/trips/available')}
+                style={{ marginTop: space.sm }}
+              />
+            </View>
+          </View>
+        </Banner>
+      ) : null}
+
+      {pricingMoved ? (
+        <Banner tone="info">
+          <Txt variant="bodyMd" color={colors.onInfoContainer}>
+            The pool changed, so every farmer's share was recalculated.
+          </Txt>
+        </Banner>
+      ) : null}
+
+      <View style={{ flexDirection: 'row', gap: space.sm, marginBottom: space.gutter }}>
+        <Pressable
+          style={[actionButton, { flex: 1 }]}
+          onPress={() => {
+            setChatOpen(true);
+            setUnread(0);
+          }}
+        >
+          <MaterialIcons name="chat" size={20} color={colors.primary} />
+          <Txt variant="labelLg" color={colors.primary}>
+            Trip chat{unread > 0 ? ` (${unread})` : ''}
+          </Txt>
+        </Pressable>
+      </View>
+
+      <Txt variant="headlineMd" style={{ marginBottom: space.sm }}>
+        Pickups in order
+      </Txt>
+
+      {shipments.length === 0 ? (
+        <EmptyState
+          icon="inventory-2"
+          title="No loads yet"
+          message="Claim loads from the pool — a farmer choosing you puts their produce on this trip."
+          action={
+            <Button
+              label="Open the load pool"
+              icon="local-shipping"
+              onPress={() => router.push('/(transporter)/trips/available')}
+            />
+          }
+        />
+      ) : (
+        shipments.map((shipment) => {
+          const next = SHIPMENT_NEXT[shipment.state];
+          const canAdvance = next ? canTransitionShipment(shipment.state, next.to) : false;
+          const phone = shipment.farmer?.phone;
+
+          return (
+            <Card key={shipment._id}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.gutter }}>
+                <View style={sequenceChip}>
+                  <Txt variant="labelLg" color={colors.onPrimary}>
+                    {String(shipment.pickupSequence + 1)}
+                  </Txt>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Txt variant="labelLg">{shipment.farmer?.name ?? 'Farmer'}</Txt>
+                  <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                    {shipment.cropType} · {kg(shipment.quantityKg)}
+                  </Txt>
+                </View>
+                <StatusBadge
+                  status={shipment.state}
+                  label={SHIPMENT_LABEL[shipment.state]}
+                />
+              </View>
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: space.sm,
+                  marginTop: space.gutter,
+                }}
+              >
+                <MaterialIcons name="my-location" size={16} color={colors.primary} />
+                <Txt variant="bodyMd" numberOfLines={1} style={{ flex: 1 }}>
+                  {shipment.pickup.name}
+                </Txt>
+              </View>
+
+              <Divider />
+              <Row label="Farmer pays" value={rupees(shipment.finalPrice ?? shipment.allocatedPrice)} />
+
+              {actionError?.key === shipment._id ? (
+                <Banner tone="error" style={{ marginTop: space.gutter, marginBottom: 0 }}>
+                  <Txt variant="bodyMd" color={colors.onErrorContainer}>
+                    {actionError.message}
+                  </Txt>
+                </Banner>
+              ) : null}
+
+              <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.gutter }}>
+                <Pressable
+                  style={[actionButton, { flex: 1, opacity: phone ? 1 : 0.5 }]}
+                  disabled={!phone}
+                  onPress={() => void Linking.openURL(`tel:${phone ?? ''}`)}
+                >
+                  <MaterialIcons name="call" size={20} color={colors.primary} />
+                  <Txt variant="labelLg" color={colors.primary}>
+                    {phone ? 'Call' : 'No number'}
+                  </Txt>
+                </Pressable>
+
+                {next && canAdvance ? (
+                  <Button
+                    label={next.label}
+                    icon={next.to === 'PICKED_UP' ? 'vpn-key' : 'arrow-forward'}
+                    loading={busy === shipment._id}
+                    onPress={() => {
+                      if (next.to === 'PICKED_UP') {
+                        setOtp('');
+                        setOtpError(undefined);
+                        setOtpFor(shipment);
+                        return;
+                      }
+                      void advanceShipment(shipment, next.to);
+                    }}
+                    style={{ flex: 2 }}
+                  />
+                ) : null}
+              </View>
+            </Card>
+          );
+        })
+      )}
+
+      <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+        Your location is shared with the farmers on this trip only while it is running.
+      </Txt>
+
+      {/* the farmer's 4-digit code is what proves the right produce was collected */}
+      <Modal
+        visible={otpFor !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setOtpFor(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(25,28,27,0.4)', justifyContent: 'flex-end' }}>
+          <View
+            style={{
+              backgroundColor: colors.background,
+              borderTopLeftRadius: radius.xl,
+              borderTopRightRadius: radius.xl,
+              padding: space.md,
+              paddingBottom: space.xl,
+            }}
+          >
+            <Txt variant="headlineMd">Pickup code</Txt>
+            <Txt variant="bodyMd" color={colors.onSurfaceVariant} style={{ marginBottom: space.md }}>
+              Ask {otpFor?.farmer?.name ?? 'the farmer'} for the 4-digit code on their phone.
+            </Txt>
+
+            <Field
+              label="4-digit code"
+              value={otp}
+              onChangeText={setOtp}
+              placeholder="0000"
+              keyboardType="number-pad"
+              maxLength={4}
+              error={otpError}
+            />
+
+            <View style={{ flexDirection: 'row', gap: space.sm }}>
+              <Button
+                label="Cancel"
+                variant="secondary"
+                icon={null}
+                onPress={() => setOtpFor(null)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                label="Confirm pickup"
+                icon="check-circle"
+                loading={busy === otpFor?._id}
+                disabled={otp.trim().length !== 4}
+                onPress={() => otpFor && void advanceShipment(otpFor, 'PICKED_UP', otp.trim())}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <ChatSheet
+        visible={chatOpen}
+        onClose={() => setChatOpen(false)}
+        tripId={id}
+        myUserId={myId}
+        socket={socketRef.current}
+        otherPartyName="Trip chat"
+      />
+    </Screen>
+  );
+}
+
+const actionButton = {
+  minHeight: 48,
+  borderRadius: radius.base,
+  borderWidth: 1,
+  borderColor: colors.primary,
+  backgroundColor: colors.surfaceContainerLowest,
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  gap: space.sm,
+};
+
+const sequenceChip = {
+  width: 32,
+  height: 32,
+  borderRadius: radius.full,
+  backgroundColor: colors.primaryContainer,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+};

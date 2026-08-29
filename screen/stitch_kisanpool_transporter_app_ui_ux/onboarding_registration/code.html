@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>KisanPool - Transporter Onboarding</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&amp;family=Manrope:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Theme Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-tint": "#466640",
+                    "tertiary": "#012410",
+                    "surface-container-highest": "#e1e3e0",
+                    "on-background": "#191c1b",
+                    "primary-fixed": "#c7edbc",
+                    "surface-container-lowest": "#ffffff",
+                    "primary-container": "#1b3a18",
+                    "on-secondary-fixed-variant": "#23501e",
+                    "background": "#f8faf7",
+                    "on-surface-variant": "#434840",
+                    "on-primary-container": "#81a579",
+                    "inverse-primary": "#abd1a1",
+                    "surface-container": "#eceeeb",
+                    "on-secondary-fixed": "#002201",
+                    "surface-container-low": "#f2f4f1",
+                    "secondary-fixed": "#bcf0ae",
+                    "outline-variant": "#c3c8bd",
+                    "secondary": "#3b6934",
+                    "on-primary-fixed": "#032104",
+                    "primary": "#052405",
+                    "secondary-fixed-dim": "#a1d494",
+                    "surface-bright": "#f8faf7",
+                    "secondary-container": "#b9eeab",
+                    "on-tertiary-fixed": "#00210e",
+                    "tertiary-container": "#183a24",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-container": "#3f6d38",
+                    "error": "#ba1a1a",
+                    "on-primary": "#ffffff",
+                    "surface": "#f8faf7",
+                    "on-error-container": "#93000a",
+                    "error-container": "#ffdad6",
+                    "on-tertiary-fixed-variant": "#2c4e36",
+                    "on-surface": "#191c1b",
+                    "inverse-surface": "#2e312f",
+                    "primary-fixed-dim": "#abd1a1",
+                    "outline": "#73796f",
+                    "on-primary-fixed-variant": "#2e4e2a",
+                    "inverse-on-surface": "#eff1ee",
+                    "surface-container-high": "#e7e9e6",
+                    "surface-dim": "#d8dbd8",
+                    "on-secondary": "#ffffff",
+                    "surface-variant": "#e1e3e0",
+                    "on-error": "#ffffff",
+                    "on-tertiary-container": "#80a488",
+                    "tertiary-fixed": "#c5eccc",
+                    "tertiary-fixed-dim": "#aad0b1"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "container-padding": "16px",
+                    "xl": "32px",
+                    "xs": "4px",
+                    "lg": "24px",
+                    "md": "16px",
+                    "card-gap": "12px",
+                    "sm": "8px"
+            },
+            "fontFamily": {
+                    "headline-md": [
+                            "Manrope"
+                    ],
+                    "body-md": [
+                            "Be Vietnam Pro"
+                    ],
+                    "headline-lg": [
+                            "Manrope"
+                    ],
+                    "headline-xl": [
+                            "Manrope"
+                    ],
+                    "body-lg": [
+                            "Be Vietnam Pro"
+                    ],
+                    "label-lg": [
+                            "Be Vietnam Pro"
+                    ],
+                    "label-sm": [
+                            "Be Vietnam Pro"
+                    ]
+            },
+            "fontSize": {
+                    "headline-md": [
+                            "20px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body-md": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-lg": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "headline-xl": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "body-lg": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "label-lg": [
+                            "14px",
+                            {
+                                    "lineHeight": "18px",
+                                    "letterSpacing": "0.01em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "label-sm": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "fontWeight": "500"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #d8dbd8;
+            border-radius: 10px;
+        }
+        
+        /* Remove arrows from number input */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md antialiased min-h-screen selection:bg-primary-container selection:text-on-primary">
+<!-- Mobile Frame Container -->
+<div class="max-w-md mx-auto relative min-h-screen flex flex-col bg-surface-bright shadow-2xl overflow-hidden">
+<!-- TopAppBar Suppressed per instructions for Onboarding Flow -->
+<!-- Header / Progress -->
+<header class="flex items-center gap-md px-container-padding py-md sticky top-0 bg-surface-bright/95 backdrop-blur-sm z-30">
+<button aria-label="Go back" class="p-2 -ml-2 rounded-full hover:bg-surface-container transition-colors flex items-center justify-center group">
+<span class="material-symbols-outlined text-on-surface group-hover:text-primary-container transition-colors">arrow_back</span>
+</button>
+<div aria-valuemax="100" aria-valuemin="0" aria-valuenow="50" class="flex-1 h-1.5 bg-surface-variant rounded-full overflow-hidden" role="progressbar">
+<div class="w-1/2 h-full bg-primary-container rounded-full shadow-[0_0_8px_rgba(27,58,24,0.4)]"></div>
+</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant w-8 text-right">2/4</div>
+</header>
+<!-- Main Scrollable Canvas -->
+<main class="flex-1 overflow-y-auto px-container-padding pb-32 pt-2 flex flex-col gap-xl">
+<!-- Section 1: Role Selection (Condensed View showing Transporter selected) -->
+<section class="flex flex-col gap-sm">
+<h1 class="font-headline-xl text-headline-xl text-primary-container tracking-tight">चला सुरुवात करूया!</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-4">आपली भूमिका निवडा / Choose your role</p>
+<div class="grid grid-cols-2 gap-card-gap">
+<!-- Farmer Card (Unselected) -->
+<button class="bg-surface-container-lowest border border-outline-variant rounded-lg p-3 flex flex-col items-center text-center gap-2 relative overflow-hidden hover:bg-surface-container-low transition-colors group">
+<div class="w-16 h-16 rounded-DEFAULT bg-cover bg-center bg-surface-variant group-hover:scale-105 transition-transform duration-300" data-alt="A clean, flat vector illustration of an Indian farmer wearing traditional headgear, standing confidently with arms crossed next to a stylized green tractor. The background is a soft, minimal agricultural landscape with premium light-mode aesthetics. The primary colors are crisp whites and various shades of sage and forest green." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAT8XxG2Ln8CjhZDrkXaT8EeQObreAeJElbqhDbPSyP0VtbS1LFkFEKG_GOsOwylyqUUFvaClk9ta-1qFPDU75T3bAGJMPTDfNlQqkf6UhIeHLUW9bcAGMQ2UOPGZfrQWBt4quDrQGTYgddOlaxOB_PON1rQzVcsosahIk1GUBh3W9AVSSbtRwL645Xs8MCMEmm_9atxEOAEzn8JuP5cMg5b4V5XVwUXe5xfVTfcSz2SJkj7NIbcwDI')"></div>
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface text-base leading-tight">शेतकरी</h2>
+<p class="font-label-sm text-label-sm text-outline mt-0.5">Farmer</p>
+</div>
+</button>
+<!-- Transporter Card (Selected state) -->
+<button class="bg-surface-container-lowest border-2 border-primary-container rounded-lg p-3 flex flex-col items-center text-center gap-2 relative overflow-hidden ring-4 ring-primary-container/10 bg-secondary-container/5">
+<div class="absolute top-0 right-0 bg-primary-container text-on-primary px-2 py-0.5 rounded-bl-DEFAULT font-label-sm text-[10px] flex items-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                            निवडले
+                        </div>
+<div class="w-16 h-16 rounded-DEFAULT bg-cover bg-center bg-surface-variant" data-alt="A modern, high-quality vector illustration of an Indian transport driver in a neat green collared shirt, smiling, positioned in front of a sleek, small green cargo truck. The visual style is premium corporate modern, utilizing a sophisticated palette of deep blacks, crisp whites, and vibrant agricultural green accents in a bright, light-mode setting." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuClzfFKAoZkEBCsw9W7FAVACC3cWa3-pv11qnS-J_y7zkvwbKirGpbkwFubs3JFF7A_2ZUGXZ6_DMEW6mRFRL7mnLIV2g39tLyLsv_h6o8NHd7JdphZLuQU91U6IO1M8ZXLvy98yLMyN2QY2lLOWdM1aHDhs5Te5Ij5BWfegTrxdiwPE1g72MK-ICL9vMri8Q2_elCz4uLyfk9WifnJFAmJ88ZW42FeD8I7uRbzWjSBYVpbIIScl7o8')"></div>
+<div>
+<h2 class="font-headline-md text-headline-md text-primary-container text-base leading-tight">वाहतूकदार</h2>
+<p class="font-label-sm text-label-sm text-primary-container/70 mt-0.5">Transporter</p>
+</div>
+</button>
+</div>
+</section>
+<!-- Divider -->
+<div class="h-px w-full bg-gradient-to-r from-transparent via-outline-variant to-transparent opacity-50"></div>
+<!-- Section 2: Details Form -->
+<section class="flex flex-col gap-md">
+<div class="flex items-center gap-3 mb-2">
+<div class="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-secondary-container" style="font-variation-settings: 'FILL' 1;">local_shipping</span>
+</div>
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface">माहिती पूर्ण करा</h2>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-0.5">Please fill your details</p>
+</div>
+</div>
+<form class="bg-surface-container-lowest border border-outline-variant/50 rounded-xl p-md flex flex-col gap-card-gap shadow-[0_4px_24px_0_rgba(70,102,64,0.05)] relative overflow-hidden">
+<!-- Decorative subtle background accent -->
+<div class="absolute -top-10 -right-10 w-32 h-32 bg-secondary-container rounded-full blur-3xl opacity-20 pointer-events-none"></div>
+<!-- Input: Full Name -->
+<div class="flex flex-col gap-1.5 relative z-10">
+<label class="font-label-lg text-label-lg text-on-surface flex justify-between" for="fullName">
+<span>पूर्ण नाव <span class="text-error">*</span></span>
+<span class="text-outline font-normal text-[11px]">Full Name</span>
+</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">person</span>
+<input class="w-full bg-surface-bright border border-outline-variant rounded-DEFAULT py-3 pl-10 pr-3 font-body-md text-on-surface placeholder:text-outline-variant focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none transition-all hover:border-outline" id="fullName" placeholder="उदा. राजेश शिंदे" type="text"/>
+</div>
+</div>
+<!-- Input: Location -->
+<div class="flex flex-col gap-1.5 relative z-10">
+<label class="font-label-lg text-label-lg text-on-surface flex justify-between" for="location">
+<span>गाव / शहर <span class="text-error">*</span></span>
+<span class="text-outline font-normal text-[11px]">City/Town</span>
+</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">location_on</span>
+<input class="w-full bg-surface-bright border border-outline-variant rounded-DEFAULT py-3 pl-10 pr-3 font-body-md text-on-surface placeholder:text-outline-variant focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none transition-all hover:border-outline" id="location" placeholder="उदा. पुणे" type="text"/>
+</div>
+</div>
+<div class="h-px bg-outline-variant/30 my-2"></div>
+<div class="flex items-center gap-2 mb-1">
+<span class="material-symbols-outlined text-primary-container text-[18px]">directions_car</span>
+<h3 class="font-label-lg text-label-lg text-primary-container">वाहन माहिती / Vehicle Info</h3>
+</div>
+<!-- Input: Vehicle Type -->
+<div class="flex flex-col gap-1.5 relative z-10">
+<label class="font-label-lg text-label-lg text-on-surface flex justify-between" for="vehicleType">
+<span>वाहन प्रकार</span>
+<span class="text-outline font-normal text-[11px]">Type</span>
+</label>
+<div class="relative">
+<select class="w-full bg-surface-bright border border-outline-variant rounded-DEFAULT p-3 pr-10 font-body-md text-on-surface appearance-none focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none transition-all hover:border-outline cursor-pointer" id="vehicleType">
+<option class="text-outline-variant" disabled="" selected="" value="">निवडा / Select</option>
+<option value="pickup">Pickup (पिकअप)</option>
+<option value="truck">Truck (ट्रक)</option>
+<option value="tractor_trolley">Tractor Trolley (ट्रॅक्टर ट्रॉली)</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-primary-container pointer-events-none">expand_more</span>
+</div>
+</div>
+<!-- Input: Reg Number -->
+<div class="flex flex-col gap-1.5 relative z-10">
+<label class="font-label-lg text-label-lg text-on-surface flex justify-between" for="regNumber">
+<span>वाहन क्रमांक</span>
+<span class="text-outline font-normal text-[11px]">Reg Number</span>
+</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px]">pin</span>
+<input class="w-full bg-surface-bright border border-outline-variant rounded-DEFAULT py-3 pl-10 pr-3 font-body-md text-on-surface uppercase placeholder:normal-case placeholder:text-outline-variant focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none transition-all hover:border-outline" id="regNumber" placeholder="उदा. MH 12 AB 1234" type="text"/>
+</div>
+</div>
+<!-- Input: Capacity -->
+<div class="flex flex-col gap-1.5 relative z-10">
+<label class="font-label-lg text-label-lg text-on-surface flex justify-between">
+<span>वाहन क्षमता (टन मध्ये)</span>
+<span class="text-outline font-normal text-[11px]">Capacity (Tons)</span>
+</label>
+<div class="flex items-center bg-surface-bright border border-outline-variant rounded-DEFAULT overflow-hidden focus-within:border-primary-container focus-within:ring-1 focus-within:ring-primary-container transition-all hover:border-outline">
+<button aria-label="Decrease capacity" class="p-3 text-primary-container hover:bg-surface-container transition-colors w-12 flex items-center justify-center border-r border-outline-variant" type="button">
+<span class="material-symbols-outlined text-[20px]">remove</span>
+</button>
+<input class="flex-1 w-full text-center border-none p-3 font-headline-md text-on-surface focus:ring-0 outline-none bg-transparent" id="capacity" min="0" step="0.5" type="number" value="5.0"/>
+<button aria-label="Increase capacity" class="p-3 text-primary-container hover:bg-surface-container transition-colors w-12 flex items-center justify-center border-l border-outline-variant" type="button">
+<span class="material-symbols-outlined text-[20px]">add</span>
+</button>
+</div>
+</div>
+</form>
+<div class="flex items-start gap-2 mt-2 px-1">
+<span class="material-symbols-outlined text-outline text-[16px] mt-0.5">shield</span>
+<p class="font-label-sm text-label-sm text-outline leading-tight">सुरक्षित, विश्वासार्ह आणि पारदर्शक प्लॅटफॉर्म. तुमची माहिती सुरक्षित आहे.<br/><span class="text-[10px]">Secure, reliable, and transparent platform.</span></p>
+</div>
+</section>
+</main>
+<!-- Sticky Footer Action -->
+<div class="absolute bottom-0 left-0 w-full bg-surface-bright/95 backdrop-blur-md border-t border-outline-variant/30 px-container-padding py-md z-40 pb-safe shadow-[0_-4px_24px_0_rgba(0,0,0,0.05)]">
+<button class="w-full bg-primary-container hover:bg-tertiary-container text-on-primary font-label-lg text-label-lg py-4 px-6 rounded-xl flex items-center justify-between gap-2 shadow-[0_4px_14px_0_rgba(27,58,24,0.15)] transition-all active:scale-[0.98] active:shadow-none group">
+<span class="font-headline-md text-base">पुढे जा (Next)</span>
+<div class="bg-on-primary/20 rounded-full p-1 group-hover:bg-on-primary/30 transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</div>
+</button>
+</div>
+</div>
+</body></html>

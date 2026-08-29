@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "KisanPool",
+    "slug": "kisanpool",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "kisanpool",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#f8faf8"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.kisanpool.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "KisanPool uses the microphone so you can book a trip by speaking in your own language.",
+        "NSLocationWhenInUseUsageDescription": "KisanPool uses your location to find vehicles and mandis near you.",
+        "NSCameraUsageDescription": "KisanPool uses the camera to upload delivery photos and documents."
+      }
+    },
+    "android": {
+      "package": "com.kisanpool.app",
+      "adaptiveIcon": { "backgroundColor": "#0d631b" },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "RECORD_AUDIO",
+        "CAMERA"
+      ],
+      "config": {
+        "googleMaps": { "apiKey": "" }
+      }
+    },
+    "plugins": ["expo-router", "expo-secure-store", "expo-av", "expo-location"],
+    "experiments": { "typedRoutes": false }
+  }
+}

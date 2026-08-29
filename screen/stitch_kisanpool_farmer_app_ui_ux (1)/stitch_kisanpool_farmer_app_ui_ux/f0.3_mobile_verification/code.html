@@ -1,0 +1,176 @@
+<!DOCTYPE html><html class="light" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>KisanPool - Enter Mobile Number</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-container": "#00731e",
+                        "on-primary-fixed-variant": "#005312",
+                        "surface": "#f8faf8",
+                        "on-primary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed-variant": "#005313",
+                        "secondary": "#006e1c",
+                        "on-secondary": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "surface-container-lowest": "#ffffff",
+                        "background": "#f8faf8",
+                        "tertiary-fixed-dim": "#ffba38",
+                        "on-primary-container": "#cbffc2",
+                        "surface-dim": "#d8dad9",
+                        "error": "#ba1a1a",
+                        "surface-container-high": "#e6e9e7",
+                        "on-tertiary-fixed": "#281900",
+                        "tertiary-container": "#926500",
+                        "on-background": "#191c1b",
+                        "on-error": "#ffffff",
+                        "on-surface": "#191c1b",
+                        "surface-container-highest": "#e1e3e1",
+                        "tertiary": "#734e00",
+                        "on-secondary-fixed": "#002204",
+                        "outline": "#707a6c",
+                        "secondary-fixed": "#94f990",
+                        "secondary-container": "#91f78e",
+                        "on-primary-fixed": "#002204",
+                        "on-tertiary-container": "#ffefda",
+                        "surface-variant": "#e1e3e1",
+                        "primary-fixed-dim": "#88d982",
+                        "inverse-on-surface": "#eff1ef",
+                        "inverse-surface": "#2e3130",
+                        "outline-variant": "#bfcaba",
+                        "primary-fixed": "#a3f69c",
+                        "primary-container": "#2e7d32",
+                        "surface-container": "#eceeec",
+                        "secondary-fixed-dim": "#78dc77",
+                        "on-error-container": "#93000a",
+                        "surface-bright": "#f8faf8",
+                        "on-tertiary-fixed-variant": "#604100",
+                        "on-surface-variant": "#40493d",
+                        "surface-tint": "#1b6d24",
+                        "primary": "#0d631b",
+                        "tertiary-fixed": "#ffdeac",
+                        "surface-container-low": "#f2f4f2",
+                        "inverse-primary": "#88d982"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "16px",
+                        "xl": "32px",
+                        "lg": "24px",
+                        "xs": "4px",
+                        "base": "4px",
+                        "edge-margin": "16px",
+                        "sm": "8px",
+                        "gutter": "12px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "bilingual-subtext": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "bilingual-subtext": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-lg": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col relative overflow-hidden antialiased">
+<!-- Top Navigation (Transactional Flow) -->
+<header class="bg-background w-full top-0 sticky flex items-center px-edge-margin h-14 z-50">
+<button class="p-2 -ml-2 rounded-full hover:bg-surface-container-low transition-colors active:scale-95 text-on-surface">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+</header>
+<!-- Progress Bar -->
+<div class="w-full px-edge-margin py-sm">
+<div class="w-full h-1 bg-surface-container-highest rounded-full overflow-hidden">
+<div class="h-full bg-primary rounded-full transition-all duration-500 ease-out" style="width: 40%"></div>
+</div>
+</div>
+<!-- Main Content Canvas -->
+<main class="flex-1 flex flex-col px-edge-margin pt-xl pb-32 z-10 relative">
+<!-- Header Text -->
+<div class="text-center mb-xl">
+<h1 class="font-headline-lg text-headline-lg text-on-surface mb-2">तुमचा मोबाईल नंबर द्या</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">We will send you an OTP to verify</p>
+</div>
+<!-- Input Section -->
+<div class="w-full max-w-md mx-auto space-y-lg">
+<div class="flex flex-col gap-sm">
+<label class="font-label-sm text-label-sm text-on-surface-variant px-1" for="mobile">मोबाईल नंबर</label>
+<div class="relative flex items-center bg-surface-container-lowest border border-outline-variant rounded-lg overflow-hidden focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-shadow">
+<!-- Country Code / Flag (Simulated) -->
+<div class="flex items-center pl-3 pr-2 py-3 border-r border-outline-variant bg-surface-container-lowest">
+<img alt="IN Flag" class="w-6 h-4 object-cover rounded-sm mr-2 shadow-sm" data-alt="A small, crisp, perfectly rectangular icon of the Indian flag with its saffron, white, and green horizontal stripes and navy blue Ashoka Chakra in the center, rendered in a flat modern UI style suitable for a mobile app input field." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCjypzztghuQjjZNjOSzfodujp565tKOLE6rAt7Qwnwb1xuiqPJB1bcM_GcWNMyoUun91TjhtJIM4Hu_gS2DyIj_1zNbqJcxTVVafeEbgZpxXCjSA119KvvWPFi9dp_r4y4V0v5XJqYnFjQDdXGpohketqoivNyR-knmmRQIuQDEdOoKVcSjNQqU0-U1PCs_R2kreIXLp3ntsWVY0nVEr8Cc76kR7ujyDge-1DqMy9L-4RSgp15WNgE">
+<span class="font-body-md text-body-md text-on-surface font-medium">+91</span>
+</div>
+<!-- Input Field -->
+<input autocomplete="tel" class="w-full bg-transparent border-none py-3 px-3 font-body-lg text-body-lg text-on-surface focus:ring-0 placeholder:text-outline" id="mobile" placeholder="98765 43210" type="tel">
+</div>
+</div>
+<!-- Action Button -->
+<button class="w-full flex items-center justify-center gap-2 bg-primary-container text-on-primary font-label-lg text-label-lg py-4 px-6 rounded-lg active:scale-[0.98] transition-transform shadow-md mt-lg">
+<span>OTP पाठवा</span>
+<span class="material-symbols-outlined text-[20px]" data-icon="arrow_forward">arrow_forward</span>
+</button>
+<!-- Terms Text -->
+<div class="text-center mt-md">
+<p class="font-bilingual-subtext text-bilingual-subtext text-on-surface-variant">
+                    By continuing, you agree to our<br>
+<a class="text-primary font-medium hover:underline" href="#">Terms &amp; Conditions and Privacy Policy</a>
+</p>
+</div>
+</div>
+</main>
+<!-- Bottom Background Illustration -->
+<div class="absolute bottom-0 left-0 w-full h-[40vh] z-0 pointer-events-none opacity-90 mix-blend-multiply" data-alt="A highly detailed, soft vector illustration of a serene Indian agricultural landscape at the bottom of the screen. Rolling green hills, lush fields of crops, a small traditional village home in the distance, and gentle sunlight. The color palette features varying shades of soft greens and earthy tones, maintaining a clean, modern logistics app aesthetic. Subtle lighting, high key, calming mood." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCxQJFSbq_XAK5297FEMCO7EjZIF9-VLq52HnTCrHR9Jzhz0kEAt6VYGcum1quBns6TBH5EpJwxbyFCYU4ZnMD3cOwweE2wBcMLnOZjeoJeJ8Xiy_sPFKVM5hUJuFqqTPQ9IusfPPDjq4O3gaUeI3XLbAVaxwYVwY_as7Cr38co9CbgwgZTNO1ZVgGSkaMmVYv2nwedU_pumLNXClkgTG_WPOvwFCMQUYCRBijmqLtWowlhOBh4xWS6')">
+</div>
+<!-- Trust Badges Overlay -->
+<div class="absolute bottom-6 left-0 w-full flex justify-center gap-6 z-20 pointer-events-none">
+<div class="flex flex-col items-center bg-surface/80 backdrop-blur-md px-3 py-2 rounded-xl shadow-sm border border-surface-container">
+<span class="material-symbols-outlined text-primary mb-1" data-icon="security">security</span>
+<span class="font-label-sm text-[10px] text-on-surface-variant">सुरक्षित व्यवहार</span>
+</div>
+<div class="flex flex-col items-center bg-surface/80 backdrop-blur-md px-3 py-2 rounded-xl shadow-sm border border-surface-container">
+<span class="material-symbols-outlined text-primary mb-1" data-icon="timer">timer</span>
+<span class="font-label-sm text-[10px] text-on-surface-variant">वेळेची बचत</span>
+</div>
+<div class="flex flex-col items-center bg-surface/80 backdrop-blur-md px-3 py-2 rounded-xl shadow-sm border border-surface-container">
+<span class="material-symbols-outlined text-primary mb-1" data-icon="trending_up">trending_up</span>
+<span class="font-label-sm text-[10px] text-on-surface-variant">जास्त कमाई</span>
+</div>
+</div>
+</body></html>

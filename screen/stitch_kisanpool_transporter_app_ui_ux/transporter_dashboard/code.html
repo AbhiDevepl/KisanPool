@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Transporter Dashboard - KisanPool</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&amp;family=Manrope:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-tint": "#466640",
+                    "tertiary": "#012410",
+                    "surface-container-highest": "#e1e3e0",
+                    "on-background": "#191c1b",
+                    "primary-fixed": "#c7edbc",
+                    "surface-container-lowest": "#ffffff",
+                    "primary-container": "#1b3a18",
+                    "on-secondary-fixed-variant": "#23501e",
+                    "background": "#f8faf7",
+                    "on-surface-variant": "#434840",
+                    "on-primary-container": "#81a579",
+                    "inverse-primary": "#abd1a1",
+                    "surface-container": "#eceeeb",
+                    "on-secondary-fixed": "#002201",
+                    "surface-container-low": "#f2f4f1",
+                    "secondary-fixed": "#bcf0ae",
+                    "outline-variant": "#c3c8bd",
+                    "secondary": "#3b6934",
+                    "on-primary-fixed": "#032104",
+                    "primary": "#052405",
+                    "secondary-fixed-dim": "#a1d494",
+                    "surface-bright": "#f8faf7",
+                    "secondary-container": "#b9eeab",
+                    "on-tertiary-fixed": "#00210e",
+                    "tertiary-container": "#183a24",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-container": "#3f6d38",
+                    "error": "#ba1a1a",
+                    "on-primary": "#ffffff",
+                    "surface": "#f8faf7",
+                    "on-error-container": "#93000a",
+                    "error-container": "#ffdad6",
+                    "on-tertiary-fixed-variant": "#2c4e36",
+                    "on-surface": "#191c1b",
+                    "inverse-surface": "#2e312f",
+                    "primary-fixed-dim": "#abd1a1",
+                    "outline": "#73796f",
+                    "on-primary-fixed-variant": "#2e4e2a",
+                    "inverse-on-surface": "#eff1ee",
+                    "surface-container-high": "#e7e9e6",
+                    "surface-dim": "#d8dbd8",
+                    "on-secondary": "#ffffff",
+                    "surface-variant": "#e1e3e0",
+                    "on-error": "#ffffff",
+                    "on-tertiary-container": "#80a488",
+                    "tertiary-fixed": "#c5eccc",
+                    "tertiary-fixed-dim": "#aad0b1"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "container-padding": "16px",
+                    "xl": "32px",
+                    "xs": "4px",
+                    "lg": "24px",
+                    "md": "16px",
+                    "card-gap": "12px",
+                    "sm": "8px"
+            },
+            "fontFamily": {
+                    "headline-md": [
+                            "Manrope"
+                    ],
+                    "body-md": [
+                            "Be Vietnam Pro"
+                    ],
+                    "headline-lg": [
+                            "Manrope"
+                    ],
+                    "headline-xl": [
+                            "Manrope"
+                    ],
+                    "body-lg": [
+                            "Be Vietnam Pro"
+                    ],
+                    "label-lg": [
+                            "Be Vietnam Pro"
+                    ],
+                    "label-sm": [
+                            "Be Vietnam Pro"
+                    ]
+            },
+            "fontSize": {
+                    "headline-md": [
+                            "20px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body-md": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-lg": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "headline-xl": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "body-lg": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "label-lg": [
+                            "14px",
+                            {
+                                    "lineHeight": "18px",
+                                    "letterSpacing": "0.01em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "label-sm": [
+                            "12px",
+                            {
+                                    "lineHeight": "16px",
+                                    "fontWeight": "500"
+                            }
+                    ]
+            }
+        },
+        },
+      }
+    </script>
+<style>
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md antialiased min-h-screen flex flex-col md:flex-row">
+<!-- NavigationDrawer (Hidden on Mobile, Visible on Desktop) -->
+<aside aria-label="Sidebar" class="hidden md:flex flex-col bg-surface dark:bg-surface-dim shadow-xl h-full w-80 rounded-r-lg fixed inset-y-0 left-0 z-[60] p-4 transition-all">
+<div class="flex items-center gap-4 mb-8 pl-2">
+<img alt="Transporter Profile" class="w-12 h-12 rounded-full object-cover border-2 border-primary-container" data-alt="A professional headshot of an Indian male transporter in his late 30s, wearing a clean light blue button-down shirt. The background is a blurred agricultural market setting. The lighting is bright and natural, reflecting a trustworthy and reliable persona in a modern logistics app context." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBqBXCsUVrtaUT9UDv1eHn4eM8RGqa-DJkWt78AH5PxuP8UYmf9dQo6XNF11UoldCea5tdowZV99HRvZSBQ-DOXF9LlF2BjXqbA6KuIn8IBX8_yhpR168vnWzXG-mUJ1Zkf6Ylvmy8bR5-L_9UMu0KjOdZSj55S0SZPYbibDOww55vdg8uo8NmXtrGWDNY9TLcfbhVO5RUSweo0g7dsN4HkOY-zZgJjR5RywwdPA7ZlKsn4-7Gm5Jdf"/>
+<div>
+<h2 class="font-headline-md text-headline-md text-primary">Rahul Patil</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Verified Transporter</p>
+<p class="font-label-sm text-label-sm text-primary-container/80 mt-1">MH-12-AB-1234</p>
+</div>
+</div>
+<nav class="flex-1 space-y-2">
+<a aria-current="page" class="flex items-center gap-4 px-4 py-3 bg-secondary-container text-on-secondary-container rounded-lg font-bold hover:bg-surface-container-high transition-all" href="#">
+<span class="material-symbols-outlined" data-icon="home" data-weight="fill" style="font-variation-settings: 'FILL' 1;">home</span>
+<span class="font-label-lg text-label-lg">Home</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-on-surface-variant rounded-lg hover:bg-surface-container-high transition-all opacity-80" href="#">
+<span class="material-symbols-outlined" data-icon="minor_crash">minor_crash</span>
+<span class="font-label-lg text-label-lg">Vehicle Details</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-on-surface-variant rounded-lg hover:bg-surface-container-high transition-all opacity-80" href="#">
+<span class="material-symbols-outlined" data-icon="headset_mic">headset_mic</span>
+<span class="font-label-lg text-label-lg">Support</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-on-surface-variant rounded-lg hover:bg-surface-container-high transition-all opacity-80" href="#">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+<span class="font-label-lg text-label-lg">Documents</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 text-on-surface-variant rounded-lg hover:bg-surface-container-high transition-all opacity-80" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-lg text-label-lg">Settings</span>
+</a>
+</nav>
+<div class="mt-auto border-t border-outline-variant pt-4">
+<a class="flex items-center gap-4 px-4 py-3 text-error rounded-lg hover:bg-error-container hover:text-on-error-container transition-all opacity-80" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-label-lg text-label-lg">Logout</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 md:ml-80 pb-24 md:pb-8 flex flex-col">
+<!-- TopAppBar (Mobile & Desktop) -->
+<header class="flex justify-between items-center px-container-padding h-16 w-full bg-surface dark:bg-on-background docked full-width top-0 sticky z-40 transition-colors">
+<div class="flex items-center gap-3">
+<button class="md:hidden p-2 -ml-2 rounded-full hover:bg-surface-container-low transition-colors text-outline dark:text-outline-variant">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container" data-icon="eco" data-weight="fill" style="font-variation-settings: 'FILL' 1;">eco</span>
+<h1 class="font-headline-lg text-headline-lg font-bold text-primary dark:text-secondary-fixed tracking-tight">KisanPool</h1>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors text-outline dark:text-outline-variant relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<img alt="Transporter Profile" class="w-8 h-8 rounded-full object-cover md:hidden border border-outline-variant" data-alt="A small circular profile picture of an Indian male transporter, matching the main profile image, showing a reliable and professional demeanor in bright lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCTLqgvt4D0iim3ZT6-PGYset1wu6aTKrE4GsJBf3Y4o7DVBwq4_M2_XcyBHesn5Z37QVWA-uUYMiN0GC85u3Cuyt9IYVuoh2C3_MrBdbecsTarumldfAFsDhfWQAYtJ_W7mUxmdY9650ipTY38frl8HcpcyHhEMFyqJAwGxMtOmOH6guclgiIx2YJfMkDx78WsTha94HWPfztPpQrO6EjPBlXRm70kULVK0RVc0CbVkCp0T0dbhlyb"/>
+</div>
+</header>
+<div class="px-container-padding max-w-3xl mx-auto w-full space-y-lg mt-sm flex-1">
+<!-- Online Status Toggle -->
+<div class="bg-surface-container-lowest border border-outline-variant/30 rounded-lg p-3 flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-3">
+<div class="w-3 h-3 bg-secondary rounded-full shadow-[0_0_8px_rgba(59,105,52,0.6)]"></div>
+<div>
+<span class="font-label-lg text-label-lg text-primary block">Online</span>
+<span class="font-body-md text-body-md text-on-surface-variant text-[13px]">You are available for trips</span>
+</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-outline after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-container"></div>
+</label>
+</div>
+<!-- Earnings Card -->
+<div class="bg-primary-container text-on-primary rounded-[24px] p-5 shadow-lg relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-10 -mt-10 blur-xl"></div>
+<div class="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+<div>
+<p class="font-body-md text-on-primary/80 mb-1">Today's Earnings</p>
+<h2 class="font-headline-xl text-[36px] font-bold text-white mb-2">₹2,450</h2>
+<div class="flex items-center gap-1 text-secondary-fixed text-sm font-medium">
+<span class="material-symbols-outlined text-[16px]" data-icon="trending_up">trending_up</span>
+<span>+18% vs yesterday</span>
+</div>
+</div>
+<div class="flex gap-6 pt-4 md:pt-0 border-t border-white/10 md:border-t-0">
+<div>
+<p class="font-body-md text-on-primary/70 text-xs mb-1 uppercase tracking-wider">Trips Completed</p>
+<p class="font-headline-lg text-white">3</p>
+</div>
+<div>
+<p class="font-body-md text-on-primary/70 text-xs mb-1 uppercase tracking-wider">Rating</p>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-yellow-400 text-[18px]" data-icon="star" data-weight="fill" style="font-variation-settings: 'FILL' 1;">star</span>
+<p class="font-headline-lg text-white">4.8</p>
+</div>
+</div>
+</div>
+</div>
+<a class="relative z-10 mt-6 flex items-center justify-between text-secondary-fixed hover:text-white transition-colors py-2 border-t border-white/10 pt-4" href="#">
+<span class="font-label-lg">View Earnings Details</span>
+<span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+</a>
+</div>
+<!-- Capacity Overview -->
+<div class="bg-surface-container-lowest border border-outline-variant/30 rounded-[24px] p-5 shadow-sm">
+<div class="flex justify-between items-center mb-4">
+<h3 class="font-headline-md text-primary">Capacity Overview</h3>
+<span class="font-label-lg text-on-surface-variant bg-surface-container py-1 px-3 rounded-full">2.6 / 4.0 Ton</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary-container text-4xl" data-icon="local_shipping" data-weight="fill" style="font-variation-settings: 'FILL' 1;">local_shipping</span>
+<div class="flex-1 relative h-3 bg-surface-container-high rounded-full overflow-hidden">
+<div class="absolute top-0 left-0 h-full bg-secondary rounded-full w-[65%] transition-all duration-500 ease-out"></div>
+</div>
+<span class="font-label-lg text-primary font-bold">65%</span>
+</div>
+<div class="flex justify-between mt-3 text-xs text-on-surface-variant font-medium">
+<span>65% Used</span>
+<span>1.4 Ton Available</span>
+</div>
+</div>
+<!-- Active Trip Card -->
+<div class="bg-surface-container-lowest border border-outline-variant/30 rounded-[24px] p-5 shadow-sm">
+<div class="flex justify-between items-start mb-4 border-b border-surface-variant pb-3">
+<h3 class="font-headline-md text-primary">Active Trip</h3>
+<span class="bg-secondary-container text-on-secondary-container text-xs font-bold px-2 py-1 rounded-md uppercase tracking-wide">In Progress</span>
+</div>
+<div class="space-y-4">
+<div class="flex relative">
+<div class="flex flex-col items-center mr-4">
+<div class="w-3 h-3 rounded-full border-2 border-primary-container bg-surface"></div>
+<div class="w-0.5 h-10 bg-outline-variant/50"></div>
+<div class="w-3 h-3 rounded-full bg-secondary flex items-center justify-center">
+<div class="w-1 h-1 bg-white rounded-full"></div>
+</div>
+</div>
+<div class="flex-1 pb-4">
+<p class="font-body-md text-on-surface-variant text-sm">Pickup</p>
+<p class="font-label-lg text-primary text-base">Pimpri, Pune</p>
+</div>
+</div>
+<div class="flex ml-7 -mt-6">
+<div class="flex-1">
+<p class="font-body-md text-on-surface-variant text-sm">Dropoff</p>
+<p class="font-label-lg text-primary text-base">Lasalgaon Mandi, Nashik</p>
+</div>
+</div>
+</div>
+<div class="mt-5 pt-4 border-t border-surface-variant flex items-center justify-between">
+<div>
+<p class="font-body-md text-on-surface-variant text-sm mb-1">ETA to Next Stop</p>
+<p class="font-headline-md text-primary text-xl">25 min</p>
+</div>
+<button class="bg-surface-container flex items-center gap-2 px-4 py-2 rounded-full text-primary-container font-label-lg hover:bg-surface-variant transition-colors border border-outline-variant/50">
+<span>View Trip</span>
+<span class="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+<!-- Current Location Map Preview -->
+<div class="bg-surface-container-lowest border border-outline-variant/30 rounded-[24px] overflow-hidden shadow-sm">
+<div class="p-4 flex justify-between items-center border-b border-surface-variant bg-surface-bright">
+<h3 class="font-label-lg text-primary">Current Location</h3>
+<span class="font-body-md text-on-surface-variant text-sm">Pune, Maharashtra</span>
+</div>
+<div class="h-32 bg-surface-variant relative w-full" data-alt="A clean, minimalist UI map showing the region around Pune, India. The map uses a light theme with soft green and grey tones for terrain and roads, suitable for a logistics dashboard background. A distinct blue 'current location' dot is visible in the center." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAsrkYjKKdX8BAFBVd_hwH0neZKWtB8QXJ1iZqr2dQw_EvHb9kWRwvmQQJs2REsrKPq98obg0QHKuCsMYpwPpM1yQUnXmHZ-fxktd0B295759vEBa9_89yaksrIgBdELd-qAqgyhyRfeqKgNxBOPBvHhVGTseYMedSYtCXJM7LurQE-FkE4trJ01sHry8nnyuIiv6tdbIKhFT6aiJdp8V0SvY4Q2viW0cVr5loui2anTRXLnAo9Im01')">
+<!-- Overlay to ensure map image looks cohesive -->
+<div class="absolute inset-0 bg-primary-container/5 mix-blend-multiply"></div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center py-2 px-1 pb-safe bg-surface dark:bg-on-background border-t border-outline-variant dark:border-outline shadow-[0_-4px_16px_rgba(0,0,0,0.05)] z-50 rounded-t-xl transition-all">
+<a aria-current="page" class="flex flex-col items-center justify-center text-primary dark:text-secondary-fixed font-bold bg-secondary-container/30 dark:bg-primary-container/30 rounded-xl px-4 py-2 scale-95 duration-100" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard" data-weight="fill" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-sm text-[10px] mt-1">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:bg-surface-container dark:hover:bg-surface-container-high rounded-xl px-2 py-2 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="local_shipping">local_shipping</span>
+<span class="font-label-sm text-[10px] mt-1">Requests</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:bg-surface-container dark:hover:bg-surface-container-high rounded-xl px-2 py-2 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="route">route</span>
+<span class="font-label-sm text-[10px] mt-1">My Trips</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:bg-surface-container dark:hover:bg-surface-container-high rounded-xl px-2 py-2 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="font-label-sm text-[10px] mt-1">Earnings</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline-variant hover:bg-surface-container dark:hover:bg-surface-container-high rounded-xl px-2 py-2 transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="person">person</span>
+<span class="font-label-sm text-[10px] mt-1">Profile</span>
+</a>
+</nav>
+<!-- AI Assistant Floating Action Button -->
+<button class="fixed bottom-20 right-4 md:bottom-8 md:right-8 w-14 h-14 bg-primary-container text-on-primary rounded-full shadow-lg flex items-center justify-center hover:bg-tertiary-container transition-transform active:scale-95 z-50 group border-2 border-white/20">
+<span class="material-symbols-outlined" data-icon="graphic_eq">graphic_eq</span>
+<div class="absolute right-16 bg-surface border border-outline-variant text-on-surface px-4 py-2 rounded-xl text-sm font-label-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+            Ask AI Assistant
+        </div>
+</button>
+</body></html>
