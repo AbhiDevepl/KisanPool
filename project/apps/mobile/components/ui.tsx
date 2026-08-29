@@ -133,7 +133,13 @@ export function Header({
   return (
     <View style={s.header}>
       {onBack ? (
-        <Pressable onPress={onBack} hitSlop={12} style={s.headerBack}>
+        <Pressable
+          onPress={onBack}
+          hitSlop={12}
+          style={s.headerBack}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <MaterialIcons name="arrow-back" size={24} color={colors.onSurface} />
         </Pressable>
       ) : null}
@@ -409,13 +415,20 @@ export function RatingStars({
   onChange?: (stars: number) => void;
 }) {
   return (
-    <View style={{ flexDirection: 'row', gap: space.xs }}>
+    <View
+      style={{ flexDirection: 'row', gap: space.xs }}
+      accessibilityRole="summary"
+      accessibilityLabel={`Rating: ${value} out of 5 stars`}
+    >
       {[1, 2, 3, 4, 5].map((star) => (
         <Pressable
           key={star}
           disabled={!onChange}
           onPress={() => onChange?.(star)}
           hitSlop={onChange ? 8 : 0}
+          accessibilityRole={onChange ? 'button' : undefined}
+          accessibilityLabel={onChange ? `Rate ${star} star${star > 1 ? 's' : ''}` : undefined}
+          accessibilityState={{ selected: star <= Math.round(value) }}
         >
           <MaterialIcons
             name={star <= Math.round(value) ? 'star' : 'star-border'}
@@ -562,7 +575,17 @@ export function AppBar({
       </View>
       {right}
       {onNotifications ? (
-        <Pressable onPress={onNotifications} hitSlop={10} style={s2.appBarIcon}>
+        <Pressable
+          onPress={onNotifications}
+          hitSlop={10}
+          style={s2.appBarIcon}
+          accessibilityRole="button"
+          accessibilityLabel={
+            unread > 0
+              ? `Notifications, ${unread} unread`
+              : 'Notifications'
+          }
+        >
           <MaterialIcons name="notifications" size={24} color={colors.primary} />
           {unread > 0 ? <View style={s2.unreadDot} /> : null}
         </Pressable>
@@ -877,7 +900,12 @@ export function SearchField({
         style={s2.searchInput}
       />
       {value.length > 0 ? (
-        <Pressable onPress={() => (onClear ? onClear() : onChangeText(''))} hitSlop={8}>
+        <Pressable
+          onPress={() => (onClear ? onClear() : onChangeText(''))}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Clear search input"
+        >
           <MaterialIcons name="close" size={20} color={colors.onSurfaceVariant} />
         </Pressable>
       ) : null}
@@ -956,7 +984,13 @@ export function FavouriteStar({
   size?: number;
 }) {
   return (
-    <Pressable onPress={onPress} hitSlop={10} accessibilityRole="button">
+    <Pressable
+      onPress={onPress}
+      hitSlop={10}
+      accessibilityRole="button"
+      accessibilityLabel={active ? 'Remove from favorites' : 'Add to favorites'}
+      accessibilityState={{ selected: active }}
+    >
       <MaterialIcons
         name={active ? 'star' : 'star-border'}
         size={size}
