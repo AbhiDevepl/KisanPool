@@ -1,0 +1,24 @@
+{
+  "name": "kisanpool",
+  "private": true,
+  "version": "0.1.0",
+  "description": "KisanPool \u2014 shared produce transport for Indian farmers",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev --workspace @kisanpool/server",
+    "dev:mobile": "npm run start --workspace @kisanpool/mobile",
+    "build:shared": "npm run build --workspace @kisanpool/shared",
+    "seed": "npm run seed --workspace @kisanpool/server --",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "bash tests/run-all.sh",
+    "dev": "npm run dev:server",
+    "dev:admin": "npm run dev --workspace @kisanpool/admin",
+    "killport": "./bin/killport"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

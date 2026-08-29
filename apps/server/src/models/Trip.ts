@@ -1,0 +1,110 @@
+import { Schema, model, type InferSchemaType, type HydratedDocument } from 'mongoose';
+import { RETURN_LEG_STATES, TRIP_STATES } from '@kisanpool/shared';
+
+/**
+ * A shared vehicle journey to one mandi, carrying many farmers' produce.
+ *
+ * This is the object the old model was missing entirely: previously a
+ * TransportRequest *was* the trip, so two farmers on one vehicle were two
+ * unrelated bookings that each paid full fare. A Trip is what lets a route cost
+ * be split (ADR-030).
+ *
+ * Capacity is NOT stored here. It is derived from the shipments on every read, so
+ * there is exactly one source of truth and no counter to drift.
+ */
+const tripSchema = new Schema(
+  {
+    transporterId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    vehicleId: { type: Schema.Types.ObjectId, ref: 'Vehicle', required: true, index: true },
+
+    destination: {
+      type: new Schema(
+        { name: { type: String, default: '' }, lat: Number, lng: Number },
+        { _id: false },
+      ),
+      required: true,
+    },
+
+    state: { type: String, enum: TRIP_STATES, default: 'FORMING', index: true },
+
+    totalCapacityKg: { type: Number, required: true },
+
+    routeDistanceKm: { type: Number, default: 0 },
+    estimatedRouteCost: { type: Number, default: 0 },
+
+    /** bumped on every reallocation; every PricingEvent carries the version it produced */
+    pricingVersion: { type: Number, default: 0 },
+
+    /**
+     * Set to the vehicle id while the trip is open, cleared when it closes.
+     *
+     * A unique sparse index on this is what makes "one open trip per vehicle" a
+     * database guarantee rather than a hope. Without it two farmers could each
+     * open their own trip on the same truck and both pass a per-trip capacity
+     * check — 900kg + 900kg on a 1500kg tempo, each trip individually "fine".
+     */
+    openForVehicle: { type: Schema.Types.ObjectId, default: undefined },
+
+    /**
+     * Bumped once per reservation attempt, inside the booking transaction.
+     *
+     * It carries no meaning — it exists purely so that two farmers confirming at
+     * the same instant write the SAME document and one of them loses. Each
+     * confirmation otherwise only INSERTS its own shipment, and MongoDB's
+     * document-level concurrency raises no conflict between two inserts, so both
+     * transactions would read the same pre-race capacity and both commit
+     * (ADR-033).
+     */
+    reservationSeq: { type: Number, default: 0 },
+
+    startedAt: { type: Date, default: undefined },
+    completedAt: { type: Date, default: undefined },
+    cancelledAt: { type: Date, default: undefined },
+    cancelReason: { type: String, default: undefined },
+
+    /**
+     * The homeward half of the same journey (V2, ADR-039).
+     *
+     * A leg on this trip, NOT a second Trip. The vehicle is on one journey, and a
+     * separate Trip would have collided with the `openForVehicle` unique index
+     * from ADR-032 — correctly, because the vehicle genuinely is not free.
+     *
+     * Defaults to state NONE and is only opened once every outbound shipment has
+     * been delivered, which is the mechanism that stops a return load ever
+     * competing with a farmer's produce for space or for the driver's attention.
+     */
+    returnLeg: {
+      type: new Schema(
+        {
+          state: { type: String, enum: RETURN_LEG_STATES, default: 'NONE' },
+          /** where home is: where the vehicle started the outbound run */
+          origin: {
+            type: new Schema(
+              { name: { type: String, default: '' }, lat: Number, lng: Number },
+              { _id: false },
+            ),
+            default: undefined,
+          },
+          /** straight-line-ish distance of the empty run this leg is recovering */
+          emptyReturnKm: { type: Number, default: 0 },
+          /** the actual homeward route once loads are aboard */
+          routeKm: { type: Number, default: 0 },
+          openedAt: { type: Date, default: undefined },
+          startedAt: { type: Date, default: undefined },
+          completedAt: { type: Date, default: undefined },
+        },
+        { _id: false },
+      ),
+      default: () => ({ state: 'NONE' }),
+    },
+  },
+  { timestamps: true },
+);
+
+tripSchema.index({ transporterId: 1, state: 1 });
+// one open trip per vehicle, enforced by the database
+tripSchema.index({ openForVehicle: 1 }, { unique: true, sparse: true });
+
+export type TripAttrs = InferSchemaType<typeof tripSchema>;
+export type TripDoc = HydratedDocument<TripAttrs>;
+export const Trip = model('Trip', tripSchema);

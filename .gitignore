@@ -1,0 +1,12 @@
+node_modules/
+dist/
+build/
+.expo/
+.env
+.env.local
+*.log
+.DS_Store
+coverage/
+
+# durable recovery journal — runtime state, never committed (ADR-044)
+.data/
