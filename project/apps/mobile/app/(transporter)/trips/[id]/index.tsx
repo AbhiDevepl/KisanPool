@@ -18,8 +18,9 @@ import {
   type ShipmentState,
   type TripState,
 } from '@kisanpool/shared';
-import { api } from '../../../../lib/api';
+import { api, type TripPredictionDTO, type TripPredictionEvent } from '../../../../lib/api';
 import { connectTripSocket } from '../../../../lib/socket';
+import { InsightCard } from '../../../../components/InsightCard';
 import { getUser } from '../../../../lib/session';
 import { toAppError } from '../../../../lib/errors';
 import { kg, rupees } from '../../../../lib/format';
@@ -92,6 +93,7 @@ export default function SharedTrip() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [detail, setDetail] = useState<TripDetail | null>(null);
+  const [prediction, setPrediction] = useState<TripPredictionDTO | null>(null);
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [unread, setUnread] = useState(0);
@@ -113,6 +115,8 @@ export default function SharedTrip() {
     try {
       setDetail(await api.getTrip(id));
       setMyId((await getUser())?._id ?? '');
+      // advisory delay + cancellation risk — best-effort, never blocks the trip
+      api.tripPrediction(id).then(setPrediction).catch(() => setPrediction(null));
     } catch (err) {
       setError(err);
     } finally {
@@ -135,6 +139,11 @@ export default function SharedTrip() {
 
       socket.on('shipment:state', () => void load());
       socket.on('trip:capacity', () => void load());
+      socket.on('trip:prediction', (payload: TripPredictionEvent) =>
+        setPrediction((prev) =>
+          prev ? { ...prev, delay: payload.delay } : { tripId: id, tripState: '', delay: payload.delay },
+        ),
+      );
       socket.on('trip:pricing_updated', () => {
         setPricingMoved(true);
         void load();
@@ -343,6 +352,10 @@ export default function SharedTrip() {
       />
 
       {error ? <ErrorView error={error} onRetry={() => void load()} /> : null}
+
+      {/* advisory risk — each renders only for MEDIUM/HIGH (ADR-041) */}
+      <InsightCard assessment={prediction?.delay} title="Possible delivery delay" />
+      <InsightCard assessment={prediction?.cancellation} title="Cancellation risk" minLevel="HIGH" />
 
       {actionError?.key === 'trip' ? (
         <Banner tone="error" style={{ marginTop: space.md }}>

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import type { OpsPredictionDTO, RiskLevel } from '@kisanpool/shared';
 import { api, type LiveOps, type LiveTrip } from '../api';
 import { Badge, Empty, ErrorBox, Loading, kg, rupees, when } from '../ui';
 
@@ -13,6 +14,7 @@ const REFRESH_MS = 15_000;
  */
 export function LiveTab() {
   const [data, setData] = useState<LiveOps | null>(null);
+  const [predictions, setPredictions] = useState<OpsPredictionDTO | null>(null);
   const [error, setError] = useState<unknown>();
   const [live, setLive] = useState(true);
   const [stuckMinutes, setStuckMinutes] = useState(45);
@@ -22,6 +24,8 @@ export function LiveTab() {
     setError(undefined);
     if (!quiet) setData(null);
     api.live(stuckMinutes).then(setData).catch(setError);
+    // advisory scoring — its own read, never blocks the operations board
+    api.predictions().then(setPredictions).catch(() => setPredictions(null));
   };
 
   useEffect(() => load(), [stuckMinutes]);
@@ -132,6 +136,8 @@ export function LiveTab() {
             </AlertCard>
           </div>
 
+          <PredictionsPanel data={predictions} />
+
           <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
             <div className="headline-md">
               Active trips ({data.trips.length})
@@ -211,6 +217,98 @@ function AlertCard({
           {children}
         </ul>
       )}
+    </div>
+  );
+}
+
+const LEVEL_RANK: Record<RiskLevel | 'NORMAL', number> = { LOW: 0, NORMAL: 0, MEDIUM: 1, HIGH: 2 };
+const levelClass = (level: string): string =>
+  level === 'HIGH' ? 'badge bad' : level === 'MEDIUM' ? 'badge warn' : 'badge';
+
+/**
+ * Predictive Insights (ADR-041) — advisory only. Deterministic scoring over live
+ * signals; it never changes a trip, a price or a dispatch. Shows only what is at
+ * MEDIUM or above so it never buries the operations board.
+ */
+function PredictionsPanel({ data }: { data: OpsPredictionDTO | null }) {
+  if (!data) return null;
+
+  const atRisk = data.trips.filter(
+    (t) => LEVEL_RANK[t.delay.level] >= 1 || LEVEL_RANK[t.cancellation.level] >= 1,
+  );
+  const hotRoutes = data.demand.filter((d) => LEVEL_RANK[d.level] >= 1);
+
+  return (
+    <div className="card" style={{ background: 'var(--surface-container-low)' }}>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <span className="headline-md">Predictive insights</span>
+        <span className="label-sm muted">advisory · from live signals · as of {when(data.generatedAt)}</span>
+      </div>
+
+      <div
+        className="grid"
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', marginTop: 8 }}
+      >
+        <div>
+          <div className="label-lg">Trips at risk ({atRisk.length})</div>
+          {atRisk.length === 0 ? (
+            <div className="body-md muted" style={{ marginTop: 4 }}>
+              No live trip is flagged for delay or cancellation risk.
+            </div>
+          ) : (
+            <ul className="stack" style={{ margin: '8px 0 0', padding: 0, listStyle: 'none' }}>
+              {atRisk.map((t) => (
+                <li key={t.tripId} className="body-md">
+                  <span className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                    {LEVEL_RANK[t.delay.level] >= 1 ? (
+                      <span className={levelClass(t.delay.level)}>delay {t.delay.level}</span>
+                    ) : null}
+                    {LEVEL_RANK[t.cancellation.level] >= 1 ? (
+                      <span className={levelClass(t.cancellation.level)}>
+                        cancel {t.cancellation.level}
+                      </span>
+                    ) : null}
+                    <strong>{t.transporter}</strong> → {t.to} · {t.poolSize} farmer
+                    {t.poolSize === 1 ? '' : 's'}
+                  </span>
+                  <div className="label-sm muted">
+                    {(LEVEL_RANK[t.delay.level] >= LEVEL_RANK[t.cancellation.level]
+                      ? t.delay
+                      : t.cancellation
+                    ).reasons[0]}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div>
+          <div className="label-lg">High-demand corridors ({hotRoutes.length})</div>
+          {hotRoutes.length === 0 ? (
+            <div className="body-md muted" style={{ marginTop: 4 }}>
+              Demand is normal on every corridor with recent activity.
+            </div>
+          ) : (
+            <ul className="stack" style={{ margin: '8px 0 0', padding: 0, listStyle: 'none' }}>
+              {hotRoutes.map((d) => (
+                <li key={d.mandi} className="body-md">
+                  <span className="row" style={{ gap: 6 }}>
+                    <span className={levelClass(d.level)}>{d.level}</span>
+                    <strong>{d.mandi}</strong>
+                  </span>
+                  <div className="label-sm muted">{d.reasons[0]}</div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <div className="label-sm muted" style={{ marginTop: 8 }}>
+        Advisory only — predictions never cancel a trip, change a price, reroute a vehicle or
+        block anyone. The backend stays authoritative.
+      </div>
     </div>
   );
 }

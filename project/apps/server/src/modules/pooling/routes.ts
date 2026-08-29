@@ -185,6 +185,9 @@ poolRouter.post(
           amount: a.amount,
           previousAmount: a.previousAmount,
         })),
+        // the whole re-priced trip, so every screen updates its headline share,
+        // the trip total and the other farmers' rows without a refetch (ADR-040)
+        pricing: pricing.pricing ?? undefined,
       });
 
       const cheaper = pricing.allocations.filter(
@@ -333,6 +336,7 @@ poolRouter.patch(
             amount: a.amount,
             previousAmount: a.previousAmount,
           })),
+          pricing: repriced.pricing ?? undefined,
         });
       }
 

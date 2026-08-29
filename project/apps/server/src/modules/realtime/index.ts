@@ -21,6 +21,8 @@ import type {
   MachineBookingRequestedEvent,
   MachineBookingStateEvent,
   ReturnLegStateEvent,
+  RiskLevel,
+  TripPredictionEvent,
 } from '@kisanpool/shared';
 import { ApiError, socketError } from '../../lib/envelope';
 import { verifyAccessToken } from '../../lib/jwt';
@@ -28,6 +30,7 @@ import { Trip, TripShipment } from '../../models';
 import { isParticipant, saveChatMessage } from '../chat/service';
 import { notifyChatMessage } from '../notifications/service';
 import { estimateEtaMinutes } from '../maps/service';
+import { assessTripDelay } from '../predictions/service';
 
 interface AuthedSocket extends Socket {
   userId: string;
@@ -146,6 +149,28 @@ export function emitTripLocation(payload: TripLocationEvent): void {
   io?.to(tripRoom(payload.tripId)).emit('trip:location', payload);
 }
 
+export function emitTripPrediction(payload: TripPredictionEvent): void {
+  io?.to(tripRoom(payload.tripId)).emit('trip:prediction', payload);
+}
+
+/**
+ * Re-score a trip's delay risk after a GPS ping and push it ONLY when the level
+ * has moved (ADR-041). Every ~5s ping would otherwise emit an identical card.
+ * Best-effort: a scoring failure must never break location streaming.
+ */
+const lastDelayLevel = new Map<string, RiskLevel>();
+export async function refreshDelayPrediction(tripId: string): Promise<void> {
+  try {
+    const delay = await assessTripDelay(tripId);
+    if (!delay) return;
+    if (lastDelayLevel.get(tripId) === delay.level) return;
+    lastDelayLevel.set(tripId, delay.level);
+    emitTripPrediction({ tripId, delay });
+  } catch {
+    // advisory only — never surface
+  }
+}
+
 export function emitPaymentCaptured(payload: PaymentCapturedEvent): void {
   io?.to(requestRoom(payload.requestId)).emit('payment:captured', payload);
   io?.to(tripRoom(payload.requestId)).emit('payment:captured', payload);
@@ -245,6 +270,8 @@ export function registerSocketHandlers(server: SocketServer): void {
 
         const etaMinutes = await estimateEtaMinutes({ lat, lng }, target);
         emitTripLocation({ tripId, lat, lng, etaMinutes });
+        // re-score delay risk off the fresh position; pushes only on a level change
+        void refreshDelayPrediction(tripId);
       });
     });
 

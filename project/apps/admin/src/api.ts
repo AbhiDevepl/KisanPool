@@ -1,4 +1,11 @@
-import type { ApiResponse, ErrorCode, ShipmentState, TripCapacity, TripState } from '@kisanpool/shared';
+import type {
+  ApiResponse,
+  ErrorCode,
+  OpsPredictionDTO,
+  ShipmentState,
+  TripCapacity,
+  TripState,
+} from '@kisanpool/shared';
 import { ERROR_STRATEGY } from '@kisanpool/shared';
 
 /**
@@ -423,6 +430,9 @@ export const api = {
 
   live: (stuckMinutes?: number) =>
     request<LiveOps>(`/admin/live${stuckMinutes ? `?stuckMinutes=${stuckMinutes}` : ''}`),
+
+  /** Advisory risk roll-up: at-risk live trips + the demand board (ADR-041). */
+  predictions: () => request<OpsPredictionDTO>('/predictions/ops'),
 
   billing: (query: { status?: string; tripId?: string } = {}) => {
     const params = new URLSearchParams();

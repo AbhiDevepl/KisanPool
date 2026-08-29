@@ -113,6 +113,19 @@ rejects a marketplace token with `AUTH_FORBIDDEN`.
 
 `PATCH /documents/:id/review` (the original operator route) also requires the admin claim.
 
+### Predictive Insights (`modules/predictions`) — advisory, read-only (ADR-041)
+
+Deterministic risk scoring over signals the app already records. **Nothing here writes, and nothing here can act on a trip, price, route or transporter** — see §9. Every response carries `reasons` (plain language, each tied to a signal that fired), the raw `signals`, and a `confidence` that is `LOW` when the inputs were too thin to trust the level.
+
+| Method | Path | Body / Query | Returns | Auth |
+|---|---|---|---|---|
+| GET | `/predictions/trips/:id` | — | `{ tripId, tripState, delay: RiskAssessment, cancellation?: RiskAssessment }`. `cancellation` is returned **only to the trip's transporter**; a farmer aboard gets `delay` alone | trip party |
+| GET | `/predictions/demand` | — | `DemandAssessment[]` — one per mandi/corridor with recent activity, most in-demand first | any signed-in user |
+| GET | `/predictions/ops` | — | `{ generatedAt, trips: [...delay + cancellation per live trip], demand: DemandAssessment[] }` | `requireAdmin` |
+| POST | `/predictions/simulate` | `{ kind: 'DELIVERY_DELAY'\|'CANCELLATION'\|'DEMAND', signals }` | Runs the pure engine on the supplied signals — no database read. Pins engine behaviour in tests | `requireAdmin` |
+
+`RiskAssessment` = `{ kind, level: LOW|MEDIUM|HIGH, score 0–100, reasons[], signals{}, confidence, computedAt }`. `DemandAssessment` uses `level: NORMAL|MEDIUM|HIGH`. Thresholds live once in `packages/shared/src/predictions.ts`.
+
 ### Maps (`modules/transport`)
 
 | Method | Path | Query | Returns |
@@ -141,6 +154,8 @@ Handshake carries the same JWT as REST (`auth: { token }`). Rooms are `requestId
 | `match:new` | `{ requestId, match }` | Match list, which re-ranks live as offers arrive |
 | `trip:status` | `{ tripId, status, at }` | Both active-trip screens and the farmer's tracking stepper |
 | `trip:location` | `{ tripId, lat, lng, etaMinutes }` | The farmer's live map — moves the vehicle marker and updates the ETA |
+| `trip:pricing_updated` | `{ tripId, pricingVersion, reason, updates[], pricing?: TripPricingDTO }` | Both active-trip screens. `pricing` carries the whole re-priced trip so the headline share, the trip total and every other farmer's row update in place without a refetch (ADR-040); `updates[]` remains for the "your cost dropped" nudge |
+| `trip:prediction` | `{ tripId, delay: RiskAssessment }` | Both active-trip screens and the admin Live board. Pushed **only when the delay level changes** after a GPS ping, never on every ping (ADR-041) |
 | `payment:captured` | `{ requestId, paymentId }` | Checkout screen, which advances to the confirmed booking once the webhook lands |
 | `chat:message` | `{ tripId, senderId, text, ts }` | Chat sheet on both sides |
 
@@ -248,3 +263,15 @@ The same 25 are used by the backend REST layer, by Socket.io error payloads, and
 4. **No ad-hoc strings.** No `throw new Error('vehicle busy')` reaching a response, no HTTP status used as the sole signal, no per-module code prefixes.
 5. **Upstream failures map to the domain code of the operation.** A Razorpay order failure is `PAYMENT_FAILED`, a transfer failure is `PAYOUT_TRANSFER_FAILED`, a Sarvam failure inside a tool call is `AI_TOOL_ERROR`. `EXTERNAL_SERVICE_ERROR` is only for upstream failures with no domain meaning.
 6. **Deterministic handling.** Every code above has exactly one client behaviour — show, retry, redirect or disable. The app's error handler is a switch over the union with no default branch, so adding a code without handling it fails the type check.
+
+---
+
+## 6. Predictive Insights — trust boundary (ADR-041)
+
+Predictions are **advisory**. They are computed read-only from real application signals, they arrive with the reasons behind them, and they never act:
+
+- No prediction cancels a trip, changes a price, reroutes a vehicle, rejects a transporter or blocks a farmer. There is no code path from `modules/predictions` into a domain write.
+- The deterministic engine (`priceTrip`, capacity, state machines) stays authoritative. A prediction that disagrees with it loses.
+- Scoring is deterministic: the same signals produce the same level and reasons every run. Verified in `tests/09_predictions.py`.
+- The feature is labelled "Predictive Insights" / "AI Risk Prediction" because it genuinely runs on application data and stated rules — it is **not** a trained model and no screen claims it is. The scoring lives behind `assess*` service functions so a model can replace the arithmetic later without a route or screen change.
+- Visibility: a farmer sees delivery-delay risk on their active trip only; the transporter also sees cancellation risk on theirs; the operator sees the full roll-up at `/predictions/ops`.

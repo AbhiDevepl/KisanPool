@@ -252,6 +252,13 @@ export interface PricingUpdatedEvent {
   pricingVersion: number;
   reason: string;
   updates: Array<{ farmerId: string; shipmentId: string; amount: number; previousAmount: number | null }>;
+  /**
+   * The whole re-priced trip, so a screen can update its headline share, the trip
+   * total and every other farmer's row in place without a refetch (ADR-040). The
+   * `updates` array above stays for the "your cost dropped" nudge and for older
+   * clients; it is a projection of `pricing.shares`.
+   */
+  pricing?: TripPricingDTO;
 }
 
 export interface TripCapacityEvent {

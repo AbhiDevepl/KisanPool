@@ -18,8 +18,9 @@ import type {
   TripCapacityEvent,
   TripState,
 } from '@kisanpool/shared';
-import { api, type TripShipmentView } from '../../../../lib/api';
+import { api, type TripPredictionDTO, type TripPredictionEvent, type TripShipmentView } from '../../../../lib/api';
 import { AppError } from '../../../../lib/errors';
+import { InsightCard } from '../../../../components/InsightCard';
 import { openCheckout } from '../../../../lib/razorpayCheckout';
 import { connectTripSocket, useSocket } from '../../../../lib/socket';
 import { getUser } from '../../../../lib/session';
@@ -95,6 +96,7 @@ export default function SharedTrip() {
     null,
   );
   const [priceNote, setPriceNote] = useState<string | null>(null);
+  const [prediction, setPrediction] = useState<TripPredictionDTO | null>(null);
   const [paying, setPaying] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -111,6 +113,9 @@ export default function SharedTrip() {
 
       const trip = await api.getTrip(id);
       setDetail(trip);
+
+      // advisory delay risk — best-effort, never blocks the trip view
+      api.tripPrediction(id).then(setPrediction).catch(() => setPrediction(null));
 
       const mine = trip.shipments.find((s) => s.farmerId === user?._id);
       if (mine) {
@@ -131,6 +136,7 @@ export default function SharedTrip() {
   const refresh = useCallback(async () => {
     try {
       setDetail(await api.getTrip(id));
+      api.tripPrediction(id).then(setPrediction).catch(() => {});
     } catch {
       // the visible state is still valid; the next event or retry will correct it
     }
@@ -146,26 +152,44 @@ export default function SharedTrip() {
   useSocket(
     { type: 'trip', id },
     {
-      // the whole point of pooling: the share is re-split and pushed, never re-fetched
+      // the whole point of pooling: the share is re-split and pushed, never re-fetched.
+      // The event now carries the entire re-priced trip (ADR-040), so the headline
+      // share, the trip total, the pricing version and every other farmer's row all
+      // move together — not just this shipment's `allocatedPrice`.
       'trip:pricing_updated': (payload: PricingUpdatedEvent) => {
-        const update = payload.updates.find((u) => u.shipmentId === myShipmentId);
-        if (!update) return;
+        setDetail((prev) => {
+          if (!prev) return prev;
+          const repriced = payload.pricing;
+          if (repriced) {
+            const shareByShipment = new Map(repriced.shares.map((sh) => [sh.shipmentId, sh]));
+            return {
+              ...prev,
+              pricing: repriced,
+              trip: { ...prev.trip, pricingVersion: repriced.version },
+              shipments: prev.shipments.map((s) => {
+                const sh = shareByShipment.get(s._id);
+                return sh ? { ...s, pricing: sh, allocatedPrice: sh.amount } : s;
+              }),
+            };
+          }
+          // older server without the full DTO — patch this row from `updates`
+          return {
+            ...prev,
+            shipments: prev.shipments.map((s) => {
+              const u = payload.updates.find((x) => x.shipmentId === s._id);
+              return u ? { ...s, allocatedPrice: u.amount } : s;
+            }),
+          };
+        });
 
-        setDetail((prev) =>
-          prev
-            ? {
-                ...prev,
-                shipments: prev.shipments.map((s) =>
-                  s._id === update.shipmentId ? { ...s, allocatedPrice: update.amount } : s,
-                ),
-              }
-            : prev,
-        );
-        setPriceNote(
-          update.previousAmount != null && update.amount < update.previousAmount
-            ? `Your cost dropped to ${rupees(update.amount)} because another farmer joined.`
-            : `Your cost is now ${rupees(update.amount)}.`,
-        );
+        const mineUpdate = payload.updates.find((u) => u.shipmentId === myShipmentId);
+        if (mineUpdate) {
+          setPriceNote(
+            mineUpdate.previousAmount != null && mineUpdate.amount < mineUpdate.previousAmount
+              ? `Your cost dropped to ${rupees(mineUpdate.amount)} — ${payload.reason}.`
+              : `Your cost is now ${rupees(mineUpdate.amount)} — ${payload.reason}.`,
+          );
+        }
       },
 
       'shipment:state': (payload: ShipmentStateEvent) => {
@@ -191,6 +215,14 @@ export default function SharedTrip() {
 
       'trip:location': (payload: { lat: number; lng: number; etaMinutes?: number }) =>
         setLive(payload),
+
+      // pushed only when the delay level actually changes (ADR-041)
+      'trip:prediction': (payload: TripPredictionEvent) =>
+        setPrediction((prev) =>
+          prev
+            ? { ...prev, delay: payload.delay }
+            : { tripId: id, tripState: '', delay: payload.delay },
+        ),
     },
   );
 
@@ -286,12 +318,20 @@ export default function SharedTrip() {
   // farmer's price was split across, not just what is still in the vehicle
   const roster = shipments.filter((s) => s.state !== 'CANCELLED');
   const others = roster.filter((s) => s._id !== mine._id);
-  // the backend's own figure for this load, breakdown included — never recomputed here
+  // the backend's own figures for this load — never recomputed here (ADR-035/040)
+  const pricing = detail.pricing;
   const breakdown = mine.pricing ?? null;
   const share = breakdown?.amount ?? mine.finalPrice ?? mine.allocatedPrice;
   const solo = breakdown?.soloPrice ?? mine.soloPrice;
   const saved = Math.max(solo - share, 0);
   const savedPct = breakdown?.savingPct ?? mine.savingPct;
+  const poolSize = pricing?.poolSize ?? roster.length;
+  // one farmer aboard is a real, common state while a trip is still FORMING — it is
+  // NOT a pooled trip, and showing "you save ₹0 (0%)" against an identical struck-
+  // through price reads like a bug. Solo and pooled get different copy (ADR-040).
+  const pooled = poolSize > 1;
+  const showSaving = pooled && saved > 1 && solo > share;
+  const frozen = mine.finalPrice != null;
   const usedPct = trip.capacity.totalKg
     ? Math.min(trip.capacity.committedKg / trip.capacity.totalKg, 1)
     : 0;
@@ -353,6 +393,9 @@ export default function SharedTrip() {
 
       {error ? <ErrorView error={error} onRetry={() => void load()} /> : null}
 
+      {/* delivery-risk insight — renders only for MEDIUM/HIGH (ADR-041) */}
+      <InsightCard assessment={prediction?.delay} title="Possible delivery delay" />
+
       <TripMap
         pickup={{ lat: mine.pickup.lat, lng: mine.pickup.lng, title: 'Your pickup' }}
         destination={{
@@ -399,66 +442,103 @@ export default function SharedTrip() {
         </View>
       ) : null}
 
-      {/* what the pool has done to the bill */}
+      {/* what the pool has done to the bill — the backend's numbers only (ADR-040) */}
       <Card>
-        <Txt variant="labelLg" color={colors.onSurfaceVariant}>
-          Your share of this trip
-        </Txt>
+        <View
+          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          <Txt variant="labelLg" color={colors.onSurfaceVariant}>
+            {pooled ? 'Your share of this trip' : 'Your trip cost'}
+          </Txt>
+          {pricing ? (
+            <Txt variant="labelSm" color={colors.outline}>
+              pricing v{pricing.version}
+              {frozen ? ' · final' : ''}
+            </Txt>
+          ) : null}
+        </View>
+
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space.sm }}>
           <Txt variant="displayLg" color={colors.primary}>
             {rupees(share)}
           </Txt>
-          <Txt
-            variant="bodyLg"
-            color={colors.onSurfaceVariant}
-            style={{ textDecorationLine: 'line-through' }}
-          >
-            {rupees(solo)}
-          </Txt>
+          {showSaving ? (
+            <Txt
+              variant="bodyLg"
+              color={colors.onSurfaceVariant}
+              style={{ textDecorationLine: 'line-through' }}
+            >
+              {rupees(solo)}
+            </Txt>
+          ) : null}
         </View>
-        <Txt variant="labelLg" color={colors.primary}>
-          Pooling saves you {rupees(saved)}
-          {savedPct != null ? ` (${savedPct}%)` : ''}
-        </Txt>
 
-        {/* WHY it is this number. Not a marketing line — the actual working the
-            backend used, so a farmer can check it against what they were told. */}
-        {breakdown && detail.pricing ? (
+        {showSaving ? (
+          <Txt variant="labelLg" color={colors.primary}>
+            You save {rupees(saved)}
+            {savedPct != null ? ` (${savedPct}%)` : ''} vs running the vehicle alone
+          </Txt>
+        ) : pooled ? (
+          <Txt variant="labelLg" color={colors.onSurfaceVariant}>
+            Shared across {poolSize} farmers.
+          </Txt>
+        ) : (
+          <Txt variant="labelLg" color={colors.onSurfaceVariant}>
+            You have this vehicle to yourself for now — your share drops as farmers join.
+          </Txt>
+        )}
+
+        {/* WHY it is this number — the actual working the backend used, so a farmer
+            can check it against what they were told. */}
+        {pricing ? (
           <View style={{ marginTop: space.gutter }}>
             <Divider />
+            <Row label="Total trip cost" value={rupees(pricing.totalCost)} />
             <Row
-              label="Whole trip costs"
-              value={`${rupees(detail.pricing.totalCost)} (${detail.pricing.effectiveRouteKm.toFixed(
-                0,
-              )} km @ ${rupees(detail.pricing.ratePerKm)}/km)`}
+              label={pooled ? 'Farmers sharing' : 'Farmers aboard'}
+              value={String(poolSize)}
             />
-            <Row label="Farmers sharing it" value={String(detail.pricing.poolSize)} />
+            {pooled ? (
+              <Row label="Total pooled load" value={kg(pricing.totalQuantityKg)} />
+            ) : null}
+            <Row label="Your load" value={kg(mine.quantityKg)} />
             <Row
-              label="Your load rides"
-              value={`${kg(breakdown.quantityKg)} for ${breakdown.rideKm.toFixed(0)} km`}
+              label="Route distance"
+              value={`${pricing.effectiveRouteKm.toFixed(0)} km @ ${rupees(pricing.ratePerKm)}/km`}
             />
-            {breakdown.detourKm > 0 ? (
+            {breakdown ? (
+              <Row label="Your load rides" value={`${breakdown.rideKm.toFixed(0)} km`} />
+            ) : null}
+            {breakdown && breakdown.detourKm > 0 ? (
               <Row
                 label="Detour to reach you"
                 value={`${breakdown.detourKm.toFixed(1)} km · ${rupees(breakdown.detourCost)}`}
               />
             ) : null}
-            <Row label="Share of the shared run" value={rupees(breakdown.lineHaulCost)} />
+            {pooled && breakdown ? (
+              <Row label="Your share of the shared run" value={rupees(breakdown.lineHaulCost)} />
+            ) : null}
+            {showSaving ? (
+              <Row label="If you went alone" value={rupees(solo)} />
+            ) : null}
+            <Divider />
+            <Row label="Your share" value={rupees(share)} bold />
             <Txt variant="labelSm" color={colors.outline} style={{ marginTop: space.xs }}>
-              The shared run is split by tonne-kilometres — how much you send and how far it
-              rides — so a bigger or further load pays more, and nobody pays an equal split.
+              {pooled
+                ? 'The shared run is split by tonne-kilometres — how much you send and how far it rides — plus your own detour. A bigger or further load pays more; nobody pays an equal split.'
+                : 'One farmer, one bill: you cover the whole route for now. Each farmer who joins takes a slice by tonne-kilometres and your share falls.'}
             </Txt>
           </View>
         ) : null}
 
-        {mine.finalPrice == null ? (
+        {frozen ? (
           <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ marginTop: space.xs }}>
-            This can still fall — it is re-split every time a farmer joins, and freezes when your
-            produce is delivered.
+            Final — frozen when your produce was delivered.
           </Txt>
         ) : (
           <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ marginTop: space.xs }}>
-            Final — frozen at delivery.
+            This can still change — it is re-split every time a farmer joins or leaves, and
+            freezes at delivery.
           </Txt>
         )}
       </Card>

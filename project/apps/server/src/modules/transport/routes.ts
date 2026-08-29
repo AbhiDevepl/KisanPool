@@ -74,6 +74,7 @@ transportRouter.post(
             amount: a.amount,
             previousAmount: a.previousAmount,
           })),
+          pricing: result.pricing.pricing ?? undefined,
         });
       }
       if (result.capacity) {

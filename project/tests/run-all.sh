@@ -34,6 +34,11 @@ npm run seed --silent -- --reset
 python3 tests/08_backhaul.py
 
 echo
+echo "########## 5. predictive insights: deterministic scoring, explainability, advisory-only ##########"
+npm run seed --silent -- --reset
+python3 tests/09_predictions.py
+
+echo
 echo "########## STALE (pre-pooling API) — see note above ##########"
 echo "########## 1b. core flow: auth, KYC gate, matching, payment, booking ##########"
 python3 tests/01_core_flow.py || echo "  (STALE SUITE — targets the pre-pooling API, see note above)"

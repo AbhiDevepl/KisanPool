@@ -20,6 +20,7 @@ import { ratingsRouter } from './modules/ratings/routes';
 import { aiRouter } from './modules/ai/routes';
 import { mapsRouter } from './modules/maps/routes';
 import { adminRouter } from './modules/admin/routes';
+import { predictionsRouter } from './modules/predictions/routes';
 
 export function createApp() {
   const app = express();
@@ -54,6 +55,8 @@ export function createApp() {
   app.use('/ai', aiRouter);
   app.use('/maps', mapsRouter);
   app.use('/admin', adminRouter);
+  // advisory risk scoring — read-only, never authoritative (ADR-041)
+  app.use('/predictions', predictionsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

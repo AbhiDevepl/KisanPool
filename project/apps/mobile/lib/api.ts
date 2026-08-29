@@ -22,6 +22,12 @@ import type {
   PaymentDTO,
   PricingEventDTO,
   RatingDTO,
+  RiskAssessment,
+  RiskLevel,
+  DemandAssessment,
+  DemandLevel,
+  TripPredictionDTO,
+  TripPredictionEvent,
   Role,
   ShipmentShareDTO,
   ShipmentState,
@@ -107,6 +113,12 @@ export type {
   TransporterOfferDTO,
   TripCapacity,
   TripPricingDTO,
+  RiskAssessment,
+  RiskLevel,
+  DemandAssessment,
+  DemandLevel,
+  TripPredictionDTO,
+  TripPredictionEvent,
   // V2
   BackhaulBookingDTO,
   BackhaulMatchDTO,
@@ -394,6 +406,17 @@ export const api = {
 
   /** Why each farmer's share changed, newest first. */
   pricingHistory: (tripId: string) => request<PricingEventDTO[]>(`/pool/trips/${tripId}/pricing`),
+
+  /**
+   * Advisory delay / cancellation risk for one trip (ADR-041). Read-only — it
+   * never changes the trip. A farmer gets `delay` only; the transporter also
+   * gets `cancellation`.
+   */
+  tripPrediction: (tripId: string) =>
+    request<TripPredictionDTO>(`/predictions/trips/${tripId}`),
+
+  /** High-demand corridors — useful when a driver is choosing where to head. */
+  demandPredictions: () => request<DemandAssessment[]>('/predictions/demand'),
 
   // ---------- shipments ----------
 
