@@ -21,10 +21,12 @@ import type {
   OperatorMode,
   PricingUnit,
   PaymentDTO,
+  PayoutState,
   PricingEventDTO,
   RatingDTO,
   RiskAssessment,
   RiskLevel,
+  ServiceStatusDTO,
   DemandAssessment,
   DemandLevel,
   TripPredictionDTO,
@@ -116,6 +118,7 @@ export type {
   TripPricingDTO,
   RiskAssessment,
   RiskLevel,
+  ServiceStatusDTO,
   DemandAssessment,
   DemandLevel,
   TripPredictionDTO,
@@ -497,17 +500,28 @@ export const api = {
         paymentId: string;
         shipmentId: string;
         tripId: string;
+        /** the driver's gross share, before Razorpay's own processing fees */
         amount: number;
         transferId: string | null;
         transferStatus: string;
+        /** the payout's own state — NOT the payment's (ADR-043) */
+        payoutState: PayoutState;
+        /** why it has not settled yet, when it has not */
+        payoutNote: string | null;
+        settledAt: string | null;
         createdAt: string;
         from: string | null;
         to: string | null;
         cropType: string | null;
         quantityKg: number | null;
       }>;
+      /** money that actually reached the bank */
       total: number;
+      /** earned and collected, but not yet transferred */
+      pendingTotal: number;
+      failedCount: number;
       account: { payoutStatus: string } | null;
+      eligibility: { eligible: boolean; reason?: string };
     }>('/transporters/payouts'),
 
   // ---------- ratings (per shipment) ----------
@@ -526,6 +540,12 @@ export const api = {
     request<{ distanceKm: number; durationMinutes: number; polyline: string | null }>(
       `/maps/directions?origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}`,
     ),
+
+  /**
+   * Honest service status (ADR-044). Deliberately small: a state, a sentence and
+   * whether new bookings/payments are currently being accepted. No internals.
+   */
+  serviceStatus: () => request<ServiceStatusDTO>('/system/service-status'),
 
   /** Resolve a typed place name to coordinates (village / town / landmark). */
   searchPlaces: (q: string, near?: { lat: number; lng: number } | null) =>

@@ -68,17 +68,36 @@ Every response — success or failure — uses one shape:
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| POST | `/payments/create-order` | `{ requestId }` | `{ razorpayOrderId, amount, keyId }` — amount in paise, `receipt: requestId` |
-| POST | `/payments/verify` | `{ razorpay_order_id, razorpay_payment_id, razorpay_signature }` | Verified payment. Server recomputes `HMAC_SHA256(orderId\|paymentId, RAZORPAY_KEY_SECRET)` and rejects on mismatch |
-| POST | `/payments/refund` | `{ paymentId, reason }` | Razorpay refund for the policy amount. Fails if a transfer has already gone out for that payment |
-| POST | `/webhooks/razorpay` | raw body | **No JWT.** Verifies `x-razorpay-signature` as an HMAC of the raw body with `RAZORPAY_WEBHOOK_SECRET`, then handles `payment.captured`, `payment.failed`, `transfer.processed`. This is the source of truth for reconciliation |
+| POST | `/payments/create-order` | `{ shipmentId }` | `{ razorpayOrderId, amount, currency, keyId, demo }` — amount in **integer paise**, `receipt` is the Payment id. The amount is the pricing engine's frozen figure; a client-supplied amount is ignored. **Idempotent**: the same shipment returns the same order. When the driver's linked account is live, the transporter's share is attached as a Route `transfers[]` entry so Razorpay settles it on capture (ADR-043) |
+| POST | `/payments/verify` | `{ razorpay_order_id, razorpay_payment_id, razorpay_signature }` | Verified payment. Server recomputes `HMAC_SHA256(orderId\|paymentId, RAZORPAY_KEY_SECRET)` and rejects on mismatch. The webhook is still what finally settles state (ADR-012) |
+| POST | `/payments/refund` | `{ paymentId, reason }` | Razorpay refund for the policy amount. If a transfer has already been **processed**, the transfer is reversed first (`POST /v1/transfers/:id/reversals`) and the payout becomes `REVERSED` — a refund after payout is no longer simply refused (ADR-043) |
+| POST | `/webhooks/razorpay` | raw body | **No JWT.** Verifies `x-razorpay-signature` as an HMAC of the raw body with `RAZORPAY_WEBHOOK_SECRET`. **Idempotent**: each delivery is claimed by inserting its `x-razorpay-event-id` into a uniquely-indexed store, so a Razorpay retry is acknowledged and dropped. Handles `payment.captured` (recording Razorpay's `fee`/`tax`), `payment.failed`, `transfer.processed`, `transfer.failed`, `settlement.processed`, `refund.created`/`refund.processed`. This is the source of truth for reconciliation |
 
 ### Transporters / payouts (`modules/payments`)
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| POST | `/transporters/payout-onboarding` | `{ panNumber, bankAccountNumber, ifsc }` | Creates the Razorpay Route linked account; stores `razorpayAccountId` on `TransporterPayoutAccount` |
-| GET | `/transporters/payouts` | — | Payout passbook: every transfer, its Razorpay status, and a running total |
+| POST | `/transporters/payout-onboarding` | `{ panNumber, bankAccountNumber, ifsc, name? }` | Creates a Razorpay **Route linked account** (not a customer) and stores the `acc_…` id plus its creation time. Starts `PENDING`, never `ACTIVE`: Razorpay must verify the bank account and a **24-hour cooling period** applies before the account can receive a transfer (ADR-043) |
+| GET | `/transporters/payouts` | — | Payout passbook: each row's gross share, `payoutState`, `payoutNote` (why it has not settled), `transferId`, `settledAt`; plus `total` (actually settled), `pendingTotal`, `failedCount` and `eligibility` |
+
+### Money: the split, and what is not ours (ADR-043)
+
+The pooled pricing engine (ADR-035) alone decides what a farmer owes. Payments only move that decided number:
+
+```
+priceTrip → shipment.finalPrice → splitPaise(amountPaise, PLATFORM_FEE_PCT)
+          → Razorpay order (+ Route transfers[]) → capture → transfer → webhooks
+```
+
+- **One commission source.** `PLATFORM_FEE_PCT` (default 10), read through `lib/money.ts#commissionRate()` by pooled transport, machinery and backhaul. `PLATFORM_COMMISSION_PCT` in shared is now only its documented default.
+- **Exact in paise.** `platformFeePaise = round(amountPaise × pct / 100)`; the transporter gets the **remainder**, so the parts always sum to the whole. ₹1,000 at 15% → ₹150 + ₹850.
+- **Pooling stays fair.** Every farmer on a shared trip is charged the same rate on their own share, so the driver's pooled total is the trip total less that one rate.
+- **Four different "fees", kept apart.** Customer payment · KisanPool commission · transporter gross share · **Razorpay's own** gateway fee (on the whole capture) and Route transfer fee (per transfer), both plus GST and both borne by the platform account. Razorpay's fees are recorded **only when Razorpay reports them**; `netPlatformPaise` is `null` until then and is never estimated.
+- **Settlement of the platform's own balance** is Razorpay's normal settlement cycle. Nothing in application code moves the retained amount to a bank account.
+- **Payment state ≠ payout state.** `Payment.status` is the farmer's money arriving; `Payment.payoutState` (`PENDING → CREATED → PROCESSED`, plus `FAILED`, `REVERSED`, `NOT_APPLICABLE`) is the driver's money leaving. A failed payout never re-charges the farmer, and a failed payment never settles a payout.
+
+**Environment** — all names already existed; no new variable is required:
+`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `PLATFORM_FEE_PCT`, `PLATFORM_CANCELLATION_FEE_PCT`. Route uses the standard API key pair — there is no separate Route access token. With `RAZORPAY_KEY_ID`/`_SECRET` blank the app runs in **demo mode**: ids are prefixed `order_demo_` / `trf_demo_` / `rfnd_demo_` / `rvrsl_demo_` so nothing can be mistaken for money that moved.
 
 ### Ratings (`modules/ratings`)
 
@@ -110,6 +129,8 @@ rejects a marketplace token with `AUTH_FORBIDDEN`.
 | GET | `/admin/vehicles` | — | Every vehicle with owner, capacity, last reported location and its active trip |
 | PATCH | `/admin/vehicles/:id` | `{ status?, verificationStatus?, currentLocation? }` | Updates a vehicle. Setting `AVAILABLE` on an unverified vehicle fails with `KYC_PENDING_REVIEW` |
 | GET | `/admin/payouts` | — | Route linked-account state per transporter |
+| GET | `/admin/billing` | `?status=&tripId=` | Settlements per shipment, each with a `settlement` block: amount / commission / transporter share in paise, Razorpay's gateway and transfer fees where reported, `netPlatformPaise` (null while unknown), `payoutState`, `transferId`, refund and reversal ids (ADR-043) |
+| POST | `/admin/payments/:id/retry-payout` | — | Re-attempt one stuck Route transfer (`PENDING` or `FAILED`). Refuses to act on a payment that already carries a `transferId`, so a retry can never double-pay, and never touches the farmer's payment |
 
 `PATCH /documents/:id/review` (the original operator route) also requires the admin claim.
 

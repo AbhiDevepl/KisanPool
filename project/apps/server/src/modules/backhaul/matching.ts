@@ -1,11 +1,11 @@
 import {
-  PLATFORM_COMMISSION_PCT,
   cargoAllowedOn,
   type BackhaulMatchDTO,
   type CargoCategory,
   type VehicleType,
 } from '@kisanpool/shared';
 import { money, type Point } from '../../lib/geo';
+import { commissionRate } from '../../lib/money';
 import { getDirections } from '../maps/service';
 
 /**
@@ -129,8 +129,8 @@ export async function quoteBackhaul(
     detourCost,
     carriageCost,
     price,
-    platformFee: money(price * PLATFORM_COMMISSION_PCT),
-    transporterEarning: money(price * (1 - PLATFORM_COMMISSION_PCT)),
+    platformFee: money(price * commissionRate()),
+    transporterEarning: money(price * (1 - commissionRate())),
     // kilometres that were going to be driven empty and now are not
     emptyKmRecovered: round1(Math.min(carryKm, leg.emptyReturnKm)),
     utilisationPct: Math.round(capacityShare * 100),

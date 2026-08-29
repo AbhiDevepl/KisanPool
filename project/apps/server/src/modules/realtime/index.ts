@@ -31,6 +31,7 @@ import { isParticipant, saveChatMessage } from '../chat/service';
 import { notifyChatMessage } from '../notifications/service';
 import { estimateEtaMinutes } from '../maps/service';
 import { assessTripDelay } from '../predictions/service';
+import { putVehicleSnapshot } from '../resilience/snapshots';
 
 interface AuthedSocket extends Socket {
   userId: string;
@@ -272,6 +273,14 @@ export function registerSocketHandlers(server: SocketServer): void {
         emitTripLocation({ tripId, lat, lng, etaMinutes });
         // re-score delay risk off the fresh position; pushes only on a level change
         void refreshDelayPrediction(tripId);
+        // last-known position, so a farmer still sees where the truck was if the
+        // database goes away (ADR-044) — display only, never authoritative
+        void putVehicleSnapshot({
+          vehicleId: String(trip.vehicleId),
+          lat,
+          lng,
+          etaMinutes,
+        }).catch(() => undefined);
       });
     });
 

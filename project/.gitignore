@@ -7,3 +7,6 @@ build/
 *.log
 .DS_Store
 coverage/
+
+# durable recovery journal — runtime state, never committed (ADR-044)
+.data/

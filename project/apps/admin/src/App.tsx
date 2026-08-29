@@ -19,6 +19,7 @@ import { AlertsTab } from './tabs/Alerts';
 import { AiTab } from './tabs/Ai';
 import { ReportsTab } from './tabs/Reports';
 import { SettingsTab } from './tabs/Settings';
+import { ResilienceTab } from './tabs/Resilience';
 
 type TabId =
   | 'dashboard'
@@ -32,6 +33,7 @@ type TabId =
   | 'alerts'
   | 'ai'
   | 'reports'
+  | 'resilience'
   | 'settings';
 
 interface Tab {
@@ -55,6 +57,7 @@ const TABS: Tab[] = [
   { id: 'alerts', label: 'Alerts & Issues', icon: '⚠', group: 'Oversight', render: () => <AlertsTab /> },
   { id: 'ai', label: 'AI Assistant', icon: '◍', group: 'Oversight', render: () => <AiTab /> },
   { id: 'reports', label: 'Reports', icon: '▤', group: 'Oversight', render: () => <ReportsTab /> },
+  { id: 'resilience', label: 'Resilience', icon: '⛨', group: 'Oversight', render: () => <ResilienceTab /> },
   { id: 'settings', label: 'Settings', icon: '⚙', group: 'Oversight', render: () => <SettingsTab /> },
 ];
 

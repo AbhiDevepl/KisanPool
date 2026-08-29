@@ -17,6 +17,7 @@ import {
   withdrawOffer,
 } from './service';
 import { capacityOf, priceTripById, reallocate, savingPct } from './pricing';
+import { requireWritable } from '../resilience/guard';
 import {
   emitOfferReceived,
   emitOfferWithdrawn,
@@ -158,6 +159,8 @@ poolRouter.post(
   '/requests/:id/select',
   requireAuth,
   requireRole('FARMER'),
+  // reserves capacity — must never be accepted unless it can be committed (ADR-044)
+  requireWritable,
   asyncHandler<AuthedRequest>(async (req, res) => {
     const { offerId } = z.object({ offerId: z.string() }).parse(req.body);
     const { trip, shipment, offer, pricing } = await selectTransporter(

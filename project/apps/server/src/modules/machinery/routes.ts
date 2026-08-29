@@ -25,6 +25,7 @@ import {
   requestBooking,
 } from './service';
 import { emitMachineBookingRequested, emitMachineBookingState } from '../realtime';
+import { requireWritable } from '../resilience/guard';
 import { notifyMachineBooking } from '../notifications/service';
 
 export const machineryRouter = Router();
@@ -259,6 +260,8 @@ const bookSchema = z.object({
 machineryRouter.post(
   '/bookings',
   requireAuth,
+  // holds a machine's slot — an irreversible reservation (ADR-044)
+  requireWritable,
   asyncHandler<AuthedRequest>(async (req, res) => {
     const body = bookSchema.parse(req.body);
     const { booking, machine } = await requestBooking({

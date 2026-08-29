@@ -74,6 +74,19 @@ async function main(): Promise<void> {
     const demoUsers = await User.find(demoPhones, '_id');
     const ids = demoUsers.map((u) => u._id);
 
+    /*
+     * The trips about to be deleted, resolved BEFORE the delete so their pricing
+     * events can be removed with them.
+     *
+     * `PricingEvent.deleteMany({})` used to be unscoped while every other delete
+     * here is scoped to demo users. That broke this block's own promise that real
+     * data survives: a non-demo trip kept its `pricingVersion` and lost every
+     * event behind it, leaving exactly the "price with no audit trail" state the
+     * integrity checker flags as INCONSISTENT — created by the seed itself
+     * (ADR-044).
+     */
+    const demoTripIds = (await Trip.find({ transporterId: { $in: ids } }, '_id')).map((t) => t._id);
+
     // only demo data — anything you created with a real phone number survives
     await Promise.all([
       Vehicle.deleteMany({ ownerId: { $in: ids } }),
@@ -82,7 +95,7 @@ async function main(): Promise<void> {
       TransporterOffer.deleteMany({ transporterId: { $in: ids } }),
       Trip.deleteMany({ transporterId: { $in: ids } }),
       TripShipment.deleteMany({ farmerId: { $in: ids } }),
-      PricingEvent.deleteMany({}),
+      PricingEvent.deleteMany({ tripId: { $in: demoTripIds } }),
       Payment.deleteMany({ farmerId: { $in: ids } }),
       TransporterPayoutAccount.deleteMany({ userId: { $in: ids } }),
       Rating.deleteMany({ $or: [{ fromUserId: { $in: ids } }, { toUserId: { $in: ids } }] }),
@@ -213,6 +226,39 @@ async function main(): Promise<void> {
 
         request.tripId = trip._id;
         await request.save();
+
+        /*
+         * The pricing event these trips imply (ADR-044).
+         *
+         * `reallocate()` always writes the PricingEvent BEFORE bumping
+         * `Trip.pricingVersion`, so in real operation the two always agree. The
+         * seed used to set `pricingVersion: 1` directly and write no event,
+         * which left every seeded trip looking — correctly — like a trip whose
+         * pricing audit trail had been lost. The integrity checker found it, and
+         * it was the seed that was wrong, not the check.
+         */
+        await PricingEvent.create({
+          tripId: trip._id,
+          version: 1,
+          reason: 'seeded historical trip',
+          routeDistanceKm: 185,
+          routeCost: 185 * t.rate,
+          totalQuantityKg: quantityKg,
+          allocations: [
+            {
+              shipmentId: shipment._id,
+              farmerId: farmer._id,
+              quantityKg,
+              rideKm: 185,
+              detourKm: 0,
+              tonneKm: Math.round((quantityKg / 1000) * 185 * 100) / 100,
+              detourCost: 0,
+              lineHaulCost: price,
+              amount: price,
+              previousAmount: null,
+            },
+          ],
+        });
 
         await Rating.create({
           tripId: trip._id,

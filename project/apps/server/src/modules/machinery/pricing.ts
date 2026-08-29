@@ -1,10 +1,10 @@
 import {
   AREA_BASED_UNITS,
-  PLATFORM_COMMISSION_PCT,
   type MachineQuoteDTO,
   type PricingUnit,
 } from '@kisanpool/shared';
 import { money, type Point } from '../../lib/geo';
+import { commissionRate } from '../../lib/money';
 import { getDirections } from '../maps/service';
 
 /**
@@ -125,8 +125,8 @@ export async function quoteBooking(input: QuoteInput): Promise<MachineQuoteDTO> 
     minimumTopUp,
     travelShareCount,
     total,
-    platformFee: money(total * PLATFORM_COMMISSION_PCT),
-    providerEarning: money(total * (1 - PLATFORM_COMMISSION_PCT)),
+    platformFee: money(total * commissionRate()),
+    providerEarning: money(total * (1 - commissionRate())),
   };
 }
 

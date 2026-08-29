@@ -30,6 +30,7 @@ import {
   Vehicle,
 } from '../../models';
 import { reconcileVehicleVerification } from '../documents/service';
+import { retryPayout, settlementOf } from '../payments/service';
 
 export const adminRouter = Router();
 
@@ -702,6 +703,17 @@ adminRouter.get(
               razorpayOrderId: payment.razorpayOrderId ?? null,
               capturedAt: payment.capturedAt ?? null,
               createdAt: payment.get('createdAt'),
+              /*
+               * The exact split in paise plus Razorpay's own fees, kept apart
+               * from our commission (ADR-043). `netPlatformPaise` is null until
+               * Razorpay has actually reported both fees — an operator should see
+               * "not known yet", never an estimate dressed up as a figure.
+               */
+              settlement: settlementOf(payment),
+              payoutState: payment.payoutState,
+              payoutNote: payment.lastTransferError ?? null,
+              refundId: payment.refundId ?? null,
+              reversalId: payment.reversalId ?? null,
             }
           : null,
       };
@@ -735,6 +747,25 @@ adminRouter.get(
       // trail without a second listing endpoint
       trips: [...new Map(settlements.filter((s) => s.trip).map((s) => [s.tripId, s.trip!])).values()],
     });
+  }),
+);
+
+/**
+ * Retry one stuck Route transfer (ADR-043).
+ *
+ * A payout can be left PENDING (the linked account was not payable when the
+ * payment captured — often just the 24-hour cooling period) or FAILED. Neither is
+ * the farmer's problem and neither should be fixed by charging anyone again, so
+ * the operator gets a button that re-attempts exactly the transfer that did not
+ * happen. Guarded in the service: a payment that already carries a `transferId`
+ * is returned untouched rather than transferred a second time.
+ */
+adminRouter.post(
+  '/payments/:id/retry-payout',
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const payment = await retryPayout(req.params.id);
+    ok(res, payment);
   }),
 );
 

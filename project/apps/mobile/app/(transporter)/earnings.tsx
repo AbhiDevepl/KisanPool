@@ -37,14 +37,29 @@ import { colors, radius, space } from '../../theme';
 type Payout = Awaited<ReturnType<typeof api.payouts>>['payouts'][number];
 type Tab = 'all' | 'settled' | 'pending';
 
-/** Razorpay's own transfer states, not a binary paid/not-paid guess. */
+/**
+ * The payout's own state, straight from the backend (ADR-043).
+ *
+ * This used to be inferred from the presence of a `transferId` plus a raw status
+ * string, which could not tell "waiting on your onboarding" apart from "Razorpay
+ * refused it" — two things a driver needs to respond to very differently. The
+ * server now decides the state; this only names it.
+ */
 function transferState(payout: Payout): { badge: string; label: string; settled: boolean } {
-  if (!payout.transferId) return { badge: 'PENDING', label: 'Pending', settled: false };
-  const status = (payout.transferStatus ?? '').toLowerCase();
-  if (status === 'failed' || status === 'reversed')
-    return { badge: 'REJECTED', label: 'Failed', settled: false };
-  if (status === 'processed') return { badge: 'DELIVERED', label: 'Settled', settled: true };
-  return { badge: 'IN_TRANSIT', label: 'Processing', settled: false };
+  switch (payout.payoutState) {
+    case 'PROCESSED':
+      return { badge: 'DELIVERED', label: 'Settled', settled: true };
+    case 'FAILED':
+      return { badge: 'REJECTED', label: 'Failed', settled: false };
+    case 'REVERSED':
+      return { badge: 'CANCELLED', label: 'Reversed', settled: false };
+    case 'CREATED':
+      return { badge: 'IN_TRANSIT', label: 'Processing', settled: false };
+    case 'NOT_APPLICABLE':
+      return { badge: 'CANCELLED', label: 'Not payable', settled: false };
+    default:
+      return { badge: 'PENDING', label: 'Pending', settled: false };
+  }
 }
 
 export default function Earnings() {
@@ -233,12 +248,19 @@ export default function Earnings() {
                     {payout.transferId ? (
                       <Txt variant="labelSm" color={colors.outline} style={{ marginTop: space.xs }}>
                         Transfer {payout.transferId}
+                        {payout.settledAt ? ` · settled ${shortDate(payout.settledAt)}` : ''}
                       </Txt>
                     ) : (
                       <Txt variant="labelSm" color={colors.outline} style={{ marginTop: space.xs }}>
                         Transfers settle shortly after the farmer pays.
                       </Txt>
                     )}
+                    {/* why it has not landed — the driver can usually act on this */}
+                    {!state.settled && payout.payoutNote ? (
+                      <Txt variant="labelSm" color={colors.onSurfaceVariant} style={{ marginTop: space.xs }}>
+                        {payout.payoutNote}
+                      </Txt>
+                    ) : null}
                   </Card>
                 );
               })

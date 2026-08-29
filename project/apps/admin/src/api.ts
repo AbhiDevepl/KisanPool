@@ -1,7 +1,10 @@
 import type {
   ApiResponse,
   ErrorCode,
+  IntegrityReport,
+  JournalEvent,
   OpsPredictionDTO,
+  ResilienceStatusDTO,
   ShipmentState,
   TripCapacity,
   TripState,
@@ -433,6 +436,44 @@ export const api = {
 
   /** Advisory risk roll-up: at-risk live trips + the demand board (ADR-041). */
   predictions: () => request<OpsPredictionDTO>('/predictions/ops'),
+
+  // ---- resilience & recovery (ADR-044) ----
+
+  resilience: () => request<ResilienceStatusDTO>('/admin/resilience/status'),
+
+  integrity: () => request<IntegrityReport>('/admin/resilience/integrity'),
+
+  journal: (limit = 50) =>
+    request<{ health: ResilienceStatusDTO['journal']; events: JournalEvent[] }>(
+      `/admin/resilience/journal?limit=${limit}`,
+    ),
+
+  /** Start a reversible, isolated fault. Destroys no data. */
+  simulate: (mode: 'OUTAGE' | 'CORRUPTION', scope?: string[]) =>
+    request<{ simulation: unknown; state: string }>('/admin/resilience/simulate', {
+      method: 'POST',
+      body: JSON.stringify({ mode, scope }),
+    }),
+
+  stopSimulation: () =>
+    request<{ cleared: boolean; state: string }>('/admin/resilience/simulate/stop', {
+      method: 'POST',
+    }),
+
+  /** Reconcile → validate → rebuild snapshots. Idempotent. */
+  recover: (restorePoint?: string) =>
+    request<{
+      replay: { examined: number; superseded: number; replayed: number; unresolved: number };
+      integrityPassed: boolean;
+      snapshotsRebuilt: number;
+      finalState: string;
+    }>('/admin/resilience/recover', {
+      method: 'POST',
+      body: JSON.stringify(restorePoint ? { restorePoint } : {}),
+    }),
+
+  resetRecovery: () =>
+    request<{ state: string }>('/admin/resilience/reset', { method: 'POST' }),
 
   billing: (query: { status?: string; tripId?: string } = {}) => {
     const params = new URLSearchParams();

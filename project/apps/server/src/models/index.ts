@@ -1,3 +1,12 @@
+/*
+ * FIRST — registers the fault-simulation gate as a global Mongoose plugin.
+ *
+ * A global plugin only applies to schemas compiled after it, so this import must
+ * precede every model below. Moving it breaks the blackout simulation silently:
+ * the gate applies to nothing and the demo appears to do nothing (ADR-044).
+ */
+import './../modules/resilience/simulation';
+
 export { User } from './User';
 export { Vehicle } from './Vehicle';
 export { KycDocument } from './Document';
@@ -11,6 +20,7 @@ export { Trip } from './Trip';
 export { TripShipment } from './TripShipment';
 export { TransporterOffer } from './TransporterOffer';
 export { PricingEvent } from './PricingEvent';
+export { WebhookEvent } from './WebhookEvent';
 
 // V2 — Farm Resource Network
 export { FarmMachine } from './FarmMachine';
@@ -32,6 +42,7 @@ export type { TripDoc } from './Trip';
 export type { TripShipmentDoc } from './TripShipment';
 export type { TransporterOfferDoc } from './TransporterOffer';
 export type { PricingEventDoc } from './PricingEvent';
+export type { WebhookEventDoc } from './WebhookEvent';
 
 export type { FarmMachineDoc } from './FarmMachine';
 export type { MachineBookingDoc } from './MachineBooking';

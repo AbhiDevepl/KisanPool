@@ -29,6 +29,8 @@ import {
   soloPrice,
   transporterEarning,
 } from './pricing';
+import { markCommitted, operationKey, recordIntent } from '../resilience/journal';
+import { putTripSnapshot } from '../resilience/snapshots';
 
 /** How far a transporter will reasonably divert to collect a load. */
 const MAX_PICKUP_RADIUS_KM = 60;
@@ -519,6 +521,27 @@ export async function offersForRequest(requestId: string, farmerId: string) {
  * half-written (PROMPT_2 §11).
  */
 export async function selectTransporter(requestId: string, offerId: string, farmerId: string) {
+  /*
+   * Write-ahead intent (ADR-044).
+   *
+   * Recorded BEFORE the transaction so that if the database goes away mid-commit
+   * the intent survives and reconciliation can ask afterwards whether it landed.
+   * The operation key is the REQUEST id, because a request may only ever ride
+   * once — the same fact the unique index on TripShipment.requestId enforces — so
+   * a replay of this event can never produce a second booking.
+   *
+   * The journal is best-effort and never blocks the booking: it makes recovery
+   * possible, it is not a precondition for serving the farmer.
+   */
+  const intent = await recordIntent({
+    eventType: 'TRANSPORTER_SELECTED',
+    entityType: 'TransportRequest',
+    entityId: requestId,
+    actorId: farmerId,
+    operationKey: operationKey('TRANSPORTER_SELECTED', requestId),
+    payload: { requestId, offerId },
+  });
+
   const useTransaction = await supportsTransactions();
   const session = useTransaction ? await mongoose.startSession() : undefined;
 
@@ -709,6 +732,9 @@ export async function selectTransporter(requestId: string, offerId: string, farm
       await shipment.save();
     }
 
+    // the authoritative store has confirmed it — the intent is now history
+    await markCommitted(intent);
+
     return { trip, shipment, offer, pricing };
   } catch (err) {
     if (session?.inTransaction()) await session.abortTransaction();
@@ -779,8 +805,24 @@ export async function advanceShipment(
     shipment.finalPrice = shipment.allocatedPrice;
   }
 
+  /*
+   * Journalled write-ahead (ADR-044). The key includes the TARGET state, so the
+   * intent is "this shipment reaches DELIVERED" — an idempotent fact. Replay
+   * checks whether it is already in that state and does nothing if so, rather
+   * than re-running the transition.
+   */
+  const intent = await recordIntent({
+    eventType: to === 'CANCELLED' ? 'SHIPMENT_CANCELLED' : 'SHIPMENT_STATE_CHANGED',
+    entityType: 'TripShipment',
+    entityId: shipmentId,
+    actorId,
+    operationKey: operationKey('SHIPMENT_STATE_CHANGED', shipmentId, to),
+    payload: { fromState: shipment.state, toState: to, tripId: String(trip._id) },
+  });
+
   shipment.state = to;
   await shipment.save();
+  await markCommitted(intent);
 
   return { shipment, trip };
 }
@@ -823,8 +865,18 @@ export async function advanceTrip(tripId: string, to: TripState, transporterId: 
     trip.completedAt = new Date();
   }
 
+  const intent = await recordIntent({
+    eventType: 'TRIP_STATE_CHANGED',
+    entityType: 'Trip',
+    entityId: tripId,
+    actorId: transporterId,
+    operationKey: operationKey('TRIP_STATE_CHANGED', tripId, to),
+    payload: { fromState: trip.state, toState: to },
+  });
+
   trip.state = to;
   await trip.save();
+  await markCommitted(intent);
   return trip;
 }
 
@@ -950,6 +1002,32 @@ export async function tripDetail(tripId: string, viewerId: string) {
   // share out of `pricing.shares`, the driver reads totalCost / transporterEarning
   const pricing = await priceTripById(tripId);
   const shareOf = new Map((pricing?.shares ?? []).map((share) => [share.shipmentId, share]));
+
+  /*
+   * Capture a continuity snapshot on the way past (ADR-044).
+   *
+   * Fire-and-forget: this is a display-only convenience, so it must never delay
+   * or fail the response that produced it. If the database later goes away, this
+   * is what lets the farmer still see their trip — clearly stamped with when it
+   * was true, never presented as live.
+   */
+  const capacityNow = await capacityOf(trip);
+  void putTripSnapshot({
+    tripId: String(trip._id),
+    state: trip.state,
+    destination: trip.destination?.name ?? '',
+    routeDistanceKm: trip.routeDistanceKm,
+    capacity: capacityNow,
+    poolSize: shipments.filter((s) => s.state !== 'CANCELLED').length,
+    pricingVersion: trip.pricingVersion,
+    totalCost: pricing?.totalCost ?? null,
+    shipments: shipments.map((s) => ({
+      shipmentId: String(s._id),
+      farmerId: String(s.farmerId),
+      state: s.state,
+      amount: s.finalPrice ?? s.allocatedPrice ?? null,
+    })),
+  }).catch(() => undefined);
 
   return {
     trip: { ...trip.toJSON(), capacity: await capacityOf(trip) },

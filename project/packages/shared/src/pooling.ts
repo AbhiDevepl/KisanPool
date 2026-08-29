@@ -342,7 +342,14 @@ export interface TripPricingDTO {
 // pricing constants
 // ---------------------------------------------------------------------------
 
-/** Platform's cut of the route cost. The rest is the transporter's earning. */
+/**
+ * Platform's cut of the route cost, as a rate. The rest is the transporter's.
+ *
+ * @deprecated as a runtime value — this is the DEFAULT only. The server reads
+ * `PLATFORM_FEE_PCT` through `lib/money.ts#commissionRate()`, which is the single
+ * source every pricing module and the Payment split now share (ADR-043). Kept
+ * exported because it documents the default and is part of the shared contract.
+ */
 export const PLATFORM_COMMISSION_PCT = 0.1;
 
 /** Below this, a vehicle is not worth offering to — avoids 5kg loads on a 4t truck. */

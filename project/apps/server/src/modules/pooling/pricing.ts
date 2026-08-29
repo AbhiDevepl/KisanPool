@@ -1,5 +1,4 @@
 import {
-  PLATFORM_COMMISSION_PCT,
   type PricingAllocation,
   type ShipmentShareDTO,
   type TripCapacity,
@@ -8,6 +7,8 @@ import {
   LOADED_STATES,
 } from '@kisanpool/shared';
 import { money, type Point } from '../../lib/geo';
+import { commissionRate } from '../../lib/money';
+import { markCommitted, operationKey, recordIntent } from '../resilience/journal';
 import { getDirections } from '../maps/service';
 import { PricingEvent, Trip, TripShipment, Vehicle } from '../../models';
 import type { TripDoc, TripShipmentDoc } from '../../models';
@@ -89,13 +90,20 @@ export function savingPct(solo: number, shared: number): number {
   return Math.max(0, Math.round(((solo - shared) / solo) * 100));
 }
 
-/** The transporter's earning on a trip: the route cost less the platform's cut. */
+/**
+ * The transporter's earning on a trip: the route cost less the platform's cut.
+ *
+ * The percentage comes from `PLATFORM_FEE_PCT` via `commissionRate()`, which is
+ * the same number the Payment row is actually split by — so what a driver is
+ * shown on the trip screen and what Razorpay transfers cannot drift apart
+ * (ADR-043). The split BETWEEN farmers above is untouched.
+ */
 export function transporterEarning(cost: number): number {
-  return money(cost * (1 - PLATFORM_COMMISSION_PCT));
+  return money(cost * (1 - commissionRate()));
 }
 
 export function platformFee(cost: number): number {
-  return money(cost * PLATFORM_COMMISSION_PCT);
+  return money(cost * commissionRate());
 }
 
 // ---------------------------------------------------------------------------
@@ -391,11 +399,24 @@ export async function reallocate(
     ),
   );
 
+  // journalled so a reallocation interrupted by an incident can be recognised
+  // afterwards: the key is the trip plus the VERSION it produced, and replay
+  // simply asks whether the trip already reached that version (ADR-044)
+  const intent = await recordIntent({
+    eventType: 'PRICING_RECALCULATED',
+    entityType: 'Trip',
+    entityId: tripId,
+    actorId: null,
+    operationKey: operationKey('PRICING_RECALCULATED', tripId, String(version)),
+    payload: { version, reason, totalCost: pricing.totalCost, poolSize: pricing.poolSize },
+  });
+
   trip.pricingVersion = version;
   // the route itself grew or shrank with the pool — record what it actually is now
   trip.routeDistanceKm = pricing.effectiveRouteKm;
   trip.estimatedRouteCost = pricing.totalCost;
   await trip.save();
+  await markCommitted(intent);
 
   return { version, allocations, pricing: { ...pricing, version } };
 }

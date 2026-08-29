@@ -21,6 +21,7 @@ import type {
 import { api, type TripPredictionDTO, type TripPredictionEvent, type TripShipmentView } from '../../../../lib/api';
 import { AppError } from '../../../../lib/errors';
 import { InsightCard } from '../../../../components/InsightCard';
+import { ServiceBanner, useServiceStatus } from '../../../../components/ServiceBanner';
 import { openCheckout } from '../../../../lib/razorpayCheckout';
 import { connectTripSocket, useSocket } from '../../../../lib/socket';
 import { getUser } from '../../../../lib/session';
@@ -98,6 +99,7 @@ export default function SharedTrip() {
   const [priceNote, setPriceNote] = useState<string | null>(null);
   const [prediction, setPrediction] = useState<TripPredictionDTO | null>(null);
   const [track, setTrack] = useState<Awaited<ReturnType<typeof api.trackTrip>> | null>(null);
+  const serviceStatus = useServiceStatus();
   const [paying, setPaying] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
@@ -410,6 +412,9 @@ export default function SharedTrip() {
           </View>
         </Banner>
       ) : null}
+
+      {/* honest status during an incident — silent when everything is normal */}
+      <ServiceBanner status={serviceStatus} />
 
       {error ? <ErrorView error={error} onRetry={() => void load()} /> : null}
 

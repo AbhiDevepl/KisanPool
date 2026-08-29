@@ -21,6 +21,7 @@ import {
 import { api, type TripPredictionDTO, type TripPredictionEvent } from '../../../../lib/api';
 import { connectTripSocket } from '../../../../lib/socket';
 import { InsightCard } from '../../../../components/InsightCard';
+import { ServiceBanner, useServiceStatus } from '../../../../components/ServiceBanner';
 import { getUser } from '../../../../lib/session';
 import { toAppError } from '../../../../lib/errors';
 import { kg, rupees } from '../../../../lib/format';
@@ -94,6 +95,7 @@ export default function SharedTrip() {
 
   const [detail, setDetail] = useState<TripDetail | null>(null);
   const [prediction, setPrediction] = useState<TripPredictionDTO | null>(null);
+  const serviceStatus = useServiceStatus();
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [unread, setUnread] = useState(0);
@@ -352,6 +354,9 @@ export default function SharedTrip() {
       />
 
       {error ? <ErrorView error={error} onRetry={() => void load()} /> : null}
+
+      {/* honest status during an incident — silent when everything is normal */}
+      <ServiceBanner status={serviceStatus} />
 
       {/* advisory risk — each renders only for MEDIUM/HIGH (ADR-041) */}
       <InsightCard assessment={prediction?.delay} title="Possible delivery delay" />

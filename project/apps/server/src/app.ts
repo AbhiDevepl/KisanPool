@@ -21,6 +21,8 @@ import { aiRouter } from './modules/ai/routes';
 import { mapsRouter } from './modules/maps/routes';
 import { adminRouter } from './modules/admin/routes';
 import { predictionsRouter } from './modules/predictions/routes';
+import { adminResilienceRouter, resilienceRouter } from './modules/resilience/routes';
+import { recoveryState, databaseHealth, cacheHealth } from './modules/resilience/health';
 
 export function createApp() {
   const app = express();
@@ -35,8 +37,21 @@ export function createApp() {
   app.use(express.json({ limit: '2mb' }));
   app.use('/uploads', express.static(localUploadsDir));
 
+  /**
+   * Liveness plus a coarse dependency summary (ADR-044).
+   *
+   * Unauthenticated, so it stays deliberately shallow: a state word and whether
+   * each dependency is up. No topology, no counts, no journal. It answers "is
+   * this process serving?" for a load balancer, and nothing a stranger could use.
+   */
   app.get('/health', (_req, res) => {
-    ok(res, { status: 'ok', at: new Date().toISOString() });
+    ok(res, {
+      status: 'ok',
+      at: new Date().toISOString(),
+      recovery: recoveryState(),
+      database: databaseHealth().state,
+      cache: cacheHealth().state,
+    });
   });
 
   app.use('/auth', authRouter);
@@ -57,6 +72,9 @@ export function createApp() {
   app.use('/admin', adminRouter);
   // advisory risk scoring — read-only, never authoritative (ADR-041)
   app.use('/predictions', predictionsRouter);
+  // resilience: an honest status for users, the full board + controls for operators
+  app.use('/system', resilienceRouter);
+  app.use('/admin/resilience', adminResilienceRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

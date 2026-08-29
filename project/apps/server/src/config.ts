@@ -65,6 +65,33 @@ export const config = {
 
   cloudinaryUrl: process.env.CLOUDINARY_URL ?? '',
 
+  /**
+   * Optional operational cache + durable journal backend (ADR-044).
+   *
+   * Entirely optional: with no URL the app runs exactly as before, reading and
+   * writing MongoDB directly, and the recovery journal falls back to a local
+   * fsync'd append-only file. Redis is only ever treated as DURABLE when it
+   * reports `appendonly yes` — a cache-mode Redis can lose acknowledged writes,
+   * so it is never trusted to hold pending intent.
+   */
+  redis: {
+    url: process.env.REDIS_URL ?? '',
+    get enabled(): boolean {
+      return Boolean(this.url);
+    },
+  },
+
+  resilience: {
+    /** durable journal location when Redis is absent or not AOF-backed */
+    journalFile: process.env.RECOVERY_JOURNAL_FILE ?? '.data/recovery-journal.log',
+    /** consecutive failed probes before an incident is declared — debounce, not a hair trigger */
+    failureThreshold: num(process.env.RECOVERY_FAILURE_THRESHOLD, 3),
+    /** how often the health probe runs, ms */
+    probeIntervalMs: num(process.env.RECOVERY_PROBE_INTERVAL_MS, 10_000),
+    /** how long a cached operational snapshot stays presentable, seconds */
+    snapshotTtlSeconds: num(process.env.RECOVERY_SNAPSHOT_TTL_SECONDS, 900),
+  },
+
   admin: {
     username: process.env.ADMIN_USERNAME ?? 'admin',
     password: process.env.ADMIN_PASSWORD ?? 'admin',

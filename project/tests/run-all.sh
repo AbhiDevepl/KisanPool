@@ -44,6 +44,16 @@ npm run seed --silent -- --reset
 python3 tests/10_v2_features.py
 
 echo
+echo "########## 7. payments & Route: exact paise split, idempotent webhooks, payout/refund states ##########"
+npm run seed --silent -- --reset
+python3 tests/11_payments_route.py
+
+echo
+echo "########## 8. resilience: blackout detection, durable journal, idempotent replay, honest recovery ##########"
+npm run seed --silent -- --reset
+python3 tests/12_resilience.py
+
+echo
 echo "########## STALE (pre-pooling API) — see note above ##########"
 echo "########## 1b. core flow: auth, KYC gate, matching, payment, booking ##########"
 python3 tests/01_core_flow.py || echo "  (STALE SUITE — targets the pre-pooling API, see note above)"
