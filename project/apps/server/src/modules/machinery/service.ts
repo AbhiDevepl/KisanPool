@@ -15,6 +15,7 @@ import { supportsTransactions } from '../../db';
 import { FarmMachine, MachineBooking, User } from '../../models';
 import type { FarmMachineDoc } from '../../models';
 import { needsArea, quoteBooking, requoteOnCompletion } from './pricing';
+import { markCommitted, operationKey, recordIntent } from '../resilience/journal';
 
 const OTP_LENGTH = 4;
 const randomOtp = (): string =>
@@ -213,11 +214,47 @@ export interface BookInput {
  * calendar. Touching the machine document makes the second writer lose.
  */
 export async function requestBooking(input: BookInput) {
+  /*
+   * Write-ahead intent (ADR-044), following the same shape as selectTransporter.
+   * There is no pre-existing entity to key off here — this is a brand-new
+   * booking — so the operation key is derived from what the farmer actually
+   * asked for (machine, window, farmer), and the booking's own _id is derived
+   * from that key. A retry of the same attempt therefore always resolves to the
+   * same document instead of racing a second one into existence, and a replay
+   * after an outage can ask "does a booking with THIS id exist?" and get a
+   * meaningful answer.
+   */
+  const opKey = operationKey(
+    'MACHINE_BOOKING_CREATED',
+    input.farmerId,
+    `${input.machineId}:${input.window.start.toISOString()}:${input.window.end.toISOString()}`,
+  );
+  const bookingId = new mongoose.Types.ObjectId(opKey.slice(0, 24));
+  const intent = await recordIntent({
+    eventType: 'MACHINE_BOOKING_CREATED',
+    entityType: 'MachineBooking',
+    entityId: String(bookingId),
+    actorId: input.farmerId,
+    operationKey: opKey,
+    payload: { machineId: input.machineId, farmerId: input.farmerId },
+  });
+
   const useTransaction = await supportsTransactions();
   const session = useTransaction ? await mongoose.startSession() : undefined;
 
   try {
     if (session) session.startTransaction();
+
+    // a genuine retry of an attempt that already landed must return that
+    // booking, not fight the calendar a second time
+    const already = await MachineBooking.findById(bookingId).session(session ?? null);
+    if (already) {
+      if (session) await session.commitTransaction();
+      const machine = await FarmMachine.findById(already.machineId);
+      if (!machine) throw new ApiError('RESOURCE_NOT_FOUND', 'That machine is no longer listed.');
+      await markCommitted(intent);
+      return { booking: already, machine };
+    }
 
     const machine = await FarmMachine.findById(input.machineId).session(session ?? null);
     if (!machine) throw new ApiError('RESOURCE_NOT_FOUND', 'That machine is no longer listed.');
@@ -293,6 +330,7 @@ export async function requestBooking(input: BookInput) {
     const created = await MachineBooking.create(
       [
         {
+          _id: bookingId,
           machineId: machine._id,
           providerId: machine.ownerId,
           farmerId: input.farmerId,
@@ -312,6 +350,7 @@ export async function requestBooking(input: BookInput) {
     );
 
     if (session) await session.commitTransaction();
+    await markCommitted(intent);
     return { booking: created[0], machine };
   } catch (err) {
     if (session?.inTransaction()) await session.abortTransaction();
@@ -451,8 +490,24 @@ export async function advanceBooking(
     booking.declineReason = options.reason;
   }
 
+  /*
+   * Journalled write-ahead (ADR-044), matching advanceTrip/advanceShipment. The
+   * key includes the TARGET state, so the intent is "this booking reaches state
+   * X" — an idempotent fact that replay can check without re-running any of the
+   * pricing or OTP logic above.
+   */
+  const intent = await recordIntent({
+    eventType: 'MACHINE_BOOKING_STATE_CHANGED',
+    entityType: 'MachineBooking',
+    entityId: bookingId,
+    actorId,
+    operationKey: operationKey('MACHINE_BOOKING_STATE_CHANGED', bookingId, to),
+    payload: { fromState: booking.state, toState: to },
+  });
+
   booking.state = to;
   await booking.save();
+  await markCommitted(intent);
   return booking;
 }
 

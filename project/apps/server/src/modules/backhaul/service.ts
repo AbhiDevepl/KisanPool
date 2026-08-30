@@ -22,6 +22,7 @@ import {
 } from '../../models';
 import type { TripDoc } from '../../models';
 import { transporterEarning } from '../pooling/pricing';
+import { markCommitted, operationKey, recordIntent } from '../resilience/journal';
 import { tripUtilisation } from './utilisation';
 import {
   MAX_BACKHAUL_DETOUR_KM,
@@ -252,6 +253,21 @@ export async function backhaulMatchesFor(tripId: string, transporterId: string) 
  * half-writing (ADR-033).
  */
 export async function acceptBackhaul(tripId: string, requestId: string, transporterId: string) {
+  /*
+   * Write-ahead intent (ADR-044), keyed on the requestId exactly like
+   * selectTransporter — a return-load request may only ever be booked once
+   * (the unique index below is the real guarantee), so "a booking for THIS
+   * request exists" is the idempotent fact replay checks (see recovery.ts).
+   */
+  const intent = await recordIntent({
+    eventType: 'BACKHAUL_BOOKING_CREATED',
+    entityType: 'BackhaulRequest',
+    entityId: requestId,
+    actorId: transporterId,
+    operationKey: operationKey('BACKHAUL_BOOKING_CREATED', requestId),
+    payload: { requestId, tripId },
+  });
+
   const useTransaction = await supportsTransactions();
   const session = useTransaction ? await mongoose.startSession() : undefined;
 
@@ -286,6 +302,24 @@ export async function acceptBackhaul(tripId: string, requestId: string, transpor
     if (!claimed) {
       const exists = await BackhaulRequest.findById(requestId).session(session ?? null);
       if (!exists) throw new ApiError('RESOURCE_NOT_FOUND', 'That return load no longer exists.');
+      // it may already be BOOKED because THIS very intent landed just before an
+      // outage cut the confirmation off — that is a replay's job to notice, not
+      // an error to hand back to a driver retrying in good faith
+      const already = await BackhaulBooking.findOne({ requestId }).session(session ?? null);
+      if (already && String(already.transporterId) === transporterId) {
+        if (session) await session.commitTransaction();
+        await markCommitted(intent);
+        // reconstruct the fields the route actually re-serves from what was
+        // persisted — everything else in a full BackhaulQuote is presentational
+        // and not worth re-deriving for what is, by construction, a retry
+        const reconstructedQuote = {
+          price: already.price,
+          transporterEarning: already.transporterEarning,
+          detourKm: already.detourKm,
+          carryKm: already.carryKm,
+        };
+        return { booking: already, request: exists, trip, quote: reconstructedQuote };
+      }
       throw new ApiError(
         'CONCURRENT_BOOKING',
         'Another driver took that return load a moment ago.',
@@ -349,6 +383,7 @@ export async function acceptBackhaul(tripId: string, requestId: string, transpor
     await trip.save({ session });
 
     if (session) await session.commitTransaction();
+    await markCommitted(intent);
     return { booking: created[0], request: claimed, trip, quote };
   } catch (err) {
     if (session?.inTransaction()) await session.abortTransaction();
@@ -402,8 +437,24 @@ export async function advanceBackhaul(
     await BackhaulRequest.findByIdAndUpdate(booking.requestId, { state: 'OPEN', bookedAt: undefined });
   }
 
+  /*
+   * Journalled write-ahead (ADR-044), matching advanceTrip/advanceShipment. The
+   * key includes the TARGET state, so replay checks "does this booking already
+   * read as DELIVERED" rather than re-running the OTP check or the sibling
+   * request update above.
+   */
+  const intent = await recordIntent({
+    eventType: 'BACKHAUL_BOOKING_STATE_CHANGED',
+    entityType: 'BackhaulBooking',
+    entityId: bookingId,
+    actorId: transporterId,
+    operationKey: operationKey('BACKHAUL_BOOKING_STATE_CHANGED', bookingId, to),
+    payload: { fromState: booking.state, toState: to },
+  });
+
   booking.state = to;
   await booking.save();
+  await markCommitted(intent);
 
   const trip = await Trip.findById(booking.tripId);
   return { booking, trip };

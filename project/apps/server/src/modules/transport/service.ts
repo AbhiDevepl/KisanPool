@@ -1,6 +1,8 @@
+import mongoose from 'mongoose';
 import { ApiError } from '../../lib/envelope';
 import { TransporterOffer, TransportRequest, Trip, TripShipment } from '../../models';
 import { capacityOf, reallocate } from '../pooling/pricing';
+import { markCommitted, operationKey, recordIntent } from '../resilience/journal';
 import type { GeoPoint } from '@kisanpool/shared';
 
 /**
@@ -23,13 +25,58 @@ export interface CreateRequestInput {
 /** How long a request waits for a claim before it stops being shown. */
 const POOL_TTL_HOURS = 24;
 
+/**
+ * Journalled write-ahead (ADR-044). This is the very first critical write in the
+ * whole pipeline — if MongoDB blips right here, the farmer's intent must not just
+ * vanish. There is no pre-existing entity to key off (unlike selecting a
+ * transporter, which keys off the request), so the operation key is derived from
+ * WHAT the farmer asked for: the same submission retried hashes to the same key,
+ * and the request's own _id is derived from that key too, so a retry that lands
+ * after an earlier attempt already committed recognises the same document rather
+ * than creating a duplicate open request.
+ */
+function requestIdempotencyKey(farmerId: string, input: CreateRequestInput): string {
+  return operationKey(
+    'REQUEST_CREATED',
+    farmerId,
+    `${input.cropType}:${input.quantityKg}:${input.pickup.lat}:${input.pickup.lng}:${input.destination.lat}:${input.destination.lng}:${input.preferredDate.toISOString()}`,
+  );
+}
+
 export async function createRequest(farmerId: string, input: CreateRequestInput) {
-  return TransportRequest.create({
+  const opKey = requestIdempotencyKey(farmerId, input);
+  // the operation key is 32 hex chars; the first 24 make a valid, deterministic
+  // ObjectId, so a replayed retry always points at the same document
+  const requestId = new mongoose.Types.ObjectId(opKey.slice(0, 24));
+
+  const intent = await recordIntent({
+    eventType: 'REQUEST_CREATED',
+    entityType: 'TransportRequest',
+    entityId: String(requestId),
+    actorId: farmerId,
+    operationKey: opKey,
+    payload: { farmerId },
+  });
+
+  // a genuine retry of an attempt that actually landed must return the existing
+  // request, not a duplicate-key error — "processing an event twice changes
+  // nothing" applies here just as it does to replay (recovery.ts)
+  const existing = await TransportRequest.findById(requestId);
+  if (existing) {
+    await markCommitted(intent);
+    return existing;
+  }
+
+  const request = await TransportRequest.create({
+    _id: requestId,
     ...input,
     farmerId,
     state: 'OPEN',
     expiresAt: new Date(Date.now() + POOL_TTL_HOURS * 3600_000),
   });
+
+  await markCommitted(intent);
+  return request;
 }
 
 export async function myRequests(farmerId: string) {

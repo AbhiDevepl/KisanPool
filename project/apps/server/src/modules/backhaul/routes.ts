@@ -19,12 +19,9 @@ import {
   returnCapacityOf,
   tripUtilisation,
 } from './service';
-import {
-  emitBackhaulBooked,
-  emitBackhaulState,
-  emitReturnLegState,
-} from '../realtime';
+import { emitBackhaulBooked, emitBackhaulState, emitReturnLegState } from '../realtime';
 import { notifyBackhaulBooked } from '../notifications/service';
+import { requireWritable } from '../resilience/guard';
 
 export const backhaulRouter = Router();
 
@@ -208,6 +205,9 @@ backhaulRouter.post(
   '/trips/:id/return-loads/:requestId/accept',
   requireAuth,
   requireRole('TRANSPORTER'),
+  // reserves return-leg capacity — an irreversible reservation (ADR-044),
+  // exactly like machinery's requestBooking and pooling's selectTransporter
+  requireWritable,
   asyncHandler<AuthedRequest>(async (req, res) => {
     const { booking, trip, quote } = await acceptBackhaul(
       req.params.id,

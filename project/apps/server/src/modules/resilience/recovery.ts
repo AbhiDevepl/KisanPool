@@ -133,7 +133,13 @@ async function effectPresent(event: JournalEvent): Promise<boolean | null> {
       }
 
       case 'BACKHAUL_BOOKING_CREATED':
-        return Boolean(await BackhaulBooking.exists({ _id: entityId }));
+        // a return-load request may only ever be booked once (unique index on
+        // BackhaulBooking.requestId), so — exactly like TRANSPORTER_SELECTED — a
+        // booking for that request IS the effect, regardless of which entityId
+        // the intent happened to be recorded under
+        return Boolean(
+          await BackhaulBooking.exists({ requestId: payload.requestId ?? entityId }),
+        );
 
       case 'BACKHAUL_BOOKING_STATE_CHANGED': {
         const booking = await BackhaulBooking.findById(entityId, 'state');
