@@ -53,7 +53,8 @@ import {
 import { capacityOf } from '../pooling/pricing';
 import { createRequest, cancelRequest } from '../transport/service';
 import { claimRequest, selectTransporter, withdrawOffer, advanceShipment, advanceTrip } from '../pooling/service';
-import { acceptBackhaul, advanceBackhaul } from '../backhaul/service';
+import { acceptBackhaul, advanceBackhaul, advanceReturnLeg, openReturnLeg } from '../backhaul/service';
+import { requestBooking } from '../machinery/service';
 import {
   closeIncident,
   currentIncident,
@@ -63,6 +64,8 @@ import {
   updateIncident,
 } from './health';
 import { markAbandoned, markReplayed, pendingEvents, reloadJournal } from './journal';
+import { ApiError } from '../../lib/envelope';
+import { isStoreFailure } from './snapshots';
 import { runIntegrityChecks } from './integrity';
 import { clearSnapshots, putTripSnapshot } from './snapshots';
 
@@ -139,6 +142,12 @@ async function effectPresent(event: JournalEvent): Promise<boolean | null> {
         const booking = await MachineBooking.findById(entityId, 'state');
         if (!booking) return null;
         return booking.state === payload.toState;
+      }
+
+      case 'RETURN_LEG_STATE_CHANGED': {
+        const trip = await Trip.findById(entityId, 'returnLeg');
+        if (!trip) return null;
+        return (trip.returnLeg?.state ?? 'NONE') === payload.toState;
       }
 
       case 'BACKHAUL_BOOKING_CREATED':
@@ -224,6 +233,45 @@ const appliers: Record<JournalEventType, (event: JournalEvent) => Promise<boolea
     await advanceBackhaul(event.entityId, to as never, event.actorId);
     return true;
   },
+  MACHINE_BOOKING_CREATED: async (event) => {
+    const p = event.payload;
+    const window = p.window as { start?: string; end?: string } | undefined;
+    if (
+      !event.actorId ||
+      typeof p.machineId !== 'string' ||
+      typeof p.operatorMode !== 'string' ||
+      !p.location ||
+      !window?.start ||
+      !window?.end
+    ) {
+      return false;
+    }
+    // through the real service, so the slot race, the service radius, the cargo
+    // rules and the pricing engine all run again — under the ORIGINAL booking id,
+    // which is what stops a second replay creating a second hold
+    await requestBooking({
+      id: event.entityId,
+      machineId: p.machineId,
+      farmerId: event.actorId,
+      window: { start: new Date(window.start), end: new Date(window.end) },
+      location: p.location as never,
+      operatorMode: p.operatorMode as never,
+      workType: typeof p.workType === 'string' ? p.workType : undefined,
+      areaAcres: typeof p.areaAcres === 'number' ? p.areaAcres : undefined,
+      notes: typeof p.notes === 'string' ? p.notes : undefined,
+    });
+    return true;
+  },
+  RETURN_LEG_STATE_CHANGED: async (event) => {
+    const to = event.payload.toState;
+    if (!event.actorId || typeof to !== 'string') return false;
+    if (to === 'OPEN') {
+      await openReturnLeg(event.entityId, event.actorId);
+      return true;
+    }
+    await advanceReturnLeg(event.entityId, to as never, event.actorId);
+    return true;
+  },
   // The journal intentionally excludes OTPs, payment-provider proof, and pricing
   // inputs. These handlers are registered so every event type is classified, but
   // return false rather than manufacture an authoritative business effect.
@@ -232,7 +280,6 @@ const appliers: Record<JournalEventType, (event: JournalEvent) => Promise<boolea
   PRICING_RECALCULATED: async () => false,
   PAYMENT_STATE_CHANGED: async () => false,
   PAYOUT_STATE_CHANGED: async () => false,
-  MACHINE_BOOKING_CREATED: async () => false,
   MACHINE_BOOKING_STATE_CHANGED: async () => false,
 };
 
@@ -240,6 +287,8 @@ export interface ReplayResult {
   examined: number;
   superseded: number;
   replayed: number;
+  /** the authoritative service refused it outright, with its own stated reason */
+  abandoned: number;
   unresolved: number;
   details: Array<{ eventId: string; eventType: string; outcome: string }>;
 }
@@ -258,6 +307,7 @@ export async function replayPending(): Promise<ReplayResult> {
     examined: pending.length,
     superseded: 0,
     replayed: 0,
+    abandoned: 0,
     unresolved: 0,
     details: [],
   };
@@ -286,9 +336,33 @@ export async function replayPending(): Promise<ReplayResult> {
             result.details.push({ eventId: event.eventId, eventType: event.eventType, outcome: 'reapplied through its original business service' });
             continue;
           }
-        } catch {
-          // Fall through to manual review. A replay must never turn a failed
-          // validation or an external-authority operation into a fake success.
+        } catch (err) {
+          /*
+           * A REFUSAL IS AN ANSWER, AND IT HAS TO BE RECORDED AS ONE.
+           *
+           * An ApiError here is the authoritative service deliberately saying no
+           * — the slot was taken, the cargo is ineligible, the state has moved
+           * on. Leaving that PENDING was the old behaviour and it was wrong twice
+           * over: the queue grew a permanent entry for an operation that will
+           * never be applicable, and because RECOVERED requires zero unresolved
+           * entries, one lost slot race made the board say MANUAL_REVIEW forever.
+           *
+           * So it is ABANDONED with the service's own reason — resolved, visible,
+           * and never invented. A store failure is a different matter: that is
+           * genuinely unknown, and falls through to manual review.
+           */
+          if (err instanceof ApiError && !isStoreFailure(err)) {
+            await markAbandoned(event, `refused on replay: ${err.message}`.slice(0, 200));
+            result.abandoned += 1;
+            result.details.push({
+              eventId: event.eventId,
+              eventType: event.eventType,
+              outcome: `cannot be applied — ${err.message}`,
+            });
+            continue;
+          }
+          // otherwise fall through to manual review. A replay must never turn a
+          // store failure into a fake success or a fake refusal.
         }
       }
       result.unresolved += 1;

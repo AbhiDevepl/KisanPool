@@ -18,6 +18,7 @@ import {
 } from './service';
 import { capacityOf, priceTripById, reallocate, savingPct } from './pricing';
 import { requireWritable } from '../resilience/guard';
+import { listKey, okOrLastKnown, tripKey } from '../resilience/snapshots';
 import {
   emitOfferReceived,
   emitOfferWithdrawn,
@@ -43,7 +44,7 @@ poolRouter.get(
   requireAuth,
   requireRole('TRANSPORTER'),
   asyncHandler<AuthedRequest>(async (req, res) => {
-    ok(res, await poolForTransporter(req.userId));
+    await okOrLastKnown(res, listKey('pool', req.userId), () => poolForTransporter(req.userId));
   }),
 );
 
@@ -113,6 +114,7 @@ poolRouter.get(
   requireAuth,
   requireRole('TRANSPORTER'),
   asyncHandler<AuthedRequest>(async (req, res) => {
+   await okOrLastKnown(res, listKey('offers', req.userId), async () => {
     const offers = await TransporterOffer.find({
       transporterId: req.userId,
       state: { $in: ['INTERESTED', 'SELECTED'] },
@@ -133,15 +135,13 @@ poolRouter.get(
     ]);
     const sizeByTrip = new Map(poolSizes.map((p) => [String(p._id), p.count]));
 
-    ok(
-      res,
-      offers.map((offer) => ({
-        ...offer.toJSON(),
-        savingPct: savingPct(offer.soloPrice, offer.quotedPrice),
-        poolSize: offer.tripId ? (sizeByTrip.get(String(offer.tripId)) ?? 0) : 0,
-        request: byId.get(String(offer.requestId)),
-      })),
-    );
+    return offers.map((offer) => ({
+      ...offer.toJSON(),
+      savingPct: savingPct(offer.soloPrice, offer.quotedPrice),
+      poolSize: offer.tripId ? (sizeByTrip.get(String(offer.tripId)) ?? 0) : 0,
+      request: byId.get(String(offer.requestId)),
+    }));
+   });
   }),
 );
 
@@ -248,10 +248,11 @@ poolRouter.get(
   requireAuth,
   requireRole('TRANSPORTER'),
   asyncHandler<AuthedRequest>(async (req, res) => {
-    const trips = await Trip.find({ transporterId: req.userId }).sort({ createdAt: -1 }).limit(30);
-    ok(
-      res,
-      await Promise.all(
+    await okOrLastKnown(res, listKey('trips', req.userId), async () => {
+      const trips = await Trip.find({ transporterId: req.userId })
+        .sort({ createdAt: -1 })
+        .limit(30);
+      return Promise.all(
         trips.map(async (trip) => ({
           ...trip.toJSON(),
           capacity: await capacityOf(trip),
@@ -262,8 +263,8 @@ poolRouter.get(
           // the trip's economics, from the same engine the farmers are priced by
           pricing: await priceTripById(String(trip._id)),
         })),
-      ),
-    );
+      );
+    });
   }),
 );
 
@@ -271,7 +272,9 @@ poolRouter.get(
   '/trips/:id',
   requireAuth,
   asyncHandler<AuthedRequest>(async (req, res) => {
-    ok(res, await tripDetail(req.params.id, req.userId));
+    await okOrLastKnown(res, `${tripKey(req.params.id)}:detail:${req.userId}`, () =>
+      tripDetail(req.params.id, req.userId),
+    );
   }),
 );
 
@@ -284,7 +287,9 @@ poolRouter.get(
   '/trips/:id/track',
   requireAuth,
   asyncHandler<AuthedRequest>(async (req, res) => {
-    ok(res, await trackTrip(req.params.id, req.userId));
+    await okOrLastKnown(res, `${tripKey(req.params.id)}:track:${req.userId}`, () =>
+      trackTrip(req.params.id, req.userId),
+    );
   }),
 );
 
@@ -380,19 +385,18 @@ poolRouter.get(
   '/shipments/mine',
   requireAuth,
   asyncHandler<AuthedRequest>(async (req, res) => {
-    const shipments = await TripShipment.find({ farmerId: req.userId })
-      .sort({ createdAt: -1 })
-      .limit(50);
-    const trips = await Trip.find({ _id: { $in: shipments.map((s) => s.tripId) } });
-    const byId = new Map(trips.map((t) => [String(t._id), t]));
+    await okOrLastKnown(res, listKey('shipments', req.userId), async () => {
+      const shipments = await TripShipment.find({ farmerId: req.userId })
+        .sort({ createdAt: -1 })
+        .limit(50);
+      const trips = await Trip.find({ _id: { $in: shipments.map((s) => s.tripId) } });
+      const byId = new Map(trips.map((t) => [String(t._id), t]));
 
-    ok(
-      res,
-      shipments.map((shipment) => ({
+      return shipments.map((shipment) => ({
         ...shipment.toJSON(),
         savingPct: savingPct(shipment.soloPrice, shipment.finalPrice ?? shipment.allocatedPrice),
         trip: byId.get(String(shipment.tripId)) ?? null,
-      })),
-    );
+      }));
+    });
   }),
 );

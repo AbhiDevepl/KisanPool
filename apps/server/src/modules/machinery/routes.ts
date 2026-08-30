@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import { z } from 'zod';
 import { ApiError, ok } from '../../lib/envelope';
 import { asyncHandler } from '../../middleware/error';
@@ -25,7 +26,8 @@ import {
   requestBooking,
 } from './service';
 import { emitMachineBookingRequested, emitMachineBookingState } from '../realtime';
-import { requireWritable } from '../resilience/guard';
+import { deferrable, requireWritable } from '../resilience/guard';
+import { listKey, okOrLastKnown } from '../resilience/snapshots';
 import { notifyMachineBooking } from '../notifications/service';
 
 export const machineryRouter = Router();
@@ -260,8 +262,29 @@ const bookSchema = z.object({
 machineryRouter.post(
   '/bookings',
   requireAuth,
-  // holds a machine's slot — an irreversible reservation (ADR-044)
-  requireWritable,
+  /*
+   * Holds a machine's slot — irreversible, so it is never confirmed while the
+   * database cannot commit it (ADR-044). It is, however, fully described by this
+   * body, so instead of vanishing it is journalled and replayed through
+   * `requestBooking` — which re-runs the slot race for real (ADR-045).
+   */
+  deferrable((req) => {
+    const body = bookSchema.parse(req.body);
+    return {
+      eventType: 'MACHINE_BOOKING_CREATED',
+      entityType: 'MachineBooking',
+      entityId: String(new mongoose.Types.ObjectId()),
+      payload: {
+        machineId: body.machineId,
+        window: { start: body.start.toISOString(), end: body.end.toISOString() },
+        location: body.location,
+        operatorMode: body.operatorMode,
+        workType: body.workType ?? null,
+        areaAcres: body.areaAcres ?? null,
+        notes: body.notes ?? null,
+      },
+    };
+  }),
   asyncHandler<AuthedRequest>(async (req, res) => {
     const body = bookSchema.parse(req.body);
     const { booking, machine } = await requestBooking({
@@ -364,6 +387,7 @@ machineryRouter.get(
     const role = z.enum(['farmer', 'provider']).default('farmer').parse(req.query.role ?? 'farmer');
     const filter = role === 'provider' ? { providerId: req.userId } : { farmerId: req.userId };
 
+   await okOrLastKnown(res, listKey(`machinebookings:${role}`, req.userId), async () => {
     const bookings = await MachineBooking.find(filter).sort({ createdAt: -1 }).limit(50);
     const machines = await FarmMachine.find({ _id: { $in: bookings.map((b) => b.machineId) } });
 
@@ -388,29 +412,27 @@ machineryRouter.get(
       };
     };
 
-    ok(
-      res,
-      bookings.map((booking) => {
-        const machine = machineById.get(String(booking.machineId));
-        // phones are exchanged only once the job is actually on
-        const committed = ['CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'PAID'].includes(booking.state);
-        return {
-          ...booking.toJSON(),
-          // the farmer reads their own start code; the provider never sees it
-          startOtp: role === 'farmer' ? booking.startOtp : undefined,
-          group: booking.groupId ? (groups.get(String(booking.groupId)) ?? undefined) : undefined,
-          machine: machine && {
-            _id: String(machine._id),
-            category: machine.category,
-            title: machine.title,
-            makeModel: machine.makeModel,
-            baseLocation: machine.baseLocation,
-          },
-          provider: brief(booking.providerId, committed),
-          farmer: brief(booking.farmerId, committed),
-        };
-      }),
-    );
+    return bookings.map((booking) => {
+      const machine = machineById.get(String(booking.machineId));
+      // phones are exchanged only once the job is actually on
+      const committed = ['CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'PAID'].includes(booking.state);
+      return {
+        ...booking.toJSON(),
+        // the farmer reads their own start code; the provider never sees it
+        startOtp: role === 'farmer' ? booking.startOtp : undefined,
+        group: booking.groupId ? (groups.get(String(booking.groupId)) ?? undefined) : undefined,
+        machine: machine && {
+          _id: String(machine._id),
+          category: machine.category,
+          title: machine.title,
+          makeModel: machine.makeModel,
+          baseLocation: machine.baseLocation,
+        },
+        provider: brief(booking.providerId, committed),
+        farmer: brief(booking.farmerId, committed),
+      };
+    });
+   });
   }),
 );
 

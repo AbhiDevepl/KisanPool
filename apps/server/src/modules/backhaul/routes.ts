@@ -25,7 +25,8 @@ import {
   emitReturnLegState,
 } from '../realtime';
 import { notifyBackhaulBooked } from '../notifications/service';
-import { requireWritable } from '../resilience/guard';
+import { deferrable, requireWritable } from '../resilience/guard';
+import { listKey, okOrLastKnown, tripKey } from '../resilience/snapshots';
 
 export const backhaulRouter = Router();
 
@@ -105,6 +106,7 @@ backhaulRouter.get(
   '/requests/mine',
   requireAuth,
   asyncHandler<AuthedRequest>(async (req, res) => {
+   await okOrLastKnown(res, listKey('backhaulrequests', req.userId), async () => {
     const requests = await BackhaulRequest.find({ requesterId: req.userId })
       .sort({ createdAt: -1 })
       .limit(50);
@@ -116,31 +118,29 @@ backhaulRouter.get(
     const drivers = await User.find({ _id: { $in: bookings.map((b) => b.transporterId) } });
     const driverById = new Map(drivers.map((u) => [String(u._id), u]));
 
-    ok(
-      res,
-      requests.map((request) => {
-        const booking = byRequest.get(String(request._id));
-        const driver = booking ? driverById.get(String(booking.transporterId)) : null;
-        return {
-          ...request.toJSON(),
-          booking: booking && {
-            _id: String(booking._id),
-            tripId: String(booking.tripId),
-            state: booking.state,
-            price: booking.price,
-            // the requester reads this out when the driver arrives
-            pickupOtp: booking.pickupOtp,
-            transporter: driver && {
-              _id: String(driver._id),
-              name: driver.name,
-              // exchanged only once a driver has actually taken the load
-              phone: driver.phone,
-              ratingAvg: driver.ratingAvg,
-            },
+    return requests.map((request) => {
+      const booking = byRequest.get(String(request._id));
+      const driver = booking ? driverById.get(String(booking.transporterId)) : null;
+      return {
+        ...request.toJSON(),
+        booking: booking && {
+          _id: String(booking._id),
+          tripId: String(booking.tripId),
+          state: booking.state,
+          price: booking.price,
+          // the requester reads this out when the driver arrives
+          pickupOtp: booking.pickupOtp,
+          transporter: driver && {
+            _id: String(driver._id),
+            name: driver.name,
+            // exchanged only once a driver has actually taken the load
+            phone: driver.phone,
+            ratingAvg: driver.ratingAvg,
           },
-        };
-      }),
-    );
+        },
+      };
+    });
+   });
   }),
 );
 
@@ -212,7 +212,18 @@ backhaulRouter.post(
   '/trips/:id/return-loads/:requestId/accept',
   requireAuth,
   requireRole('TRANSPORTER'),
-  requireWritable,
+  /*
+   * Both identities are in the URL and `acceptBackhaul` re-runs every cargo,
+   * capacity and race check on replay, so an outage defers this rather than
+   * losing it. The unique index on BackhaulBooking.requestId is what makes a
+   * double replay impossible (ADR-045).
+   */
+  deferrable((req) => ({
+    eventType: 'BACKHAUL_BOOKING_CREATED',
+    entityType: 'BackhaulRequest',
+    entityId: req.params.requestId,
+    payload: { tripId: req.params.id, requestId: req.params.requestId },
+  })),
   asyncHandler<AuthedRequest>(async (req, res) => {
     const { booking, trip, quote } = await acceptBackhaul(
       req.params.id,
@@ -244,30 +255,32 @@ backhaulRouter.get(
   requireAuth,
   requireRole('TRANSPORTER'),
   asyncHandler<AuthedRequest>(async (req, res) => {
-    const trip = await Trip.findById(req.params.id);
-    if (!trip) throw new ApiError('RESOURCE_NOT_FOUND', 'That trip no longer exists.');
-    if (String(trip.transporterId) !== req.userId) {
-      throw new ApiError('AUTH_FORBIDDEN', 'That trip is not yours.');
-    }
+    await okOrLastKnown(res, `${tripKey(req.params.id)}:returnleg`, async () => {
+      const trip = await Trip.findById(req.params.id);
+      if (!trip) throw new ApiError('RESOURCE_NOT_FOUND', 'That trip no longer exists.');
+      if (String(trip.transporterId) !== req.userId) {
+        throw new ApiError('AUTH_FORBIDDEN', 'That trip is not yours.');
+      }
 
-    const bookings = await BackhaulBooking.find({ tripId: trip._id, state: { $ne: 'CANCELLED' } })
-      .sort({ createdAt: 1 });
-    const requesters = await User.find({ _id: { $in: bookings.map((b) => b.requesterId) } });
-    const byId = new Map(requesters.map((u) => [String(u._id), u]));
+      const bookings = await BackhaulBooking.find({ tripId: trip._id, state: { $ne: 'CANCELLED' } })
+        .sort({ createdAt: 1 });
+      const requesters = await User.find({ _id: { $in: bookings.map((b) => b.requesterId) } });
+      const byId = new Map(requesters.map((u) => [String(u._id), u]));
 
-    ok(res, {
-      returnLeg: trip.returnLeg,
-      capacity: await returnCapacityOf(trip),
-      utilisation: await tripUtilisation(String(trip._id)),
-      bookings: bookings.map((b) => ({
-        ...b.toJSON(),
-        // the driver never sees the collection code; the requester reads it out
-        pickupOtp: undefined,
-        requester: (() => {
-          const u = byId.get(String(b.requesterId));
-          return u && { _id: String(u._id), name: u.name, phone: u.phone, ratingAvg: u.ratingAvg };
-        })(),
-      })),
+      return {
+        returnLeg: trip.returnLeg,
+        capacity: await returnCapacityOf(trip),
+        utilisation: await tripUtilisation(String(trip._id)),
+        bookings: bookings.map((b) => ({
+          ...b.toJSON(),
+          // the driver never sees the collection code; the requester reads it out
+          pickupOtp: undefined,
+          requester: (() => {
+            const u = byId.get(String(b.requesterId));
+            return u && { _id: String(u._id), name: u.name, phone: u.phone, ratingAvg: u.ratingAvg };
+          })(),
+        })),
+      };
     });
   }),
 );

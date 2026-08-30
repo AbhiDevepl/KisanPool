@@ -193,6 +193,8 @@ export function ResilienceTab() {
             style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', marginTop: 10 }}
           >
             <Metric label="Pending events" value={incident.pendingEvents} />
+            {/* replayed = genuinely re-driven through the real business service */}
+            <Metric label="Replayed" value={incident.replayedEvents} />
             <Metric label="Already applied" value={incident.supersededEvents} />
             <Metric label="Unresolved" value={incident.failedEvents} bad={incident.failedEvents > 0} />
             <Metric
@@ -218,8 +220,9 @@ export function ResilienceTab() {
             <div className="card" style={{ marginTop: 10, borderColor: 'var(--primary)' }}>
               <strong>SYSTEM RECOVERED</strong>
               <div className="label-sm">
-                ✓ Journal reconciled ({incident.supersededEvents} already applied,{' '}
-                {incident.failedEvents} unresolved) · ✓ Integrity checks passed · ✓{' '}
+                ✓ Journal reconciled ({incident.replayedEvents} replayed,{' '}
+                {incident.supersededEvents} already applied, {incident.failedEvents} unresolved) ·
+                ✓ Integrity checks passed · ✓{' '}
                 {incident.snapshotsRebuilt ?? 0} snapshots rebuilt from the database
               </div>
             </div>

@@ -24,7 +24,9 @@
  * loses nothing by using it, and CASE 3 of the failure matrix — Redis down,
  * Mongo healthy — must simply keep working.
  */
+import type { Response } from 'express';
 import { config } from '../../config';
+import { ok } from '../../lib/envelope';
 import { redisConnection } from './journal';
 
 export interface Snapshot<T> {
@@ -179,3 +181,79 @@ export const readVehicleSnapshot = (
 
 /** Test/diagnostic view of the in-process fallback. */
 export const memorySnapshotCount = (): number => memory.size;
+
+// ---------------------------------------------------------------------------
+// read-through continuity — the thing that makes CASE 2 usable
+// ---------------------------------------------------------------------------
+
+/**
+ * Is this failure "the store could not answer", as opposed to "the answer is no"?
+ *
+ * The distinction is the whole safety property. A 404, a 403 or a validation
+ * error is a real, correct answer and must be returned as-is — serving a cached
+ * trip to someone who has just been removed from it would be a security bug, not
+ * continuity. Only an unreachable/unreadable store falls back.
+ *
+ * `MongoServerError` is excluded on purpose: it means the server answered and
+ * rejected the operation (a duplicate key, a failed validator), which is a real
+ * answer.
+ */
+export function isStoreFailure(err: unknown): boolean {
+  const e = err as { name?: string; message?: string } | null;
+  if (!e) return false;
+  if (typeof e.name === 'string' && e.name.startsWith('Mongo') && e.name !== 'MongoServerError') {
+    return true;
+  }
+  return /buffering timed out|server selection|topology|ECONNREFUSED|not connected|pool (was )?cleared|blackout simulation/i.test(
+    e.message ?? '',
+  );
+}
+
+/**
+ * Cache-aside read with outage continuity (ADR-045).
+ *
+ * On the happy path this is an ordinary read that also leaves a snapshot behind —
+ * which is what keeps Redis holding *current operational state* without a second
+ * set of write hooks to drift out of sync with the read models. When the
+ * authoritative store cannot answer, the last snapshot is served instead, stamped
+ * with when it was captured.
+ *
+ * If there is no snapshot the original error is rethrown. Inventing an empty list
+ * would read as "you have no trips", which is a lie a farmer would act on.
+ */
+export async function continuity<T>(
+  key: string,
+  load: () => Promise<T>,
+): Promise<{ value: T; asOf: string | null }> {
+  try {
+    const value = await load();
+    // fire-and-forget: a cache write must never delay or fail the response
+    void putSnapshot(key, value);
+    return { value, asOf: null };
+  } catch (err) {
+    if (!isStoreFailure(err)) throw err;
+    const snapshot = await getSnapshot<T>(key);
+    if (!snapshot) throw err;
+    return { value: snapshot.value, asOf: snapshot.capturedAt };
+  }
+}
+
+/**
+ * Route helper: serve a read, falling back to the last known snapshot.
+ *
+ * The payload shape is unchanged, so no client breaks. Staleness is advertised
+ * out-of-band in `X-Data-As-Of`; the user-facing banner is driven by
+ * `/system/service-status`, which already carries `lastSyncedAt`.
+ */
+export async function okOrLastKnown<T>(
+  res: Response,
+  key: string,
+  load: () => Promise<T>,
+): Promise<void> {
+  const { value, asOf } = await continuity(key, load);
+  if (asOf) res.setHeader('X-Data-As-Of', asOf);
+  ok(res, value);
+}
+
+/** Per-user list snapshots — `list:<view>:<userId>`. */
+export const listKey = (view: string, userId: string): string => `list:${view}:${userId}`;

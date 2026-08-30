@@ -96,6 +96,17 @@ export async function openReturnLeg(tripId: string, transporterId: string) {
   const home = await homeFor(trip);
   const { distanceKm } = await getDirections(asPoint(trip.destination), home);
 
+  // opening the homeward leg changes what capacity this vehicle is offering, so
+  // it is journalled like any other trip transition (ADR-045)
+  const intent = await recordIntent({
+    eventType: 'RETURN_LEG_STATE_CHANGED',
+    entityType: 'Trip',
+    entityId: tripId,
+    actorId: transporterId,
+    operationKey: operationKey('RETURN_LEG_STATE_CHANGED', tripId, 'OPEN'),
+    payload: { fromState: trip.returnLeg?.state ?? 'NONE', toState: 'OPEN' },
+  });
+
   trip.returnLeg = {
     state: 'OPEN',
     origin: {
@@ -110,6 +121,7 @@ export async function openReturnLeg(tripId: string, transporterId: string) {
     completedAt: undefined,
   };
   await trip.save();
+  await markCommitted(intent);
   return trip;
 }
 
@@ -456,8 +468,18 @@ export async function advanceReturnLeg(tripId: string, to: ReturnLegState, trans
   }
   if (to === 'IN_TRANSIT') trip.returnLeg.startedAt = new Date();
 
+  const intent = await recordIntent({
+    eventType: 'RETURN_LEG_STATE_CHANGED',
+    entityType: 'Trip',
+    entityId: tripId,
+    actorId: transporterId,
+    operationKey: operationKey('RETURN_LEG_STATE_CHANGED', tripId, to),
+    payload: { fromState: from, toState: to },
+  });
+
   trip.returnLeg.state = to;
   await trip.save();
+  await markCommitted(intent);
   return trip;
 }
 

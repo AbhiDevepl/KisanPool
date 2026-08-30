@@ -51,6 +51,9 @@ def check(label, condition, detail=""):
         print(f"  FAIL  {label}   {detail}")
 
 
+LAST_HEADERS = {}
+
+
 def call(method, path, body=None, token=None):
     request = urllib.request.Request(BASE + path, method=method)
     if token:
@@ -59,8 +62,10 @@ def call(method, path, body=None, token=None):
     if body is not None:
         request.add_header("content-type", "application/json")
         data = json.dumps(body).encode()
+    LAST_HEADERS.clear()
     try:
         with urllib.request.urlopen(request, data, timeout=60) as response:
+            LAST_HEADERS.update({k.lower(): v for k, v in response.headers.items()})
             envelope = json.loads(response.read())
     except urllib.error.HTTPError as error:
         envelope = json.loads(error.read())
@@ -227,9 +232,17 @@ check("an aggregate-backed endpoint works normally",
       error_of(agg) is None, f'{len(agg) if isinstance(agg, list) else "?"} row(s)')
 
 call("POST", "/admin/resilience/simulate", {"mode": "OUTAGE"}, admin)
+# The gate still fires — but since ADR-045 the read no longer dies on it: the
+# request above left a snapshot behind, so continuity serves it stamped with when
+# it was true. The `X-Data-As-Of` header IS the proof the gate fired.
 agg_blocked = call("GET", "/pool/offers/mine", token=driver)
-check("the same endpoint IS gated during an outage — the hook really fires",
-      error_of(agg_blocked) is not None, str(error_of(agg_blocked)))
+check("the outage is intercepted and the read is served from the last snapshot",
+      error_of(agg_blocked) is None and "x-data-as-of" in LAST_HEADERS,
+      LAST_HEADERS.get("x-data-as-of", str(error_of(agg_blocked))))
+uncached = call("GET", "/pool/requests", token=driver)
+check("a read with NO snapshot still fails honestly rather than inventing an empty list",
+      error_of(uncached) == "EXTERNAL_SERVICE_ERROR" or "x-data-as-of" in LAST_HEADERS,
+      str(error_of(uncached)))
 call("POST", "/admin/resilience/simulate/stop", {}, admin)
 call("POST", "/admin/resilience/reset", {}, admin)
 
@@ -467,6 +480,312 @@ check("business data is unchanged end to end",
       after_all["pricing"]["totalCost"] == snapshot_before["pricing"]["totalCost"]
       and len(after_all["shipments"]) == len(snapshot_before["shipments"]),
       f'₹{after_all["pricing"]["totalCost"]}')
+
+# ===========================================================================
+# 13. THE FOUR-CASE FAILURE MATRIX, END TO END (ADR-045)
+#
+# The sections above prove detection, refusal and honest recovery. This one
+# proves the two things that were MISSING, and that the Blackout brief actually
+# asks for:
+#
+#   * with MongoDB gone and Redis up, the app is still USABLE — reads are served
+#     from the operational snapshots, stamped with when they were true;
+#   * a new critical operation attempted during the outage is DURABLY CAPTURED
+#     and later replayed, instead of disappearing.
+#
+# Before ADR-045 every read returned EXTERNAL_SERVICE_ERROR and the pending
+# journal queue never moved off zero — which meant every applier in recovery.ts
+# was unreachable code.
+# ===========================================================================
+print()
+print("=== 13. CASE A: MongoDB ON + Redis ON — normal, and Redis holds live state ===")
+call("POST", "/admin/resilience/reset", {}, admin)
+call("POST", "/admin/resilience/redis/enable", {"url": "redis://localhost:6379"}, admin)
+s = status(admin)
+check("CASE A state is nominal", s["state"] in ("HEALTHY", "DEGRADED"), s["state"])
+check("CASE A accepts writes", s["writesRestricted"] is False)
+
+# read the views a farmer and a driver actually use; each one leaves a snapshot
+warm = {
+    "farmer requests": call("GET", "/transport/requests", token=farmer),
+    "farmer shipments": call("GET", "/pool/shipments/mine", token=farmer),
+    "farmer trip": call("GET", f"/pool/trips/{TRIP_ID}", token=farmer),
+    "farmer track": call("GET", f"/pool/trips/{TRIP_ID}/track", token=farmer),
+    "driver trips": call("GET", "/pool/trips/mine", token=driver),
+    "driver offers": call("GET", "/pool/offers/mine", token=driver),
+    "driver pool": call("GET", "/pool/requests", token=driver),
+    "machine bookings": call("GET", "/farm/bookings/mine", token=farmer),
+    "backhaul requests": call("GET", "/backhaul/requests/mine", token=farmer),
+}
+
+# a REAL machine, so the booking deferred below can genuinely replay rather than
+# being reported unresolved — that is what proves machinery recovery, not just
+# machinery capture
+listed = call("GET", "/farm/machines?lat=18.6298&lng=73.7997", token=farmer)
+MACHINE_ID = next(
+    (m["_id"] for m in listed if m["status"] == "LISTED" and m["operatorMode"] in ("WITH_OPERATOR", "EITHER")),
+    None,
+) if isinstance(listed, list) else None
+check("a real machine is available to book", MACHINE_ID is not None, str(MACHINE_ID))
+check("every operational view reads normally with both stores up",
+      all(error_of(v) is None for v in warm.values()),
+      str({k: error_of(v) for k, v in warm.items() if error_of(v)}) or "all OK")
+check("none of them is marked stale while MongoDB is answering",
+      "x-data-as-of" not in LAST_HEADERS)
+
+print()
+print("=== 13b. CASE B: MongoDB OFF + Redis ON — usable, and nothing is lost ===")
+call("POST", "/admin/resilience/simulate", {"mode": "OUTAGE"}, admin)
+s = drive_detector(admin)
+check("CASE B is diagnosed", s["state"] == "RECOVERY_REQUIRED" and s["database"]["state"] == "DOWN",
+      f'{s["state"]} · db={s["database"]["state"]} · cache={s["cache"]["state"]}')
+
+served = {}
+for label, path, tok in (
+    ("farmer requests", "/transport/requests", farmer),
+    ("farmer shipments", "/pool/shipments/mine", farmer),
+    ("farmer trip", f"/pool/trips/{TRIP_ID}", farmer),
+    ("farmer track", f"/pool/trips/{TRIP_ID}/track", farmer),
+    ("driver trips", "/pool/trips/mine", driver),
+    ("driver offers", "/pool/offers/mine", driver),
+    ("machine bookings", "/farm/bookings/mine", farmer),
+    ("backhaul requests", "/backhaul/requests/mine", farmer),
+):
+    result = call("GET", path, token=tok)
+    served[label] = (error_of(result), LAST_HEADERS.get("x-data-as-of"), result)
+
+check(
+    "THE APP STAYS USABLE — every warmed view is still served with MongoDB gone",
+    all(e is None for e, _, _ in served.values()),
+    str({k: e for k, (e, _, _) in served.items() if e}) or "8/8 served",
+)
+check(
+    "and every one of them is stamped with when it was last true",
+    all(asof for _, asof, _ in served.values()),
+    str(next((a for _, a, _ in served.values() if a), None)),
+)
+check(
+    "the continuity data is the REAL last-known state, not a placeholder",
+    served["farmer trip"][2]["trip"]["_id"] == TRIP_ID
+    and served["farmer trip"][2]["pricing"]["totalCost"] == warm["farmer trip"]["pricing"]["totalCost"],
+    f'₹{served["farmer trip"][2]["pricing"]["totalCost"]} · {len(served["farmer trip"][2]["shipments"])} shipment(s)',
+)
+check(
+    "the transporter's last known position and ETA survive the outage",
+    "trackable" in served["farmer track"][2],
+    str(sorted(served["farmer track"][2].keys()))[:70],
+)
+
+# --- the critical part: a NEW operation during the outage ---
+pending_before = call("GET", "/admin/resilience/journal?limit=500", token=admin)["health"]["pending"]
+
+deferred_req = call("POST", "/transport/requests", {
+    "cropType": "Onion", "quantityKg": 550, "pickup": PIMPRI, "destination": LASALGAON,
+    "preferredDate": "2026-09-12T06:00:00.000Z", "notes": "created during the blackout",
+}, farmer)
+check("a new request during the outage is NOT reported as confirmed",
+      error_of(deferred_req) == "EXTERNAL_SERVICE_ERROR", str(error_of(deferred_req)))
+check("...but the farmer is told it was saved and will complete automatically",
+      "saved" in deferred_req.get("__message", "").lower()
+      and "reference" in deferred_req.get("__message", "").lower(),
+      deferred_req.get("__message", "")[:90])
+
+deferred_machine = call("POST", "/farm/bookings", {
+    "machineId": MACHINE_ID,
+    "start": "2026-11-18T03:00:00Z", "end": "2026-11-18T06:00:00Z",
+    "location": {"name": "Hinjewadi, Pune", "lat": 18.5913, "lng": 73.7389},
+    "operatorMode": "WITH_OPERATOR", "areaAcres": 2,
+}, farmer)
+check("a machinery booking during the outage is captured, not confirmed",
+      error_of(deferred_machine) == "EXTERNAL_SERVICE_ERROR"
+      and "saved" in deferred_machine.get("__message", "").lower(),
+      deferred_machine.get("__message", "")[:70])
+
+deferred_backhaul = call("POST", f"/backhaul/trips/{TRIP_ID}/return-loads/000000000000000000000000/accept",
+                         {}, driver)
+check("a backhaul acceptance during the outage is captured, not confirmed",
+      error_of(deferred_backhaul) == "EXTERNAL_SERVICE_ERROR"
+      and "saved" in deferred_backhaul.get("__message", "").lower(),
+      deferred_backhaul.get("__message", "")[:70])
+
+blocked_payment = call("POST", "/payments/create-order", {"shipmentId": "000000000000000000000000"}, farmer)
+check("MONEY IS NEVER DEFERRED — a payment order is flatly refused",
+      error_of(blocked_payment) == "EXTERNAL_SERVICE_ERROR"
+      and "saved" not in blocked_payment.get("__message", "").lower(),
+      blocked_payment.get("__message", "")[:70])
+
+board = call("GET", "/admin/resilience/journal?limit=500", token=admin)
+pending_now = board["health"]["pending"]
+pending_kinds = {e["eventType"] for e in board["events"] if e["state"] == "PENDING"}
+check("THE PENDING QUEUE ACTUALLY MOVED — operations were durably preserved",
+      pending_now > pending_before, f"{pending_before} → {pending_now} pending")
+# the journal is a long-lived append-only file, so identity — not a count — is what
+# proves these three specific operations were the ones captured
+pending_payloads = json.dumps([e["payload"] for e in board["events"] if e["state"] == "PENDING"])
+check("the deferred request is in the queue as REQUEST_CREATED, with its own payload",
+      "REQUEST_CREATED" in pending_kinds and "created during the blackout" in pending_payloads,
+      str(sorted(pending_kinds)))
+check("the deferred machinery booking is in the queue with the real machine it named",
+      any(e["eventType"] == "MACHINE_BOOKING_CREATED" and e["state"] == "PENDING"
+          and e["payload"].get("machineId") == MACHINE_ID
+          and str(e["payload"].get("window", {}).get("start", "")).startswith("2026-11-18")
+          for e in board["events"]),
+      "MACHINE_BOOKING_CREATED pending for the deferred window")
+check("the deferred backhaul acceptance is in the queue too",
+      "BACKHAUL_BOOKING_CREATED" in pending_kinds, str(sorted(pending_kinds)))
+check("the journal is durable while it is holding them",
+      board["health"]["durable"] is True, board["health"]["backend"])
+check("no pending payment intent was manufactured",
+      "PAYMENT_STATE_CHANGED" not in pending_kinds, str(sorted(pending_kinds)))
+check("the deferred payloads carry no secrets",
+      not any(k in json.dumps([e["payload"] for e in board["events"] if e["state"] == "PENDING"]).lower()
+              for k in ("otp", "token", "secret", "password", "ifsc", "pan")))
+
+print()
+print("=== 13c. CASE D: MongoDB OFF + Redis OFF — safe mode, still no data loss ===")
+call("POST", "/admin/resilience/redis/disable", {}, admin)
+s = drive_detector(admin, 2)
+check("CASE D reports both dependencies down",
+      s["database"]["state"] == "DOWN" and s["cache"]["state"] == "DOWN",
+      f'db={s["database"]["state"]} · cache={s["cache"]["state"]}')
+check("CASE D is an explicit safe/degraded mode, not a crash",
+      s["state"] == "RECOVERY_REQUIRED" and s["writesRestricted"] is True, s["state"])
+check("the journal is STILL durable — the fsync'd file is the floor",
+      s["journal"]["durable"] is True and s["journal"]["backend"] == "FILE",
+      f'{s["journal"]["backend"]} · {s["journal"]["pending"]} pending')
+check("nothing already captured was dropped when the cache went away",
+      s["journal"]["pending"] >= pending_now, f'{pending_now} → {s["journal"]["pending"]}')
+
+safe_read = call("GET", f"/pool/trips/{TRIP_ID}", token=farmer)
+check("with both stores gone a read either fails honestly or serves the in-process copy",
+      error_of(safe_read) == "EXTERNAL_SERVICE_ERROR" or "x-data-as-of" in LAST_HEADERS,
+      str(error_of(safe_read) or f'as of {LAST_HEADERS.get("x-data-as-of")}'))
+user_view = call("GET", "/system/service-status", token=farmer)
+check("the user is still told the truth in safe mode",
+      user_view["normal"] is False and user_view["writesRestricted"] is True, user_view["state"])
+check("and is never shown a false 'Recovered'",
+      "recovered" not in user_view["message"].lower(), user_view["message"][:60])
+
+deferred_in_safe_mode = call("POST", "/transport/requests", {
+    "cropType": "Grapes", "quantityKg": 300, "pickup": PIMPRI, "destination": LASALGAON,
+    "preferredDate": "2026-09-13T06:00:00.000Z", "notes": "created in full safe mode",
+}, farmer)
+check("a critical operation in FULL safe mode is still durably captured",
+      "saved" in deferred_in_safe_mode.get("__message", "").lower(),
+      deferred_in_safe_mode.get("__message", "")[:70])
+
+print()
+print("=== 13d. CASE C: Redis OFF + MongoDB ON — straight through to MongoDB ===")
+call("POST", "/admin/resilience/simulate/stop", {}, admin)
+s = drive_detector(admin, 2)
+check("CASE C keeps serving: cache down, database up",
+      s["database"]["state"] in ("UP", "DEGRADED") and s["cache"]["state"] == "DOWN",
+      f'db={s["database"]["state"]} · cache={s["cache"]["state"]}')
+check("CASE C does not restrict writes — losing a cache is not an incident",
+      s["writesRestricted"] is False or s["state"] == "RECONCILING", s["state"])
+
+no_cache_read = call("GET", "/pool/shipments/mine", token=farmer)
+check("reads go straight to MongoDB with no cache in the way",
+      error_of(no_cache_read) is None and "x-data-as-of" not in LAST_HEADERS,
+      f'{len(no_cache_read) if isinstance(no_cache_read, list) else "?"} row(s), fresh')
+
+print()
+print("=== 13e. recovery: replay → reconcile → validate → rebuild Redis ===")
+call("POST", "/admin/resilience/redis/enable", {"url": "redis://localhost:6379"}, admin)
+drive_detector(admin, 2)
+
+rec = call("POST", "/admin/resilience/recover", {}, admin)
+check("recovery runs", error_of(rec) is None, str(error_of(rec)))
+check("the pending operations captured during the outage were examined",
+      rec["replay"]["examined"] >= 3, f'{rec["replay"]["examined"]} examined')
+check("at least one was genuinely re-applied through its real business service",
+      rec["replay"]["replayed"] >= 1,
+      f'{rec["replay"]["replayed"]} replayed · {rec["replay"]["superseded"]} superseded · '
+      f'{rec["replay"].get("abandoned", 0)} abandoned · {rec["replay"]["unresolved"]} unresolved')
+check("an operation the real service REFUSES is abandoned with its reason, not left pending forever",
+      rec["replay"].get("abandoned", 0) >= 1
+      and any("cannot be applied" in d["outcome"] for d in rec["replay"]["details"]),
+      str([d["outcome"][:55] for d in rec["replay"]["details"] if "cannot be applied" in d["outcome"]])[:120])
+check("Redis snapshots were rebuilt from the authoritative database",
+      rec["snapshotsRebuilt"] >= 0, f'{rec["snapshotsRebuilt"]} rebuilt')
+check("integrity validation ran BEFORE recovery was declared",
+      rec["incident"] is not None and rec["incident"]["integrity"] is not None)
+check("RECOVERED is only claimed when validation actually passed",
+      (rec["finalState"] == "RECOVERED") == (rec["integrityPassed"] and rec["replay"]["unresolved"] == 0),
+      f'{rec["finalState"]} · integrityPassed={rec["integrityPassed"]}')
+
+# the requests the farmer was told were "saved" must now genuinely exist
+after_recovery = call("GET", "/transport/requests", token=farmer)
+notes = [r.get("notes") for r in after_recovery] if isinstance(after_recovery, list) else []
+check("THE PROMISE WAS KEPT — the request deferred during the outage now exists",
+      "created during the blackout" in notes,
+      f'{len(notes)} request(s)')
+check("so does the one captured in full safe mode",
+      "created in full safe mode" in notes, f'{len(notes)} request(s)')
+
+machine_after = call("GET", "/farm/bookings/mine", token=farmer)
+recovered_slot = [
+    b for b in machine_after
+    if isinstance(b, dict) and b.get("window", {}).get("start", "").startswith("2026-11-18")
+] if isinstance(machine_after, list) else []
+check("MACHINERY RECOVERY — the slot deferred during the outage was really held",
+      len(recovered_slot) == 1,
+      f'{len(recovered_slot)} booking(s) for the deferred window')
+check("...and it holds the identity the journal recorded, so a replay cannot double it",
+      bool(recovered_slot) and bool(recovered_slot[0]["_id"]),
+      recovered_slot[0]["_id"] if recovered_slot else "-")
+check("the backhaul acceptance that could NOT be re-driven is reported, never invented",
+      any(d["eventType"] == "BACKHAUL_BOOKING_CREATED" and "review" in d["outcome"].lower()
+          for d in rec["replay"]["details"])
+      or rec["replay"]["unresolved"] == 0,
+      str([d["outcome"][:40] for d in rec["replay"]["details"]]))
+
+print()
+print("=== 13f. replaying the recovery a second time changes nothing ===")
+count_before = len(after_recovery) if isinstance(after_recovery, list) else -1
+again = call("POST", "/admin/resilience/replay", {}, admin)
+once_more = call("POST", "/admin/resilience/replay", {}, admin)
+check("replay is safe to run repeatedly", error_of(again) is None and error_of(once_more) is None)
+check("the second pass has nothing left to examine",
+      once_more["examined"] <= again["examined"],
+      f'{again["examined"]} then {once_more["examined"]}')
+after_twice = call("GET", "/transport/requests", token=farmer)
+check("REPLAY IS IDEMPOTENT — no duplicate request was created",
+      isinstance(after_twice, list) and len(after_twice) == count_before,
+      f'{count_before} → {len(after_twice) if isinstance(after_twice, list) else "?"}')
+
+machine_twice = call("GET", "/farm/bookings/mine", token=farmer)
+slots_twice = [
+    b for b in machine_twice
+    if isinstance(b, dict) and b.get("window", {}).get("start", "").startswith("2026-11-18")
+] if isinstance(machine_twice, list) else []
+check("REPLAY IS IDEMPOTENT — no duplicate machinery hold, no double capacity",
+      len(slots_twice) == len(recovered_slot),
+      f'{len(recovered_slot)} → {len(slots_twice)}')
+
+integrity_final = call("GET", "/admin/resilience/integrity", token=admin)
+dup_final = next(f for f in integrity_final["findings"] if f["check"] == "duplicate shipments")
+check("no shipment was duplicated by the whole exercise",
+      dup_final["classification"] == "AUTO_RECOVERED", dup_final["detail"][:60])
+split_final = next(f for f in integrity_final["findings"] if f["check"] == "payment split arithmetic")
+check("money is still exactly split after replay",
+      split_final["classification"] == "AUTO_RECOVERED", split_final["detail"][:60])
+
+print()
+print("=== 13g. stale snapshots never outlive the data they described ===")
+fresh = call("GET", f"/pool/trips/{TRIP_ID}", token=farmer)
+check("after recovery reads are FRESH, never the pre-incident snapshot",
+      error_of(fresh) is None and "x-data-as-of" not in LAST_HEADERS,
+      "served from MongoDB")
+call("POST", "/admin/resilience/rebuild-snapshots", {}, admin)
+rebuilt_read = call("GET", f"/pool/trips/{TRIP_ID}", token=farmer)
+check("a snapshot rebuild does not disturb normal serving",
+      error_of(rebuilt_read) is None and rebuilt_read["trip"]["_id"] == TRIP_ID)
+
+call("POST", "/admin/resilience/reset", {}, admin)
+final_state = status(admin)
+check("the system ends the drill HEALTHY", final_state["state"] == "HEALTHY", final_state["state"])
+check("no simulation is left behind", final_state["simulation"] is None)
 
 print()
 print(f"{passed} passed, {failed} failed")

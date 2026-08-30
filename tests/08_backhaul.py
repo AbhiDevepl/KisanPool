@@ -461,5 +461,64 @@ check("the farmer's outbound share is unchanged by any of this",
       "outbound shares still sum to the outbound total")
 
 print()
+print("=== 12. the return leg is recoverable, not just correct (ADR-045) ===")
+# The Blackout brief asks specifically that machinery, backhaul AND the return
+# leg be covered by the recovery journal. This suite is the only place that
+# actually drives a trip all the way to an open return leg with a booked load, so
+# the journal assertions live here rather than being simulated elsewhere.
+_admin = call("POST", "/admin/login", {"username": "admin", "password": "admin"})["token"]
+
+# drive one real return-leg transition so BOTH journalled paths — opening it and
+# advancing it — are exercised against live state rather than asserted about.
+# (OPEN → LOADING happens as a side effect of accepting the first load, and is
+# covered by BACKHAUL_BOOKING_CREATED's own replay, so the explicit transition
+# to test is the next one.)
+_advanced = call("PATCH", f"/backhaul/trips/{TRIP_ID}/return-leg/state", {"state": "IN_TRANSIT"}, driver)
+check("the return leg advances", error_of(_advanced) is None
+      and _advanced["trip"]["returnLeg"]["state"] == "IN_TRANSIT", str(error_of(_advanced)))
+
+_journal = call("GET", "/admin/resilience/journal?limit=500", token=_admin)
+_events = _journal["events"]
+
+
+def _committed(kind, entity=None):
+    return [
+        e for e in _events
+        if e["eventType"] == kind
+        and e["state"] in ("COMMITTED", "REPLAYED", "SUPERSEDED")
+        and (entity is None or e["entityId"] == entity)
+    ]
+
+
+check("opening the return leg is journalled as a recoverable transition",
+      any(e["payload"].get("toState") == "OPEN" for e in _committed("RETURN_LEG_STATE_CHANGED", TRIP_ID)),
+      str([e["payload"].get("toState") for e in _committed("RETURN_LEG_STATE_CHANGED", TRIP_ID)]))
+check("advancing the return leg is journalled too",
+      any(e["payload"].get("toState") == "IN_TRANSIT"
+          for e in _committed("RETURN_LEG_STATE_CHANGED", TRIP_ID)),
+      str([e["payload"].get("toState") for e in _committed("RETURN_LEG_STATE_CHANGED", TRIP_ID)]))
+check("accepting a return load is journalled",
+      bool(_committed("BACKHAUL_BOOKING_CREATED")),
+      f'{len(_committed("BACKHAUL_BOOKING_CREATED"))} acceptance(s) recorded')
+check("every return-load state change is journalled",
+      bool(_committed("BACKHAUL_BOOKING_STATE_CHANGED")),
+      f'{len(_committed("BACKHAUL_BOOKING_STATE_CHANGED"))} transition(s) recorded')
+check("each carries a stable idempotency key",
+      all(len(e["operationKey"]) >= 16
+          for e in _committed("RETURN_LEG_STATE_CHANGED") + _committed("BACKHAUL_BOOKING_CREATED")))
+check("no collection code ever reaches the journal",
+      not any(k in json.dumps([e["payload"] for e in _events]).lower()
+              for k in ("otp", "pickupotp", "startotp", "secret", "token")))
+
+_before_replay = call("GET", f"/backhaul/trips/{TRIP_ID}/return-leg", token=driver)
+_replay = call("POST", "/admin/resilience/replay", {}, _admin)
+_after_replay = call("GET", f"/backhaul/trips/{TRIP_ID}/return-leg", token=driver)
+check("replaying the journal creates no second return-load booking and no state drift",
+      error_of(_replay) is None
+      and len(_after_replay["bookings"]) == len(_before_replay["bookings"])
+      and _after_replay["returnLeg"]["state"] == _before_replay["returnLeg"]["state"],
+      f'{len(_after_replay["bookings"])} booking(s), leg {_after_replay["returnLeg"]["state"]}')
+
+print()
 print(f"{passed} passed, {failed} failed")
 raise SystemExit(1 if failed else 0)

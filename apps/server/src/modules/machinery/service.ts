@@ -201,6 +201,8 @@ export interface BookInput {
   workType?: string;
   areaAcres?: number;
   notes?: string;
+  /** recovery-only: preserve the original identity across a replay */
+  id?: string;
 }
 
 /**
@@ -214,13 +216,29 @@ export interface BookInput {
  * calendar. Touching the machine document makes the second writer lose.
  */
 export async function requestBooking(input: BookInput) {
-  const bookingId = new mongoose.Types.ObjectId();
+  // a replay must recreate the booking under its ORIGINAL id: that is both the
+  // identity the journal recorded and the constraint that makes a double replay
+  // impossible (ADR-045)
+  const bookingId = input.id
+    ? new mongoose.Types.ObjectId(input.id)
+    : new mongoose.Types.ObjectId();
   const intent = await recordIntent({
     eventType: 'MACHINE_BOOKING_CREATED',
     entityType: 'MachineBooking',
     entityId: String(bookingId),
     actorId: input.farmerId,
     operationKey: operationKey('MACHINE_BOOKING_CREATED', String(bookingId)),
+    // everything a replay needs, and nothing secret — the start OTP is generated
+    // server-side at commit time and never journalled
+    payload: {
+      machineId: input.machineId,
+      window: { start: input.window.start.toISOString(), end: input.window.end.toISOString() },
+      location: input.location,
+      operatorMode: input.operatorMode,
+      workType: input.workType ?? null,
+      areaAcres: input.areaAcres ?? null,
+      notes: input.notes ?? null,
+    },
   });
   const useTransaction = await supportsTransactions();
   const session = useTransaction ? await mongoose.startSession() : undefined;

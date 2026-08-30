@@ -2,7 +2,8 @@
 
 How KisanPool survives a data-store incident, what each layer is actually for, and
 what a human still has to do. Implementation: `apps/server/src/modules/resilience/`.
-Decision record: `docs/DECISIONS.md` ADR-044.
+Decision records: `docs/DECISIONS.md` ADR-044 (the architecture) and ADR-045 (the
+continuity reads and deferred intent that connect it to the app).
 
 ---
 
@@ -121,7 +122,7 @@ The board shows the backend, whether it is durable, and *why* — never implied.
 | # | MongoDB | Redis | Behaviour |
 |---|---|---|---|
 | 1 | Healthy | Healthy | Normal. Snapshots written on the read path; intent journalled on critical writes |
-| 2 | **Down** | Healthy | `RECOVERY_REQUIRED`. Reads served from snapshots with a timestamp. **Irreversible writes refused with a reason.** Intent journalled for reconciliation |
+| 2 | **Down** | Healthy | `RECOVERY_REQUIRED`. Reads served from snapshots with a timestamp. **Irreversible writes refused with a reason** — and the three replayable creations are *journalled first*, so the refusal says "saved, not confirmed" (§4a) |
 | 3 | Healthy | **Down** | `DEGRADED`. Snapshots fall back to the in-process store, journal to disk. **Everything keeps working** |
 | 4 | **Down** | **Down** | `RECOVERY_REQUIRED`. Writes refused. The journal is still durable (local fsync'd file), so nothing in flight is lost |
 
@@ -131,6 +132,57 @@ capacity, no money moved, and the truck may already be full. Telling someone the
 produce is on a lorry when it is not is worse than telling them to try again in a
 minute. So writes are **refused**, with `EXTERNAL_SERVICE_ERROR` and a message that
 says nothing has been lost.
+
+---
+
+## 4a. Continuity reads, and deferred intent (ADR-045)
+
+Case 2 has two halves, and until ADR-045 neither was actually wired: nothing read
+the snapshots, and `requireWritable` refused ahead of the handler so the service's
+own `recordIntent` never ran. The pending queue stayed empty for the whole
+incident and every applier in `recovery.ts` was unreachable code.
+
+### Reads: cache-aside, which is also how Redis stays current
+
+```
+okOrLastKnown(res, key, load)
+   │
+   ├─ MongoDB answers  →  serve it, and leave a snapshot behind
+   ├─ store failure + snapshot  →  serve the snapshot + `X-Data-As-Of`
+   └─ store failure + no snapshot  →  rethrow. An empty list is a lie
+```
+
+There is deliberately no second set of write hooks feeding the cache. Populating
+it from the read models means the snapshot is by construction the exact shape the
+screen renders, and it cannot drift out of step with it. Historical and completed
+data is never cached — only what a live screen asked for.
+
+`isStoreFailure` is the safety boundary. A 404, a 403 or a validation error is a
+real, correct answer and is returned unchanged: serving a cached trip to someone
+who has just been removed from it would be a security bug, not continuity.
+
+Covered: farmer requests and request detail · shipments · trip detail · live
+track (last position + ETA) · driver trips, offers and the pool · machinery
+bookings · backhaul requests · return-leg state.
+
+### Writes: refused, but journalled first where that is honest
+
+| Operation | During an outage |
+|---|---|
+| Transport request · machinery booking · backhaul acceptance | **Deferred.** Intent journalled durably under the id the replay will use; the response is still a failure, with the reference |
+| Any state transition, capacity change, OTP-gated step | **Refused.** They cannot be validated without the database, and journalling an intent nobody validated is a promise we have no right to make |
+| Anything touching money | **Refused, flatly.** A payment is never deferred |
+
+The response for a deferred operation is the same `EXTERNAL_SERVICE_ERROR`
+envelope every client already handles. That is deliberate: the operation was
+*preserved*, not performed — no capacity reserved, no price fixed, nothing
+confirmed — so a success envelope would be precisely the lie this layer exists to
+prevent. The message says it was saved and carries the reference.
+
+**The idempotency anchor is minted at deferral time.** The route generates the
+`_id` the replay will create the record under, so a second replay collides with
+the primary key (and with `TripShipment.requestId` / `BackhaulBooking.requestId`)
+and cannot double anything.
 
 ---
 
@@ -210,8 +262,18 @@ re-price a trip, re-reserve capacity and possibly re-charge someone. It **verifi
 | Result | Outcome |
 |---|---|
 | Effect present | `SUPERSEDED` — the write landed; only the confirmation was lost |
-| Effect absent | Reported for an operator to re-drive through the normal API. **Not reconstructed** |
+| Effect absent, and a safe applier exists | `REPLAYED` — re-driven through the **real** business service, under the original id, with all of its own validation |
+| Effect absent, and the service **refuses** it | `ABANDONED`, carrying the service's own stated reason. A refusal is an answer |
+| Effect absent, no safe applier | Reported for an operator to re-drive through the normal API. **Not reconstructed** |
 | Unknown | Reported. Unknown ≠ absent |
+
+**Why a refusal is abandoned rather than left pending.** A lost slot race or an
+ineligible cargo used to record intent, fail its write, and stay `PENDING`
+forever. Because `RECOVERED` requires zero unresolved entries, one lost race made
+the board read `MANUAL_REVIEW` for the rest of the deployment's life — which
+trains an operator to ignore it. Recording what the authoritative service actually
+said is the same discipline as classifying an integrity finding instead of
+repairing it: it is not silent, and it invents nothing.
 
 That is the honest reading of "replay must be idempotent": **the safe outcome of
 processing an event twice is that the second time changes nothing.**
@@ -322,7 +384,7 @@ Likewise, ambiguous integrity findings are never auto-repaired (§8).
 
 Being precise about this matters more than a confident summary.
 
-**Verified against the live cluster and in `tests/12_resilience.py` (66 checks):**
+**Verified live in `tests/12_resilience.py` (136 checks) and `tests/08_backhaul.py`:**
 
 - ✅ 3-member replica set `atlas-13ab35-shard-0`, MongoDB 8.0.30, read from the cluster
 - ✅ Outage detection, debounce, `RECOVERY_REQUIRED`, honest user messaging
@@ -334,6 +396,18 @@ Being precise about this matters more than a confident summary.
 - ✅ Simulation destroys nothing — data byte-identical before and after
 - ✅ Operator controls unreachable with a marketplace token
 - ✅ Snapshots rebuilt from the authoritative database
+- ✅ **All four matrix cases driven end to end** — ON/ON, OFF/ON, ON/OFF, OFF/OFF
+- ✅ **CASE 2 is usable**: eight warmed operational views still served with MongoDB
+  gone, each stamped `X-Data-As-Of`, carrying the real last-known trip, price,
+  capacity, last position and ETA
+- ✅ **New critical operations survive the outage**: a transport request, a
+  machinery booking and a backhaul acceptance all land in the pending queue while
+  a payment order is flatly refused — and the queue is still durable in CASE 4
+- ✅ After recovery: 3 replayed, 1 abandoned with the service's real reason, 0
+  unresolved → `RECOVERED`; the deferred request and the machinery slot genuinely
+  exist; a second replay adds no duplicate request and no duplicate hold
+- ✅ Reads after recovery are fresh, never the pre-incident snapshot
+- ✅ Return-leg open/advance and backhaul acceptance journalled and replay-safe
 
 **NOT verified — assumed from documentation, or requires manual setup:**
 
@@ -412,10 +486,19 @@ Admin → **Resilience**.
 1. **Normal** — board green. Replica set, member count and journal backend are shown.
 2. **Simulate MongoDB failure** — within ~3 probes: `RECOVERY_REQUIRED`, database
    `DOWN`, writes restricted. In the mobile app a farmer sees *"System recovery in
-   progress"* with the last-confirmed timestamp, and their trip is still readable.
-   A booking attempt is **refused** with a reason.
+   progress"* with the last-confirmed timestamp, **and their trip, requests,
+   shipments, live track, machinery bookings and backhaul loads all still open** —
+   served from the snapshots, each response stamped `X-Data-As-Of`. A booking
+   attempt is **refused** with a reason.
+2b. **Create a request while it is down.** It is refused — and the message says it
+   was *saved*, with a reference. The board's **Pending events** counter moves. Do
+   the same for a machinery booking. Try a payment: that one is refused flatly,
+   with no promise, because money is never deferred.
 3. **Clear simulation** → `RECONCILING`. **Run recovery** → replay → integrity →
-   snapshot rebuild → `RECOVERED` (or `MANUAL_REVIEW`, honestly).
+   snapshot rebuild → `RECOVERED` (or `MANUAL_REVIEW`, honestly). **Replayed** on
+   the board counts what was genuinely re-driven through the real business
+   service. Reopen the farmer's request list: the request from step 2b is there
+   for real. Run recovery again — nothing duplicates.
 4. **Simulate data corruption** — note the *different* diagnosis: the database is
    reachable, but its data is unreadable, and the board says failover would not help.
 5. **Turn Redis OFF** — the cache goes `DOWN`, the journal backend drops to `FILE`

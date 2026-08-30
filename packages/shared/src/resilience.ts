@@ -137,6 +137,9 @@ export const JOURNAL_EVENT_TYPES = [
   'PAYOUT_STATE_CHANGED',
   'MACHINE_BOOKING_CREATED',
   'MACHINE_BOOKING_STATE_CHANGED',
+  // the homeward leg is a trip state of its own: opening it and advancing it are
+  // both recoverable transitions, so they get the same protection (ADR-045)
+  'RETURN_LEG_STATE_CHANGED',
   'BACKHAUL_BOOKING_CREATED',
   'BACKHAUL_BOOKING_STATE_CHANGED',
 ] as const;
