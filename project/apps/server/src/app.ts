@@ -31,6 +31,10 @@ export function createApp() {
   app.use('/webhooks', webhookRouter);
 
   app.use(express.json({ limit: '2mb' }));
+  // KYC documents are encrypted at rest and only reachable through the authed
+  // /documents/file/* route, which decrypts them (ADR-042). Everything else
+  // under /uploads (avatars, etc.) is still served statically.
+  app.use('/uploads/kyc', (_req, res) => res.status(404).end());
   app.use('/uploads', express.static(localUploadsDir));
 
   app.get('/health', (_req, res) => {

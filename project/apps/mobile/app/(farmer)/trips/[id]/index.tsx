@@ -354,6 +354,7 @@ export default function SharedTrip() {
       {error ? <ErrorView error={error} onRetry={() => void load()} /> : null}
 
       <TripMap
+        markerVariant="shop-red"
         pickup={{ lat: mine.pickup.lat, lng: mine.pickup.lng, title: 'Your pickup' }}
         destination={{
           lat: trip.destination.lat,

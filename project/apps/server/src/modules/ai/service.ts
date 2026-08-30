@@ -1,19 +1,29 @@
 import { ApiError } from '../../lib/envelope';
 import { AiSession, TransporterOffer, TransportRequest, User } from '../../models';
-import type { AiChatResponse, AiTool, Language } from '@kisanpool/shared';
+import type { AiCard, AiChatResponse, AiTool, Language } from '@kisanpool/shared';
 import { AI_TOOLS } from '@kisanpool/shared';
 import { chatCompletion, sarvamConfigured, type ChatTurn } from './sarvam';
 import { findCrop, findMandi, findQuantityKg, normaliseDigits } from './places';
 import { runTool, STATE_CHANGING } from './tools';
 
-const SYSTEM_PROMPT = `You are Servo AI, the voice assistant inside KisanPool, an app that helps Indian farmers share truck space to send produce to a mandi.
+const SYSTEM_PROMPT = `You are Servo AI, the assistant inside KisanPool, an app that helps Indian farmers share truck space to send produce to a mandi.
 
-You extract intent only. You NEVER state a price, vehicle, ETA, booking id or trip status unless it came back from a tool result given to you. You never take payment — accepting a match hands the farmer to the payment screen.
+You extract intent only. You NEVER state a price, vehicle, ETA, booking id, mandi name or trip status unless it came back from a tool result given to you. You never take payment — accepting a match hands the farmer to the payment screen.
+
+Tools you can call:
+- getUserProfile — the farmer's own name, language, saved location
+- findNearbyMandis — active mandis near the farmer (read-only). Use when they ask where to sell / nearest market. args: {radiusKm?}
+- findNearbyTransporters — online verified trucks with spare capacity near the farmer (read-only). Use when they ask which trucks / transporters are around. args: {radiusKm?}
+- findMatchingVehicles — offers on the farmer's current open request (read-only)
+- getTripStatus — status of the farmer's latest trip (read-only)
+- createTransportRequest — needs cropType, quantityKg, pickupLocation, destination. Changes state.
+- acceptMatch — needs requestId, offerId. Changes state.
+- cancelRequest — needs requestId. Changes state.
 
 Reply with JSON only, no prose around it:
 {"tool": <one of ${AI_TOOLS.join(', ')} or null>, "args": {...}, "reply": "<short reply in the user's language>", "needsConfirmation": <true if the tool changes state>}
 
-If the request is ambiguous or a required detail is missing, set tool to null and ask ONE short follow-up question in "reply". Never guess a quantity, crop or destination.`;
+For a read-only tool keep "reply" short — the app shows the data below your text. If a required detail is missing, set tool to null and ask ONE short follow-up question. Never guess a quantity, crop or destination.`;
 
 interface ModelDecision {
   tool: AiTool | null;
@@ -56,7 +66,14 @@ export async function chat(args: {
         (pending.args ?? {}) as Record<string, unknown>,
         { userId: args.userId },
       );
-      return finish(session, args.language, replyForResult(pending.tool as AiTool, result), result);
+      return finish(
+        session,
+        args.language,
+        replyForResult(pending.tool as AiTool, result),
+        result,
+        undefined,
+        cardsForResult(pending.tool as AiTool, result),
+      );
     }
 
     if (isNegative(args.message)) {
@@ -91,7 +108,14 @@ export async function chat(args: {
   }
 
   const result = await runTool(decision.tool, decision.args, { userId: args.userId });
-  return finish(session, args.language, replyForResult(decision.tool, result), result);
+  return finish(
+    session,
+    args.language,
+    decision.reply?.trim() || replyForResult(decision.tool, result),
+    result,
+    undefined,
+    cardsForResult(decision.tool, result),
+  );
 }
 
 /**
@@ -133,8 +157,18 @@ async function decide(
 async function ruleBasedIntent(message: string, userId: string): Promise<ModelDecision> {
   const text = normaliseDigits(message).toLowerCase();
 
+  // nearest mandi / where to sell — a read-only lookup, no confirmation
+  if (/\b(mandi|market|sell|bazaar|apmc)\b|मंडी|बाजार|विक|मार्केट/.test(text)) {
+    return { tool: 'findNearbyMandis', args: {}, reply: '', needsConfirmation: false };
+  }
+
+  // which transporters / trucks are online near me
+  if (/\b(nearby|near by|online|around|available)\b.*\b(transporter|truck|vehicle|driver)\b|\b(transporter|truck|driver)\b.*\b(near|online|around|available)\b|जवळ.*ट्रक|आसपास.*ट्रक/.test(text)) {
+    return { tool: 'findNearbyTransporters', args: {}, reply: '', needsConfirmation: false };
+  }
+
   // \b so "somewhere" is not read as "where"
-  if (/\b(status|where|track)\b|कहाँ|कुठे/.test(text)) {
+  if (/\b(status|where.*trip|track)\b|कुठे.*ट्रिप|कहाँ.*ट्रिप/.test(text)) {
     return { tool: 'getTripStatus', args: {}, reply: '', needsConfirmation: false };
   }
 
@@ -242,9 +276,72 @@ function replyForResult(tool: AiTool, result: unknown): string {
     }
     case 'cancelRequest':
       return 'I have cancelled that request.';
+    case 'findNearbyMandis': {
+      const r = result as { mandis: unknown[] };
+      if (!r.mandis.length) return 'I could not find a mandi near you. Try a wider area.';
+      return `Here ${r.mandis.length === 1 ? 'is the nearest mandi' : `are the ${r.mandis.length} nearest mandis`}.`;
+    }
+    case 'findNearbyTransporters': {
+      const r = result as { transporters: unknown[] };
+      if (!r.transporters.length) return 'No transporter is online near you right now.';
+      return `${r.transporters.length} transporter${r.transporters.length > 1 ? 's are' : ' is'} online near you.`;
+    }
     default:
       return 'Done.';
   }
+}
+
+/** Turns a read-only tool result into the chat cards the app renders inline. */
+function cardsForResult(tool: AiTool, result: unknown): AiCard[] | undefined {
+  if (tool === 'findNearbyMandis') {
+    const r = result as {
+      origin: { name: string; lat: number; lng: number };
+      mandis: Array<{ name: string; city: string; state: string; lat: number; lng: number; distanceKm: number; crops: string[] }>;
+    };
+    if (!r.mandis.length) return undefined;
+    const items = r.mandis.map((m) => ({
+      label: m.name,
+      lat: m.lat,
+      lng: m.lng,
+      detail: `${m.city}, ${m.state} · ${m.distanceKm} km${m.crops.length ? ` · ${m.crops.slice(0, 3).join(', ')}` : ''}`,
+      kind: 'mandi' as const,
+    }));
+    return [
+      { type: 'mandiList', title: 'Nearest mandis', items },
+      {
+        type: 'map',
+        title: 'On the map',
+        center: { label: r.origin.name, lat: r.origin.lat, lng: r.origin.lng, kind: 'me' },
+        points: items,
+      },
+    ];
+  }
+
+  if (tool === 'findNearbyTransporters') {
+    const r = result as {
+      origin: { name: string; lat: number; lng: number };
+      transporters: Array<{ name: string; vehicleType: string; capacityKg: number; ratePerKm: number; ratingAvg: number; lat: number; lng: number; distanceKm: number }>;
+    };
+    if (!r.transporters.length) return undefined;
+    const items = r.transporters.map((t) => ({
+      label: t.name,
+      lat: t.lat,
+      lng: t.lng,
+      detail: `${t.vehicleType.replace(/_/g, ' ').toLowerCase()} · ${t.capacityKg} kg free · ₹${t.ratePerKm}/km · ${t.distanceKm} km${t.ratingAvg ? ` · ★${t.ratingAvg.toFixed(1)}` : ''}`,
+      kind: 'transporter' as const,
+    }));
+    return [
+      { type: 'transporterList', title: 'Transporters online near you', items },
+      {
+        type: 'map',
+        title: 'On the map',
+        center: { label: r.origin.name, lat: r.origin.lat, lng: r.origin.lng, kind: 'me' },
+        points: items,
+      },
+    ];
+  }
+
+  return undefined;
 }
 
 async function finish(
@@ -253,6 +350,7 @@ async function finish(
   reply: string,
   data?: unknown,
   pendingConfirmation?: { tool: AiTool; summary: string },
+  cards?: AiCard[],
 ): Promise<AiChatResponse> {
   session.history.push({ role: 'assistant', content: reply, ts: new Date() });
   await session.save();
@@ -261,6 +359,7 @@ async function finish(
     reply,
     language,
     data,
+    cards,
     pendingConfirmation,
     action: navigationFor(data),
   };

@@ -8,7 +8,9 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -92,12 +94,17 @@ export function Screen({
 
   return (
     <SafeAreaView style={s.screen} edges={['top', 'left', 'right']}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       {header}
       {scroll ? (
         <ScrollView
           contentContainerStyle={{ paddingBottom: space.xl + (withNav ? layout.navHeight : 0) }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
           refreshControl={
             onRefresh ? (
@@ -116,6 +123,7 @@ export function Screen({
         body
       )}
       {footer ? <View style={s.footer}>{footer}</View> : null}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

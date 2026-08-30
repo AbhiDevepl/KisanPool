@@ -18,6 +18,11 @@ import { toAppError } from '../../lib/errors';
 import { Button, Chip, Field, Header, Screen, Txt } from '../../components/ui';
 import { colors, space } from '../../theme';
 
+// Indian plate: 2 letters (state) + 1–2 digits (RTO) + 1–3 letters (series) + 4 digits.
+// Accepts "MH12AA1234", "MH 12 AB 1234", "MH12 AB 1234" — spaces are ignored.
+const PLATE_RE = /^[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{4}$/;
+const normalizePlate = (text: string): string => text.replace(/\s+/g, '').toUpperCase();
+
 export default function VehicleRegister() {
   const router = useRouter();
   const { t } = useT();
@@ -55,7 +60,7 @@ export default function VehicleRegister() {
 
       await api.registerVehicle({
         vehicleType,
-        registrationNumber: registrationNumber.toUpperCase(),
+        registrationNumber: normalizePlate(registrationNumber),
         capacityKg: Number(capacityKg),
         ratePerKm: Number(ratePerKm),
         currentLocation,
@@ -68,9 +73,13 @@ export default function VehicleRegister() {
     }
   };
 
+  const plateValid = PLATE_RE.test(normalizePlate(registrationNumber));
+  const plateError =
+    registrationNumber.trim().length > 0 && !plateValid ? t('vehicle.regInvalid') : undefined;
+
   const valid =
     name.trim().length >= 2 &&
-    registrationNumber.trim().length >= 4 &&
+    plateValid &&
     Number(capacityKg) > 0 &&
     Number(ratePerKm) > 0;
 
@@ -115,9 +124,10 @@ export default function VehicleRegister() {
       <Field
         label={t('vehicle.regLabel')}
         value={registrationNumber}
-        onChangeText={setRegistrationNumber}
+        onChangeText={(text) => setRegistrationNumber(text.toUpperCase())}
         autoCapitalize="characters"
         placeholder={t('vehicle.regPlaceholder')}
+        error={plateError}
       />
       <Field
         label={t('vehicle.capacityLabel')}

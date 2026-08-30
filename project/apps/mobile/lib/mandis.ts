@@ -35,6 +35,8 @@ export interface Mandi {
   closesAt: number;
   demand: Demand;
   prices: CommodityPrice[];
+  /** road-time estimate from the farmer, minutes (from the server when available) */
+  serverEtaMinutes?: number;
 }
 
 export const CATEGORIES: Array<'All' | Category> = ['All', 'Vegetables', 'Fruits', 'Grains'];
@@ -53,6 +55,7 @@ const fromDTO = (m: MandiDTO): Mandi => ({
   closesAt: 24 * 60, // treat as always open; operator mandis carry no hours
   demand: 'MEDIUM',
   prices: [],
+  serverEtaMinutes: m.etaMinutes,
 });
 
 // last fetched set, so findMandi() stays synchronous for favourites/labels
@@ -161,7 +164,7 @@ export function rankMandis(
       return {
         ...mandi,
         distanceKm,
-        etaMinutes: travelMinutes(distanceKm),
+        etaMinutes: mandi.serverEtaMinutes ?? travelMinutes(distanceKm),
         favourite: favourites.includes(mandi.id),
         score: Math.round(Math.min(100, proximity + 18)),
       };

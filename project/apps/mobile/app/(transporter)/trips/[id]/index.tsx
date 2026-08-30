@@ -72,13 +72,17 @@ const TRIP_LABEL: Record<TripState, string> = {
   CANCELLED: 'Cancelled',
 };
 
-/** The one step forward from each shipment state — the rest of the machine is the server's. */
+/**
+ * The one step forward from each shipment state — the rest of the machine is the
+ * server's. Per-farmer actions stop at pickup: delivery is a single trip-level
+ * action ("Arrived at the mandi") that delivers every load aboard at once, since
+ * all farmers on a trip share one destination.
+ */
 const SHIPMENT_NEXT: Partial<Record<ShipmentState, { to: ShipmentState; label: string }>> = {
   ASSIGNED: { to: 'EN_ROUTE', label: 'Heading to this pickup' },
   EN_ROUTE: { to: 'ARRIVED', label: 'I have arrived' },
   ARRIVED: { to: 'PICKED_UP', label: 'Collect with the farmer’s code' },
   PICKED_UP: { to: 'IN_TRANSIT', label: 'Loaded — moving on' },
-  IN_TRANSIT: { to: 'DELIVERED', label: 'Delivered at the mandi' },
 };
 
 const TRIP_NEXT: Partial<Record<TripState, { to: TripState; label: string }>> = {
@@ -324,6 +328,7 @@ export default function SharedTrip() {
       </Card>
 
       <TripMap
+        markerVariant="shop-red"
         destination={{ ...trip.destination, title: trip.destination.name }}
         vehicle={position ? { ...position, title: 'You' } : null}
         markers={shipments

@@ -17,6 +17,7 @@ import {
   TripShipment,
   User,
   Vehicle,
+  type TripShipmentDoc,
 } from '../../models';
 import { supportsTransactions } from '../../db';
 import {
@@ -166,10 +167,20 @@ export async function poolForTransporter(transporterId: string) {
 
   scored.sort((a, b) => b.fitScore - a.fitScore);
 
+  const top = scored.slice(0, 20);
+  // who posted each load — the driver decides on a person, not an id
+  const farmers = await User.find({
+    _id: { $in: top.map((entry) => entry.request.farmerId) },
+  }).select('name');
+  const nameById = new Map(farmers.map((f) => [String(f._id), f.name]));
+
   return {
     offline: false as const,
     trip: trip ? { trip, capacity } : null,
-    requests: scored.slice(0, 20),
+    requests: top.map((entry) => ({
+      ...entry,
+      farmerName: nameById.get(String(entry.request.farmerId)) ?? null,
+    })),
   };
 }
 
@@ -179,24 +190,35 @@ const sameDestination = (trip: { destination: { lat?: number | null; lng?: numbe
     dest,
   ) < 5;
 
-/** Extra distance to collect one more pickup on the way. */
+/**
+ * Cheap straight-line estimate of the extra distance to collect one more pickup —
+ * measured at its BEST slot in the chain, not blindly after the last pickup, so a
+ * farmer earlier on the same corridor is not wrongly rejected before the engine
+ * (which does the real road-distance insertion) sees them.
+ */
 async function detourFor(trip: { _id: unknown; destination: { lat?: number | null; lng?: number | null } }, pickup: { lat: number; lng: number }): Promise<number> {
   const existing = await TripShipment.find({
     tripId: trip._id,
     state: { $in: OCCUPIES_CAPACITY },
-  });
+  }).sort({ pickupSequence: 1, createdAt: 1 });
   if (!existing.length) return 0;
 
-  const last = existing[existing.length - 1];
-  const lastPoint = { lat: last.pickup.lat as number, lng: last.pickup.lng as number };
   const destination = {
     lat: trip.destination.lat as number,
     lng: trip.destination.lng as number,
   };
+  const stops = existing.map((s) => ({ lat: s.pickup.lat as number, lng: s.pickup.lng as number }));
 
-  const direct = haversineKm(lastPoint, destination);
-  const viaPickup = haversineKm(lastPoint, pickup) + haversineKm(pickup, destination);
-  return Math.max(0, viaPickup - direct);
+  const legs = (pts: Array<{ lat: number; lng: number }>): number =>
+    pts.slice(1).reduce((sum, p, i) => sum + haversineKm(pts[i], p), 0);
+
+  const base = legs([...stops, destination]);
+  let best = Infinity;
+  for (let pos = 0; pos <= stops.length; pos += 1) {
+    const withPickup = [...stops.slice(0, pos), pickup, ...stops.slice(pos), destination];
+    best = Math.min(best, legs(withPickup) - base);
+  }
+  return Math.max(0, best);
 }
 
 /**
@@ -808,9 +830,35 @@ export async function advanceTrip(tripId: string, to: TripState, transporterId: 
     trip.completedAt = new Date();
   }
 
+  // Arriving at the mandi is ONE action for the whole vehicle — every load still
+  // aboard is delivered here, its bill frozen, and payment opened for that
+  // farmer. The driver does not confirm delivery farmer-by-farmer.
+  let delivered: TripShipmentDoc[] = [];
+  if (to === 'AT_DESTINATION') {
+    const aboard = await TripShipment.find({
+      tripId: trip._id,
+      state: { $in: ['PICKED_UP', 'IN_TRANSIT'] },
+    });
+    for (const s of aboard) {
+      s.deliveredAt = new Date();
+      s.finalPrice = s.allocatedPrice; // freeze — later joiners cannot move it
+      s.state = 'PAYMENT_PENDING'; // billing opens the moment produce is handed over
+      await s.save();
+    }
+    delivered = aboard;
+  }
+
   trip.state = to;
   await trip.save();
-  return trip;
+
+  if (delivered.length) {
+    // the delivered bills just froze — what remains of the route splits among
+    // any farmers still aboard (there are none once AT_DESTINATION, but keep the
+    // engine authoritative)
+    await reallocate(String(trip._id), 'the trip reached the mandi');
+  }
+
+  return { trip, delivered };
 }
 
 /** Full trip view for the transporter — pool, capacity, pickup order. */

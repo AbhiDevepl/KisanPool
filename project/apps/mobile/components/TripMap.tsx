@@ -33,8 +33,11 @@ export function TripMap({
   destination?: MapPoint | null;
   vehicle?: MapPoint | null;
   markers?: MapPoint[];
-  /** 'shop' draws each marker as a red storefront badge (mandi discovery) */
-  markerVariant?: 'pin' | 'shop';
+  /**
+   * 'shop'     — yellow storefront badge for the destination / mandi
+   * 'shop-red' — same, in red (trip screens)
+   */
+  markerVariant?: 'pin' | 'shop' | 'shop-red';
   polyline?: Array<{ latitude: number; longitude: number }> | null;
   height?: number;
   onMarkerPress?: (index: number) => void;
@@ -101,14 +104,18 @@ export function TripMap({
         ) : null}
 
         {destination ? (
-          markerVariant === 'shop' ? (
+          markerVariant === 'shop' || markerVariant === 'shop-red' ? (
             <Marker
               coordinate={{ latitude: destination.lat, longitude: destination.lng }}
               title={destination.title ?? 'Destination'}
               anchor={{ x: 0.5, y: 0.5 }}
             >
-              <View style={s.shopPinYellow}>
-                <MaterialIcons name="storefront" size={16} color="#3a2e00" />
+              <View style={markerVariant === 'shop-red' ? s.shopPin : s.shopPinYellow}>
+                <MaterialIcons
+                  name="storefront"
+                  size={16}
+                  color={markerVariant === 'shop-red' ? '#ffffff' : '#3a2e00'}
+                />
               </View>
             </Marker>
           ) : (

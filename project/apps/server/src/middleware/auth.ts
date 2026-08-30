@@ -6,6 +6,7 @@ import type { Role } from '@kisanpool/shared';
 export interface AuthedRequest extends Request {
   userId: string;
   role: Role;
+  isAdmin: boolean;
 }
 
 /**
@@ -26,6 +27,7 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
     const authed = req as AuthedRequest;
     authed.userId = payload.sub;
     authed.role = payload.role;
+    authed.isAdmin = payload.admin === true;
     next();
   } catch (err) {
     next(err);

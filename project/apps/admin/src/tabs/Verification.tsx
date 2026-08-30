@@ -125,7 +125,13 @@ export function VerificationTab() {
                         ) : null}
                       </td>
                       <td>
-                        <a href={doc.fileUrl} target="_blank" rel="noreferrer">
+                        <a
+                          href={doc.fileUrl}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            void api.openDocument(doc.fileUrl);
+                          }}
+                        >
                           view
                         </a>
                       </td>

@@ -72,6 +72,8 @@ export interface TripShipmentView extends FarmerShipment {
 /** One row in the transporter's pool. */
 export interface PoolEntry {
   request: TransportRequestDTO;
+  /** name of the farmer who posted this load, for the pickup card */
+  farmerName: string | null;
   pickupDistanceKm: number;
   detourKm: number;
   distanceKm: number;
@@ -127,18 +129,26 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       headers,
       body: form ?? (body ? JSON.stringify(body) : undefined),
     });
-  } catch {
+  } catch (err) {
+    console.warn(`[api] ${method} ${BASE_URL}${path} — network error:`, err);
     throw new AppError(
       'EXTERNAL_SERVICE_ERROR',
-      'We could not reach KisanPool. Please check your connection.',
+      `Could not reach the server at ${BASE_URL} (${(err as Error)?.message ?? 'network error'}).`,
     );
   }
 
   let json: ApiResponse<T>;
   try {
     json = (await res.json()) as ApiResponse<T>;
-  } catch {
-    throw new AppError('EXTERNAL_SERVICE_ERROR', 'Something went wrong. Please try again.');
+  } catch (err) {
+    console.warn(`[api] ${method} ${path} — HTTP ${res.status}, non-JSON body:`, err);
+    throw new AppError('EXTERNAL_SERVICE_ERROR', `Server returned HTTP ${res.status}.`);
+  }
+
+  if (!json.success) {
+    console.log(json.error);
+    
+    console.warn(`[api] ${method} ${path} — ${json.error.code}: ${json.error.message}`);
   }
 
   if (json.success) return json.data;
@@ -221,6 +231,9 @@ export const api = {
       body: { status },
     }),
 
+  updateVehicleLocation: (loc: { lat: number; lng: number }) =>
+    request<VehicleDTO>('/vehicles/me/location', { method: 'PATCH', body: loc }),
+
   // ---------- documents / KYC ----------
 
   uploadDocument: (type: string, file: { uri: string; name: string; type: string }) => {
@@ -284,6 +297,9 @@ export const api = {
       method: 'POST',
       body: { reason },
     }),
+
+  deleteRequest: (id: string) =>
+    request<{ deleted: true }>(`/transport/requests/${id}`, { method: 'DELETE' }),
 
   /** Chat is per shared trip — every farmer aboard plus the driver. */
   messages: (tripId: string) => request<ChatMessageDTO[]>(`/transport/trips/${tripId}/messages`),

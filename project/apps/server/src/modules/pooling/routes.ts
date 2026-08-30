@@ -28,6 +28,7 @@ import {
   notifyOfferReceived,
   notifyOfferSelected,
   notifyPriceChanged,
+  notifyTripStatus,
 } from '../notifications/service';
 
 export const poolRouter = Router();
@@ -272,7 +273,27 @@ poolRouter.patch(
   requireRole('TRANSPORTER'),
   asyncHandler<AuthedRequest>(async (req, res) => {
     const { state } = z.object({ state: z.enum(TRIP_STATES) }).parse(req.body);
-    ok(res, await advanceTrip(req.params.id, state, req.userId));
+    const { trip, delivered } = await advanceTrip(req.params.id, state, req.userId);
+
+    // arriving at the mandi delivered every load at once — tell each farmer
+    for (const s of delivered) {
+      emitShipmentState({
+        tripId: String(trip._id),
+        shipmentId: String(s._id),
+        requestId: String(s.requestId),
+        state: s.state,
+        at: new Date().toISOString(),
+      });
+    }
+    if (delivered.length) {
+      await notifyTripStatus(
+        delivered.map((s) => String(s.farmerId)),
+        String(trip._id),
+        'DELIVERED',
+      );
+    }
+
+    ok(res, trip);
   }),
 );
 

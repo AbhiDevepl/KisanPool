@@ -56,11 +56,11 @@ export async function getDirections(origin: Point, destination: Point): Promise<
 
       const leg = json.routes?.[0]?.legs?.[0];
       if (json.status !== 'OK' || !leg) {
-        console.warn(
-          `[maps] directions returned ${json.status}` +
-            (json.error_message ? ` — ${json.error_message}` : '') +
-            ' — using straight-line fallback',
-        );
+        // console.warn(
+        //   `[maps] directions returned ${json.status}` +
+        //     (json.error_message ? ` — ${json.error_message}` : '') +
+        //     ' — using straight-line fallback',
+        // );
         result = fallback(origin, destination);
       } else {
         result = {
@@ -70,7 +70,7 @@ export async function getDirections(origin: Point, destination: Point): Promise<
         };
       }
     } catch (err) {
-      console.warn('[maps] directions failed, falling back to straight line', err);
+      // console.warn('[maps] directions failed, falling back to straight line', err);
       result = fallback(origin, destination);
     }
   }

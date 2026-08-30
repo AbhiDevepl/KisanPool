@@ -10,7 +10,7 @@ KisanPool matches a farmer's produce-transport request with a nearby verified ve
 
 ## Hard rules — never violate
 
-- **No LLM writes to the database.** Servo AI has exactly six tools (`docs/API_CONTRACTS.md` §4); each calls the same service function the equivalent REST route calls. The user id comes from the JWT, never from speech. The model never invents a price, vehicle, ETA or booking id.
+- **No LLM writes to the database.** Servo AI has a closed set of tools (`docs/API_CONTRACTS.md` §4); each calls the same service function the equivalent REST route calls. The user id comes from the JWT, never from speech. The model never invents a price, vehicle, ETA or booking id.
 - **No payment is ever confirmed client-side only.** Server-side HMAC signature verification *and* the signature-verified Razorpay webhook are what mark a `Payment` as `PAID`. `acceptMatch` by voice hands off to the checkout screen — it never pays.
 - **KYC-unverified vehicles never appear in matching.** The filter lives in the matching query, not the UI. Not even the admin console can override it — it refuses to put an unverified vehicle on the road.
 - **Admin is a JWT claim, never a `User.role`.** `/admin/*` and document review require `requireAdmin`; a marketplace token gets `AUTH_FORBIDDEN`.

@@ -79,6 +79,10 @@ export const config = {
 
   cloudinaryUrl: process.env.CLOUDINARY_URL ?? '',
 
+  // Locally-stored KYC documents are encrypted at rest with AES-256-GCM (ADR-042).
+  // Key derives from this secret; falls back to the JWT secret in demo mode.
+  uploadsEncryptionKey: process.env.UPLOADS_ENCRYPTION_KEY ?? process.env.JWT_SECRET ?? 'dev-uploads-key',
+
   admin: {
     username: process.env.ADMIN_USERNAME ?? 'admin',
     password: process.env.ADMIN_PASSWORD ?? 'admin',

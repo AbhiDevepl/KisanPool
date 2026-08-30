@@ -262,16 +262,24 @@ export default function Requests() {
                       <TripMap
                         pickup={{ ...request.pickup, title: 'Pickup' }}
                         destination={{ ...request.destination, title: request.destination.name }}
+                        markerVariant="shop-red"
                         height={130}
                       />
                     </View>
 
                     <View style={{ marginTop: space.gutter, gap: space.xs }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-                        <MaterialIcons name="my-location" size={16} color={colors.primary} />
-                        <Txt variant="bodyMd" numberOfLines={1} style={{ flex: 1 }}>
-                          {request.pickup.name}
-                        </Txt>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.sm }}>
+                        <MaterialIcons name="my-location" size={16} color={colors.primary} style={{ marginTop: 2 }} />
+                        <View style={{ flex: 1 }}>
+                          <Txt variant="bodyMd" numberOfLines={1}>
+                            {request.pickup.name}
+                          </Txt>
+                          {entry.farmerName ? (
+                            <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                              Farmer: {entry.farmerName}
+                            </Txt>
+                          ) : null}
+                        </View>
                       </View>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
                         <MaterialIcons name="place" size={16} color={colors.tertiary} />

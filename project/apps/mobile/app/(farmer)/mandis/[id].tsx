@@ -169,7 +169,8 @@ export default function MandiDetails() {
               <View style={[s.pill, { backgroundColor: colors.surfaceContainerLow }]}>
                 <MaterialIcons name="directions-car" size={14} color={colors.onSurfaceVariant} />
                 <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-                  {km(distanceKm)} · {durationLabel(travelMinutes(distanceKm))}
+                  {km(distanceKm)} ·{' '}
+                  {durationLabel(mandi.serverEtaMinutes ?? travelMinutes(distanceKm))} to mandi
                 </Txt>
               </View>
             ) : null}

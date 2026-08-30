@@ -4,8 +4,8 @@
  * Submitting puts the request in the pool for nearby transporters to claim; it
  * does not book anything and costs nothing.
  */
-import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { GeoPoint } from '@kisanpool/shared';
 import { api } from '../../../lib/api';
@@ -43,17 +43,25 @@ export default function NewRequest() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>();
   const [mandis, setMandis] = useState<Mandi[]>([]);
+  const [loadingMandis, setLoadingMandis] = useState(false);
+
+  const loadMandis = useCallback(async (): Promise<void> => {
+    setLoadingMandis(true);
+    try {
+      const user = await getUser();
+      if (user?.defaultLocation) setPickup(user.defaultLocation);
+      const next = await refreshMandis(user?.defaultLocation);
+      setMandis(next);
+    } catch {
+      setMandis([]);
+    } finally {
+      setLoadingMandis(false);
+    }
+  }, []);
 
   useEffect(() => {
-    void getUser().then((user) => {
-      if (user?.defaultLocation) {
-        setPickup(user.defaultLocation);
-        void refreshMandis(user.defaultLocation).then(setMandis).catch(() => setMandis([]));
-      } else {
-        void refreshMandis().then(setMandis).catch(() => setMandis([]));
-      }
-    });
-  }, []);
+    void loadMandis();
+  }, [loadMandis]);
 
   const submit = async (): Promise<void> => {
     if (!pickup || !destination) return;
@@ -123,9 +131,23 @@ export default function NewRequest() {
         </Txt>
       </Card>
 
-      <Txt variant="labelLg" color={colors.onSurfaceVariant} style={{ marginBottom: space.sm }}>
-        Destination mandi
-      </Txt>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: space.sm,
+        }}
+      >
+        <Txt variant="labelLg" color={colors.onSurfaceVariant}>
+          Destination mandi
+        </Txt>
+        <Pressable onPress={() => void loadMandis()} disabled={loadingMandis} hitSlop={8}>
+          <Txt variant="labelLg" color={colors.primary}>
+            {loadingMandis ? 'Refreshing…' : 'Refresh'}
+          </Txt>
+        </Pressable>
+      </View>
       {mandis.length === 0 ? (
         <Card>
           <Txt variant="labelSm" color={colors.onSurfaceVariant}>

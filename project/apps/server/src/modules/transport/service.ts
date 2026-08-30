@@ -139,3 +139,25 @@ export async function cancelRequest(requestId: string, reason: string, farmerId:
 
   return { request, shipment, pricing, capacity, tripId: shipment?.tripId ?? null };
 }
+
+/**
+ * Permanently remove a request. Only allowed once it is closed (CANCELLED /
+ * EXPIRED) and no shipment ever left the pickup — an active request must be
+ * cancelled first so the pool and any pool-mates are reconciled.
+ */
+export async function deleteRequest(requestId: string, farmerId: string) {
+  const request = await TransportRequest.findById(requestId);
+  if (!request) throw new ApiError('RESOURCE_NOT_FOUND', 'That request no longer exists.');
+  if (String(request.farmerId) !== farmerId) {
+    throw new ApiError('AUTH_FORBIDDEN', "That request isn't yours.");
+  }
+  if (!['CANCELLED', 'EXPIRED'].includes(request.state)) {
+    throw new ApiError('BOOKING_STATE_INVALID', 'Cancel the request before deleting it.');
+  }
+
+  await TransporterOffer.deleteMany({ requestId: request._id });
+  await TripShipment.deleteMany({ requestId: request._id, state: 'CANCELLED' });
+  await request.deleteOne();
+
+  return { deleted: true as const };
+}

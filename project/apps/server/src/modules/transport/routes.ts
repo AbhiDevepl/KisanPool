@@ -8,6 +8,7 @@ import { emitPricingUpdated, emitTripCapacity } from '../realtime';
 import {
   cancelRequest,
   createRequest,
+  deleteRequest,
   getRequestForFarmer,
   myRequests,
 } from './service';
@@ -86,6 +87,14 @@ transportRouter.post(
     }
 
     ok(res, result);
+  }),
+);
+
+transportRouter.delete(
+  '/requests/:id',
+  requireAuth,
+  asyncHandler<AuthedRequest>(async (req, res) => {
+    ok(res, await deleteRequest(req.params.id, req.userId));
   }),
 );
 

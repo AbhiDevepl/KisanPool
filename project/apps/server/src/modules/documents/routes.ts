@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { ApiError, ok } from '../../lib/envelope';
 import { asyncHandler } from '../../middleware/error';
 import { requireAdmin, requireAuth, type AuthedRequest } from '../../middleware/auth';
-import { upload, uploadFile } from '../../lib/upload';
+import { upload, uploadFile, readEncryptedUpload } from '../../lib/upload';
 import { DOCUMENT_TYPES, VERIFICATION_STATUSES } from '@kisanpool/shared';
 import { KycDocument } from '../../models';
 import { kycStatusFor, reconcileVehicleVerification } from './service';
@@ -36,6 +36,34 @@ documentsRouter.get(
   asyncHandler<AuthedRequest>(async (req, res) => {
     const documents = await KycDocument.find({ userId: req.userId });
     ok(res, { documents, kyc: await kycStatusFor(req.userId) });
+  }),
+);
+
+/**
+ * Serves a locally-stored KYC document, decrypting it on the fly (ADR-042).
+ * A transporter may read only their own files; an admin may read anyone's.
+ * Cloudinary-hosted docs keep their absolute URL and never hit this route.
+ */
+documentsRouter.get(
+  '/file/*',
+  requireAuth,
+  asyncHandler<AuthedRequest>(async (req, res) => {
+    const rel = (req.params as unknown as string[])[0] ?? '';
+    const urlPath = `/uploads/${rel}`;
+
+    const owned = rel.startsWith(`kyc/${req.userId}/`);
+    if (!owned && !req.isAdmin) throw new ApiError('AUTH_FORBIDDEN', 'Not your document.');
+
+    let file;
+    try {
+      file = await readEncryptedUpload(urlPath);
+    } catch {
+      throw new ApiError('RESOURCE_NOT_FOUND', 'Document not found.');
+    }
+    res.setHeader('Content-Disposition', `inline; filename="${file.filename}"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.type(file.filename);
+    res.send(file.buffer);
   }),
 );
 

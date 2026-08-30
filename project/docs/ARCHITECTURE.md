@@ -66,7 +66,7 @@ Everything the app talks to is our own backend. Sarvam, Razorpay's server APIs, 
 
 **Realtime layer (`modules/realtime`).** Socket.io mounted on the same HTTP server as Express. Rooms are keyed by `requestId` or `tripId`. It carries new match offers, trip status transitions, live vehicle location with ETA, payment-captured notices and in-trip chat. It is a transport, not a source of truth: every event it emits reflects a state change already committed to MongoDB.
 
-**AI layer (`modules/ai`).** Proxies Sarvam STT, TTS and chat completion so the API key stays server-side, holds `AiSession` history, and exposes exactly six tools to the model. Each tool calls the *same service function* a REST route calls — there is no second, looser path into the domain.
+**AI layer (`modules/ai`).** Proxies Sarvam STT, TTS and chat completion so the API key stays server-side, holds `AiSession` history, and exposes a closed set of eight tools to the model (ADR-043). Each tool calls the *same service function* a REST route calls — there is no second, looser path into the domain.
 
 **Notification layer (`modules/notifications`).** Fires Expo pushes for match found, payment captured, trip status change and new chat message, so a backgrounded or closed app still learns what a socket event would have told it.
 
@@ -98,7 +98,7 @@ The voice path replaces steps 2–6 only: record → `/ai/stt` → `/ai/chat` (t
 
 > **AI understands → Backend decides → Matching engine calculates → Payment settles it → Database records everything → Frontend presents.**
 
-Each arrow is a boundary, and the rule exists to rule three things out. **The LLM never writes to the database** — its six tools call the same service functions the REST routes call, and those services perform every validation they would perform for a human tap. **The LLM never invents a fact** — a price, an ETA, a vehicle, a booking ID or a status it reports must have come back from a real tool call, and when intent is ambiguous it asks a follow-up rather than filling the gap. **The client never confirms money** — a payment is `PAID` because a server-verified signature and a signature-verified webhook say so, not because a mobile SDK returned success; likewise the frontend renders state, it does not compute cost splits or matching scores locally.
+Each arrow is a boundary, and the rule exists to rule three things out. **The LLM never writes to the database** — its tools call the same service functions the REST routes call, and those services perform every validation they would perform for a human tap. **The LLM never invents a fact** — a price, an ETA, a vehicle, a booking ID or a status it reports must have come back from a real tool call, and when intent is ambiguous it asks a follow-up rather than filling the gap. **The client never confirms money** — a payment is `PAID` because a server-verified signature and a signature-verified webhook say so, not because a mobile SDK returned success; likewise the frontend renders state, it does not compute cost splits or matching scores locally.
 
 ---
 

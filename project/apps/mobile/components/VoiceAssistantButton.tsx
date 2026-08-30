@@ -8,15 +8,16 @@
  * stops at the checkout handoff — it never pays (ADR-014).
  */
 import { useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { useRouter } from 'expo-router';
-import type { AiChatResponse, Language } from '@kisanpool/shared';
+import type { AiCard, AiChatResponse, Language } from '@kisanpool/shared';
 import { api } from '../lib/api';
 import { toAppError } from '../lib/errors';
 import { colors, elevation, layout, radius, space } from '../theme';
 import { Button, Txt } from './ui';
+import { AiChatCards } from './AiChatCards';
 
 type VoiceState = 'idle' | 'listening' | 'transcribing' | 'thinking' | 'speaking' | 'error';
 
@@ -35,6 +36,8 @@ export function VoiceAssistantButton({ language = 'en' }: { language?: Language 
   const [state, setState] = useState<VoiceState>('idle');
   const [transcript, setTranscript] = useState('');
   const [reply, setReply] = useState('');
+  const [typed, setTyped] = useState('');
+  const [cards, setCards] = useState<AiCard[] | undefined>();
   const [pending, setPending] = useState<AiChatResponse['pendingConfirmation']>();
 
   const recording = useRef<Audio.Recording | null>(null);
@@ -58,6 +61,21 @@ export function VoiceAssistantButton({ language = 'en' }: { language?: Language 
       setState('listening');
       setTranscript('');
       setReply('');
+    } catch (err) {
+      setState('error');
+      setReply(toAppError(err).message);
+    }
+  };
+
+  // typed fallback — works with no Sarvam key, since /ai/chat has a rule-based mode
+  const sendTyped = async (): Promise<void> => {
+    const message = typed.trim();
+    if (!message) return;
+    setTyped('');
+    setTranscript(message);
+    setReply('');
+    try {
+      await send(message, language);
     } catch (err) {
       setState('error');
       setReply(toAppError(err).message);
@@ -92,9 +110,11 @@ export function VoiceAssistantButton({ language = 'en' }: { language?: Language 
 
   const send = async (message: string, lang: Language): Promise<void> => {
     setState('thinking');
+    setCards(undefined);
     const answer = await api.aiChat(message, sessionId.current, lang);
 
     setReply(answer.reply);
+    setCards(answer.cards);
     setPending(answer.pendingConfirmation);
 
     // speak the reply — a failure here is not fatal, the text is already on screen
@@ -137,6 +157,8 @@ export function VoiceAssistantButton({ language = 'en' }: { language?: Language 
     setState('idle');
     setTranscript('');
     setReply('');
+    setTyped('');
+    setCards(undefined);
     setPending(undefined);
   };
 
@@ -161,21 +183,31 @@ export function VoiceAssistantButton({ language = 'en' }: { language?: Language 
               </Pressable>
             </View>
 
-            {transcript ? (
-              <View style={s.transcript}>
-                <Txt variant="labelSm" color={colors.onSurfaceVariant}>
-                  You said
-                </Txt>
-                <Txt variant="bodyLg">{transcript}</Txt>
-              </View>
-            ) : null}
+            {transcript || reply || cards?.length ? (
+              <ScrollView
+                style={{ maxHeight: 420 }}
+                contentContainerStyle={{ gap: space.sm }}
+                showsVerticalScrollIndicator={false}
+              >
+                {transcript ? (
+                  <View style={s.transcript}>
+                    <Txt variant="labelSm" color={colors.onSurfaceVariant}>
+                      You said
+                    </Txt>
+                    <Txt variant="bodyLg">{transcript}</Txt>
+                  </View>
+                ) : null}
 
-            {reply ? (
-              <View style={s.reply}>
-                <Txt variant="bodyLg" color={colors.onSurface}>
-                  {reply}
-                </Txt>
-              </View>
+                {reply ? (
+                  <View style={s.reply}>
+                    <Txt variant="bodyLg" color={colors.onSurface}>
+                      {reply}
+                    </Txt>
+                  </View>
+                ) : null}
+
+                <AiChatCards cards={cards} />
+              </ScrollView>
             ) : null}
 
             {/* a state-changing action, shown as text before it happens */}
@@ -216,6 +248,29 @@ export function VoiceAssistantButton({ language = 'en' }: { language?: Language 
                 </Txt>
               </View>
             )}
+
+            {/* type instead — always available, and the only path with no voice key */}
+            {!pending ? (
+              <View style={s.typeRow}>
+                <TextInput
+                  style={s.input}
+                  value={typed}
+                  onChangeText={setTyped}
+                  placeholder="Type your question…"
+                  placeholderTextColor={colors.onSurfaceVariant}
+                  editable={state !== 'thinking' && state !== 'transcribing'}
+                  onSubmitEditing={() => void sendTyped()}
+                  returnKeyType="send"
+                />
+                <Pressable
+                  style={s.sendBtn}
+                  onPress={() => void sendTyped()}
+                  disabled={!typed.trim() || state === 'thinking'}
+                >
+                  <MaterialIcons name="send" size={20} color={colors.onPrimary} />
+                </Pressable>
+              </View>
+            ) : null}
 
             <Txt variant="labelSm" color={colors.onSurfaceVariant} style={s.disclaimer}>
               Servo AI never takes payment — it hands you to the payment screen.
@@ -273,4 +328,22 @@ const s = StyleSheet.create({
   },
   confirmRow: { gap: space.sm },
   disclaimer: { textAlign: 'center' },
+  typeRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  input: {
+    flex: 1,
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: radius.full,
+    paddingHorizontal: space.gutter,
+    paddingVertical: space.sm,
+    color: colors.onSurface,
+    fontSize: 16,
+  },
+  sendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

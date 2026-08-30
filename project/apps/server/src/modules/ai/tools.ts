@@ -1,11 +1,37 @@
 import { ApiError } from '../../lib/envelope';
-import { TransportRequest, User } from '../../models';
+import { Mandi, TransportRequest, User, Vehicle } from '../../models';
 import { cancelRequest, createRequest, getRequestForFarmer } from '../transport/service';
 import { offersForRequest, selectTransporter } from '../pooling/service';
 import type { AiTool } from '@kisanpool/shared';
 
+/** Straight-line km between two lat/lng points. */
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((a.lat * Math.PI) / 180) *
+      Math.cos((b.lat * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+/** The farmer's saved pickup point — every geo tool needs an origin. */
+async function farmerOrigin(userId: string): Promise<{ lat: number; lng: number; name: string }> {
+  const user = await User.findById(userId);
+  const loc = user?.defaultLocation;
+  if (!loc || loc.lat == null || loc.lng == null) {
+    throw new ApiError(
+      'AI_INTENT_UNCLEAR',
+      'I do not know where you are yet. Set your location on the home screen and ask me again.',
+    );
+  }
+  return { lat: loc.lat, lng: loc.lng, name: loc.name ?? 'Your location' };
+}
+
 /**
- * The six tools Servo AI may call — no more (ADR-014). Each one calls the SAME
+ * The tools Servo AI may call — a closed set (ADR-014, extended in ADR-043). Each one calls the SAME
  * service function the REST route calls, so every validation a human tap triggers
  * also runs here. The model never touches Mongoose directly.
  */
@@ -125,8 +151,78 @@ export async function runTool(
       );
     }
 
+    case 'findNearbyMandis': {
+      const origin = await farmerOrigin(ctx.userId);
+      const radiusKm = Math.min(Number(args.radiusKm) || 150, 500);
+
+      const near = await Mandi.find({
+        active: true,
+        geo: {
+          $near: {
+            $geometry: { type: 'Point', coordinates: [origin.lng, origin.lat] },
+            $maxDistance: radiusKm * 1000,
+          },
+        },
+      }).limit(6);
+
+      return {
+        origin,
+        mandis: near.map((m) => {
+          const [lng, lat] = (m.geo?.coordinates ?? [0, 0]) as [number, number];
+          return {
+            name: m.name,
+            city: m.city,
+            state: m.state,
+            crops: m.crops,
+            lat,
+            lng,
+            distanceKm: Math.round(haversineKm(origin, { lat, lng }) * 10) / 10,
+          };
+        }),
+      };
+    }
+
+    case 'findNearbyTransporters': {
+      const origin = await farmerOrigin(ctx.userId);
+      const radiusKm = Math.min(Number(args.radiusKm) || 30, 150);
+
+      // an "online" transporter is a VERIFIED vehicle that is ONLINE with a
+      // known position and spare capacity (same gate matching uses, ADR-010)
+      const vehicles = await Vehicle.find({
+        status: 'ONLINE',
+        verificationStatus: 'VERIFIED',
+        availableCapacityKg: { $gt: 0 },
+        currentLocation: { $ne: null },
+      })
+        .populate('ownerId', 'name ratingAvg')
+        .limit(50);
+
+      const within = vehicles
+        .map((v) => {
+          const loc = v.currentLocation!;
+          const owner = v.ownerId as unknown as { name?: string; ratingAvg?: number };
+          return {
+            name: owner?.name || 'Transporter',
+            vehicleType: v.vehicleType,
+            capacityKg: v.availableCapacityKg,
+            ratePerKm: v.ratePerKm,
+            ratingAvg: owner?.ratingAvg ?? 0,
+            lat: loc.lat as number,
+            lng: loc.lng as number,
+            distanceKm:
+              Math.round(haversineKm(origin, { lat: loc.lat as number, lng: loc.lng as number }) * 10) /
+              10,
+          };
+        })
+        .filter((v) => v.distanceKm <= radiusKm)
+        .sort((a, b) => a.distanceKm - b.distanceKm)
+        .slice(0, 8);
+
+      return { origin, transporters: within };
+    }
+
     default:
-      // anything outside the six-tool contract
+      // anything outside the tool contract
       throw new ApiError('AI_TOOL_ERROR', 'I am not able to do that.');
   }
 }

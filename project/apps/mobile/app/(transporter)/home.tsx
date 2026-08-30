@@ -14,9 +14,10 @@
  *   Loaded     physically aboard                       -> reserved
  *   Available  what a farmer could still confirm into
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Switch, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as Location from 'expo-location';
 import { MaterialIcons } from '@expo/vector-icons';
 import type { TripCapacity, UserDTO, VehicleDTO } from '@kisanpool/shared';
 import { api } from '../../lib/api';
@@ -92,6 +93,23 @@ export default function TransporterDashboard() {
       return { me, vehicle: myVehicle, trips, offers, payouts };
     }, []),
   );
+
+  // push the driver's real position so the request pool matches by where they are
+  useEffect(() => {
+    void (async () => {
+      try {
+        const perm = await Location.requestForegroundPermissionsAsync();
+        if (perm.status !== 'granted') return;
+        const pos = await Location.getCurrentPositionAsync({});
+        await api.updateVehicleLocation({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+      } catch {
+        // location is a matching hint; failing it must not break the dashboard
+      }
+    })();
+  }, [dash.data?.vehicle?._id]);
 
   const trips = dash.data?.trips ?? [];
   const offers = dash.data?.offers ?? [];

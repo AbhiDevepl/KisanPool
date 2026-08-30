@@ -14,13 +14,14 @@ import { ApiError, ok } from '../../lib/envelope';
 import { asyncHandler } from '../../middleware/error';
 import { requireAuth, requireAdmin, type AuthedRequest } from '../../middleware/auth';
 import { Mandi, type MandiDoc } from '../../models';
+import { estimateEtaMinutes } from '../maps/service';
 
 const coordsOf = (m: MandiDoc): [number, number] => {
   const c = m.geo?.coordinates ?? [];
   return [Number(c[0] ?? 0), Number(c[1] ?? 0)]; // [lng, lat]
 };
 
-const serialise = (m: MandiDoc, distanceKm?: number) => {
+const serialise = (m: MandiDoc, extra?: { distanceKm?: number; etaMinutes?: number }) => {
   const [lng, lat] = coordsOf(m);
   return {
     _id: String(m._id),
@@ -31,7 +32,10 @@ const serialise = (m: MandiDoc, distanceKm?: number) => {
     active: m.active,
     location: { name: m.name, lat, lng },
     createdAt: m.get('createdAt'),
-    ...(distanceKm != null ? { distanceKm: Math.round(distanceKm * 10) / 10 } : {}),
+    ...(extra?.distanceKm != null
+      ? { distanceKm: Math.round(extra.distanceKm * 10) / 10 }
+      : {}),
+    ...(extra?.etaMinutes != null ? { etaMinutes: extra.etaMinutes } : {}),
   };
 };
 
@@ -92,12 +96,24 @@ mandisRouter.get(
       return 2 * R * Math.asin(Math.sqrt(a));
     };
 
-    ok(res, {
-      mandis: near.map((m) => {
+    const origin = { lat: q.lat, lng: q.lng };
+    const withEta = await Promise.all(
+      near.map(async (m, i) => {
         const [lng, lat] = coordsOf(m);
-        return serialise(m, haversine(lat, lng));
+        const distanceKm = haversine(lat, lng);
+        // real road ETA for the closest few; a rough estimate for the rest so one
+        // request never fans out into dozens of directions calls
+        const etaMinutes =
+          i < 12
+            ? await estimateEtaMinutes(origin, { lat, lng }).catch(() =>
+                Math.round((distanceKm / 35) * 60),
+              )
+            : Math.round((distanceKm / 35) * 60);
+        return serialise(m, { distanceKm, etaMinutes });
       }),
-    });
+    );
+
+    ok(res, { mandis: withEta });
   }),
 );
 

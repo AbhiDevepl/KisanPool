@@ -21,6 +21,7 @@ import {
   AppBar,
   Button,
   Card,
+  ConfirmDialog,
   EmptyState,
   FilterRow,
   IconBadge,
@@ -122,7 +123,14 @@ export default function Bookings() {
         ) : visible.length === 0 ? (
           <EmptyForFilter filter={filter} onCreate={() => router.push('/(farmer)/requests/new')} />
         ) : (
-          visible.map((row) => <BookingCard key={row._id} row={row} router={router} />)
+          visible.map((row) => (
+            <BookingCard
+              key={row._id}
+              row={row}
+              router={router}
+              onDeleted={requests.refresh}
+            />
+          ))
         )}
       </Screen>
 
@@ -134,13 +142,32 @@ export default function Bookings() {
 function BookingCard({
   row,
   router,
+  onDeleted,
 }: {
   row: MyRequest;
   router: ReturnType<typeof useRouter>;
+  onDeleted: () => void;
 }) {
   const copy = row.shipment ? SHIPMENT_COPY[row.shipment.state] : REQUEST_COPY[row.state];
   const awaiting = row.state === 'TRANSPORTER_INTERESTED' && row.offerCount > 0;
   const share = row.shipment ? (row.shipment.finalPrice ?? row.shipment.allocatedPrice) : null;
+  const closed = row.state === 'CANCELLED' || row.state === 'EXPIRED';
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const remove = async (): Promise<void> => {
+    setDeleting(true);
+    try {
+      await api.deleteRequest(row._id);
+      setDeleteOpen(false);
+      onDeleted();
+    } catch {
+      setDeleteOpen(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const open = (): void => {
     if (row.shipment) router.push(`/(farmer)/trips/${row.shipment.tripId}`);
@@ -198,13 +225,34 @@ function BookingCard({
                 : copy.label}
           </Txt>
         </View>
-        <Button
-          label={awaiting ? 'Choose transporter' : row.shipment ? 'Track' : 'View'}
-          variant={awaiting ? 'primary' : 'secondary'}
-          icon={awaiting ? 'check' : 'chevron-right'}
-          onPress={open}
-        />
+        {closed ? (
+          <Button
+            label="Delete"
+            variant="danger"
+            icon="delete"
+            loading={deleting}
+            onPress={() => setDeleteOpen(true)}
+          />
+        ) : (
+          <Button
+            label={awaiting ? 'Choose transporter' : row.shipment ? 'Track' : 'View'}
+            variant={awaiting ? 'primary' : 'secondary'}
+            icon={awaiting ? 'check' : 'chevron-right'}
+            onPress={open}
+          />
+        )}
       </View>
+
+      <ConfirmDialog
+        visible={deleteOpen}
+        title="Delete this request?"
+        message="It will be removed from your bookings for good. This cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        busy={deleting}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={() => void remove()}
+      />
     </Card>
   );
 }

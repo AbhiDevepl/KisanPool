@@ -145,6 +145,8 @@ export interface MandiDTO {
   createdAt: string;
   /** present only on the farmer's nearby list */
   distanceKm?: number;
+  /** road-time estimate to the mandi, minutes (nearby list only) */
+  etaMinutes?: number;
 }
 
 export interface WalletTransactionDTO {
@@ -263,8 +265,30 @@ export const AI_TOOLS = [
   'acceptMatch',
   'getTripStatus',
   'cancelRequest',
+  'findNearbyMandis',
+  'findNearbyTransporters',
 ] as const;
 export type AiTool = (typeof AI_TOOLS)[number];
+
+/** A geo point the chat can drop on a map card. */
+export interface AiMapPoint {
+  label: string;
+  lat: number;
+  lng: number;
+  /** free line under the label — distance, price, capacity */
+  detail?: string;
+  kind?: 'mandi' | 'transporter' | 'me';
+}
+
+/**
+ * A rich block the chat renders under the assistant's text reply — a list of
+ * places, or a small map. The model never builds these; they come from a tool
+ * result the server shaped.
+ */
+export type AiCard =
+  | { type: 'mandiList'; title: string; items: AiMapPoint[] }
+  | { type: 'transporterList'; title: string; items: AiMapPoint[] }
+  | { type: 'map'; title: string; center: AiMapPoint; points: AiMapPoint[] };
 
 export interface AiChatResponse {
   reply: string;
@@ -275,6 +299,8 @@ export interface AiChatResponse {
     route: string;
   };
   data?: unknown;
+  /** rich blocks to render inline in the chat, in order */
+  cards?: AiCard[];
   /** set when the assistant is waiting on a spoken yes before a state-changing tool */
   pendingConfirmation?: {
     tool: AiTool;

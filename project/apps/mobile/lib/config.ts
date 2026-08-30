@@ -24,7 +24,10 @@ function hostFromExpo(): string | null {
 }
 
 export const API_URL: string =
-  process.env.EXPO_PUBLIC_API_URL ?? hostFromExpo() ?? `http://localhost:${DEFAULT_PORT}`;
+  process.env.EXPO_PUBLIC_API_URL ?? hostFromExpo() ?? "http://30.0.2.62:4000";
 
 /** Socket.io shares the API origin unless it is deliberately split out. */
 export const SOCKET_URL: string = process.env.EXPO_PUBLIC_SOCKET_URL ?? API_URL;
+
+// printed once at startup so it's obvious which host the app is trying to reach
+console.log(`[config] API_URL = ${API_URL}  (SOCKET_URL = ${SOCKET_URL})`);

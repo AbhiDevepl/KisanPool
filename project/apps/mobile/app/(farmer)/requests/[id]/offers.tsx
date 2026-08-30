@@ -73,6 +73,8 @@ export default function SmartPoolMatch() {
   const [confirming, setConfirming] = useState<TransporterOfferDTO | null>(null);
   const [selecting, setSelecting] = useState<string | null>(null);
   const [selectError, setSelectError] = useState<unknown>();
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const detail = useLoader(
     useCallback(async () => {
@@ -111,6 +113,20 @@ export default function SmartPoolMatch() {
       detail.refresh();
     } finally {
       setSelecting(null);
+    }
+  };
+
+  const cancel = async (): Promise<void> => {
+    setCancelling(true);
+    try {
+      await api.cancelRequest(id, 'Cancelled by farmer');
+      setCancelOpen(false);
+      router.replace('/(farmer)/bookings');
+    } catch (err) {
+      setCancelOpen(false);
+      setSelectError(err);
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -324,7 +340,29 @@ export default function SmartPoolMatch() {
             </View>
           </>
         )}
+
+        {request && !detail.loading ? (
+          <Button
+            label="Cancel this request"
+            variant="danger"
+            icon="close"
+            loading={cancelling}
+            onPress={() => setCancelOpen(true)}
+            style={{ marginTop: space.lg }}
+          />
+        ) : null}
       </Screen>
+
+      <ConfirmDialog
+        visible={cancelOpen}
+        title="Cancel this request?"
+        message="It will be removed from the pool. Nothing has been charged. You can create a new request any time."
+        confirmLabel="Cancel request"
+        destructive
+        busy={cancelling}
+        onCancel={() => setCancelOpen(false)}
+        onConfirm={() => void cancel()}
+      />
 
       {/* the moment a booking is actually created — worth a confirmation step */}
       <ConfirmDialog

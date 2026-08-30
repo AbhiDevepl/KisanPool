@@ -11,6 +11,10 @@ export default defineConfig({
     port: 5173,
     // the console talks to the same API the apps do; proxying keeps one origin
     // so there is no CORS story and no API URL baked into the bundle
-    proxy: { '/admin': 'http://localhost:4000', '/uploads': 'http://localhost:4000' },
+    proxy: {
+      '/admin': 'http://localhost:4000',
+      '/uploads': 'http://localhost:4000',
+      '/documents': 'http://localhost:4000',
+    },
   },
 });

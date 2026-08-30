@@ -52,6 +52,39 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   throw new AdminError(json.error.code, json.error.message);
 }
 
+/**
+ * KYC documents are encrypted at rest and served only through an authed route
+ * (ADR-042). Fetch with the bearer token, then open the decrypted blob.
+ */
+export async function openDocument(fileUrl: string): Promise<void> {
+  if (/^https?:\/\//.test(fileUrl)) {
+    window.open(fileUrl, '_blank', 'noreferrer');
+    return;
+  }
+  const token = getToken();
+  const rel = fileUrl.replace(/^\/uploads\//, '');
+  const res = await fetch(`${base_url}/documents/file/${rel}`, {
+    headers: token ? { authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new AdminError('RESOURCE_NOT_FOUND', 'Could not load that document.');
+
+  let blob = await res.blob();
+  // dev proxy misses / SPA fallback would hand back text/html — treat that as a failure
+  if (blob.type.includes('html')) {
+    throw new AdminError('EXTERNAL_SERVICE_ERROR', 'Document route not reachable.');
+  }
+  // guess an image type from the URL when the server sent none
+  if (!blob.type || blob.type === 'application/octet-stream') {
+    const ext = (fileUrl.split('.').pop() ?? 'jpg').toLowerCase();
+    const mime =
+      ext === 'png' ? 'image/png' : ext === 'pdf' ? 'application/pdf' : 'image/jpeg';
+    blob = new Blob([blob], { type: mime });
+  }
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noreferrer');
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 // ---- types the console renders ----
 
 export interface Stats {
@@ -410,6 +443,8 @@ export const api = {
 
   documents: (status?: string) =>
     request<KycGroup[]>(`/admin/documents${status ? `?status=${status}` : ''}`),
+
+  openDocument,
 
   reviewDocument: (id: string, status: 'VERIFIED' | 'REJECTED', reason?: string) =>
     request<{ document: unknown; vehicleVerification: string | null }>(`/admin/documents/${id}`, {

@@ -2,7 +2,7 @@
   "name": "kisanpool",
   "private": true,
   "version": "0.1.0",
-  "description": "KisanPool \u2014 shared produce transport for Indian farmers",
+  "description": "KisanPool — shared produce transport for Indian farmers",
   "workspaces": [
     "packages/*",
     "apps/*"
@@ -20,5 +20,11 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "@types/react-native-razorpay": "^2.2.6",
+    "react-native-razorpay": "^3.0.0",
+    "react-refresh": "^0.18.0",
+    "scheduler": "^0.27.0"
   }
 }

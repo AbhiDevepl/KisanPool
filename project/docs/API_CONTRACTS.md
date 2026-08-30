@@ -148,16 +148,22 @@ Handshake carries the same JWT as REST (`auth: { token }`). Rooms are `requestId
 
 ## 4. AI-safe tool contract
 
-Servo AI may call exactly these six tools. **Each one calls the same service function the corresponding REST route calls** — there is no separate, looser code path into the domain, and every validation a human tap triggers also runs here.
+Servo AI may call exactly these eight tools. **Each one calls the same service function the corresponding REST route calls** — there is no separate, looser code path into the domain, and every validation a human tap triggers also runs here.
 
 ```js
 getUserProfile()
 findMatchingVehicles({ pickupLocation, destination, cropType, quantityKg, preferredDate })
 createTransportRequest({ cropType, quantityKg, pickupLocation, destination, preferredDate })
-acceptMatch({ requestId, vehicleId })   // hands off to the checkout screen — does NOT pay
+acceptMatch({ requestId, offerId })   // hands off to the checkout screen — does NOT pay
 getTripStatus({ requestId })
 cancelRequest({ requestId, reason })
+findNearbyMandis({ radiusKm })            // read-only; origin is the farmer's saved location (ADR-043)
+findNearbyTransporters({ radiusKm })      // read-only; online VERIFIED vehicles with spare capacity
 ```
+
+`findNearbyMandis` and `findNearbyTransporters` are read-only, need no spoken confirmation, and
+return `cards` on `AiChatResponse` (a `mandiList` / `transporterList` and a `map` card) that the
+app renders inline under the text reply.
 
 Rules that bind these tools:
 
@@ -230,7 +236,7 @@ The same 25 are used by the backend REST layer, by Socket.io error payloads, and
 | Code | HTTP | Meaning | Client behaviour |
 |---|---|---|---|
 | `AI_INTENT_UNCLEAR` | 200 with `success:false` | The assistant could not resolve intent and is asking a follow-up rather than guessing | Not an error state in the UI — speak and display the follow-up question and keep the session open for the next utterance |
-| `AI_TOOL_ERROR` | 502 | A tool call failed, or the model attempted something outside the six-tool contract | Say "I couldn't do that — please try on screen", close the voice session cleanly, and leave the user on a usable screen. Never fabricate a result |
+| `AI_TOOL_ERROR` | 502 | A tool call failed, or the model attempted something outside the closed tool contract | Say "I couldn't do that — please try on screen", close the voice session cleanly, and leave the user on a usable screen. Never fabricate a result |
 
 ### Cross-cutting (3)
 

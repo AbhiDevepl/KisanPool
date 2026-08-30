@@ -112,6 +112,10 @@ export interface PricedShipmentInput {
   sequence: number;
   /** set once delivered — the bill is final and no longer moves */
   frozenPrice?: number | null;
+  /** a hypothetical joiner being quoted — slotted into the chain at its cheapest
+   *  position rather than blindly appended (so a farmer earlier on the same
+   *  corridor still pools) */
+  candidate?: boolean;
 }
 
 export interface PriceTripInput {
@@ -144,11 +148,34 @@ const EMPTY_PRICING = (ratePerKm: number, version: number): TripPricingDTO => ({
  */
 export async function priceTrip(input: PriceTripInput): Promise<TripPricingDTO> {
   const { ratePerKm, destination, version = 0 } = input;
-  const pool = [...input.shipments].sort(
+  const ordered = [...input.shipments].sort(
     (a, b) => a.sequence - b.sequence || a.id.localeCompare(b.id),
   );
 
-  if (!pool.length || ratePerKm <= 0) return EMPTY_PRICING(ratePerKm, version);
+  if (!ordered.length || ratePerKm <= 0) return EMPTY_PRICING(ratePerKm, version);
+
+  // A hypothetical joiner is inserted at the chain position that grows the route
+  // the least, instead of always going last. Confirmed shipments keep their
+  // order (the driver may already be on that route); only the candidate moves.
+  const candidate = ordered.find((s) => s.candidate);
+  const fixed = ordered.filter((s) => !s.candidate);
+  let pool = ordered;
+  if (candidate && fixed.length) {
+    let bestKm = Infinity;
+    let bestAt = fixed.length;
+    for (let k = 0; k <= fixed.length; k += 1) {
+      const chain = [...fixed.slice(0, k), candidate, ...fixed.slice(k)];
+      let km = await roadKm(chain[chain.length - 1].pickup, destination);
+      for (let i = 0; i < chain.length - 1; i += 1) {
+        km += await roadKm(chain[i].pickup, chain[i + 1].pickup);
+      }
+      if (km < bestKm - 0.05) {
+        bestKm = km;
+        bestAt = k;
+      }
+    }
+    pool = [...fixed.slice(0, bestAt), candidate, ...fixed.slice(bestAt)];
+  }
 
   // ---- geometry: the chain, and what each load rides of it -------------------
   //
@@ -300,7 +327,7 @@ export async function priceTripById(
   }).sort({ pickupSequence: 1, createdAt: 1 });
 
   const pool = shipments.map(toInput);
-  if (extra) pool.push({ ...extra, sequence: pool.length });
+  if (extra) pool.push({ ...extra, sequence: pool.length, candidate: true });
 
   return priceTrip({
     ratePerKm: vehicle?.ratePerKm ?? 0,

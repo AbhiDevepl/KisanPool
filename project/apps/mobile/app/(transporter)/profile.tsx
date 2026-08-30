@@ -6,6 +6,7 @@
  */
 import { useCallback, useState } from 'react';
 import { Linking, View } from 'react-native';
+import * as Location from 'expo-location';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import type { Language, UserDTO, VehicleDTO } from '@kisanpool/shared';
@@ -34,6 +35,7 @@ import {
   Txt,
 } from '../../components/ui';
 import { BottomNav } from '../../components/BottomNav';
+import { TripMap } from '../../components/TripMap';
 import { colors, space } from '../../theme';
 
 const LANGUAGES: Array<{ code: Language; native: string; english: string }> = [
@@ -60,8 +62,42 @@ export default function TransporterProfile() {
   const [nameDraft, setNameDraft] = useState('');
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [toastTone, setToastTone] = useState<'success' | 'error'>('success');
+
+  const updateLocation = async (): Promise<void> => {
+    setLocating(true);
+    try {
+      console.log('[update-location] requesting permission…');
+      const perm = await Location.requestForegroundPermissionsAsync();
+      console.log('[update-location] permission:', perm.status);
+      if (perm.status !== 'granted') {
+        setToastTone('error');
+        setToast('Location permission denied');
+        return;
+      }
+
+      console.log('[update-location] getting GPS position…');
+      const pos = await Location.getCurrentPositionAsync({});
+      console.log('[update-location] coords:', pos.coords.latitude, pos.coords.longitude);
+
+      const updated = await api.updateVehicleLocation({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+      });
+      console.log('[update-location] saved. vehicle.currentLocation =', updated?.currentLocation);
+      setVehicle(updated);
+      setToastTone('success');
+      setToast('Location updated — nearby loads will match');
+    } catch (err) {
+      console.error('[update-location] FAILED:', err);
+      setToastTone('error');
+      setToast(`Update failed: ${toAppError(err).message}`);
+    } finally {
+      setLocating(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setUserState(await getUser());
@@ -194,9 +230,37 @@ export default function TransporterProfile() {
               <Row label="Type" value={VEHICLE_LABEL[vehicle.vehicleType] ?? vehicle.vehicleType} />
               <Row label="Capacity" value={kg(vehicle.capacityKg)} />
               <Row label="Rate" value={`${rupees(vehicle.ratePerKm)} / km`} />
+              <Row
+                label="Base location"
+                value={
+                  vehicle.currentLocation
+                    ? `${vehicle.currentLocation.lat.toFixed(4)}, ${vehicle.currentLocation.lng.toFixed(4)}`
+                    : 'Not set'
+                }
+              />
+              {vehicle.currentLocation ? (
+                <View style={{ marginTop: space.sm }}>
+                  <TripMap
+                    pickup={{
+                      lat: vehicle.currentLocation.lat,
+                      lng: vehicle.currentLocation.lng,
+                      title: 'You',
+                    }}
+                    height={140}
+                  />
+                </View>
+              ) : null}
+              <Button
+                label="Update my location"
+                variant="secondary"
+                icon="my-location"
+                loading={locating}
+                onPress={() => void updateLocation()}
+                style={{ marginTop: space.gutter }}
+              />
               <Txt variant="labelSm" color={colors.outline} style={{ marginTop: space.sm }}>
-                Your rate and capacity are what the pricing engine quotes farmers from. To change
-                them, contact support.
+                Farmers' loads are matched to you by distance from this point. Your rate and capacity
+                are what the pricing engine quotes from — to change them, contact support.
               </Txt>
             </>
           ) : (

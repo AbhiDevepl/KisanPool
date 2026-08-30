@@ -81,3 +81,22 @@ vehiclesRouter.patch(
     ok(res, vehicle);
   }),
 );
+
+/** The driver's live position, so the request pool can match by where they are now. */
+vehiclesRouter.patch(
+  '/me/location',
+  requireAuth,
+  requireRole('TRANSPORTER'),
+  asyncHandler<AuthedRequest>(async (req, res) => {
+    const { lat, lng } = z
+      .object({ lat: z.number().min(-90).max(90), lng: z.number().min(-180).max(180) })
+      .parse(req.body);
+    const vehicle = await Vehicle.findOneAndUpdate(
+      { ownerId: req.userId },
+      { currentLocation: { lat, lng } },
+      { new: true },
+    );
+    if (!vehicle) throw new ApiError('RESOURCE_NOT_FOUND', 'Register your vehicle first.');
+    ok(res, vehicle);
+  }),
+);

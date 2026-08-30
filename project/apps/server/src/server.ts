@@ -15,8 +15,8 @@ async function main(): Promise<void> {
   const io = new SocketServer(server, { cors: { origin: '*' } });
   registerSocketHandlers(io);
 
-  server.listen(config.port, () => {
-    console.log(`[server] http://localhost:${config.port}`);
+  server.listen(config.port, '0.0.0.0', () => {
+    console.log(`[server] listening on 0.0.0.0:${config.port}`);
     if (config.otp.demoMode) console.log('[server] OTP demo mode — codes are logged, not sent');
     if (!config.razorpay.enabled) console.log('[server] Razorpay not configured — checkout runs in demo mode');
     if (config.admin.usingDefaults) {
