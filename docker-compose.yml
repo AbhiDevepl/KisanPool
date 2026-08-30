@@ -1,11 +1,14 @@
-# KisanPool server stack.
+# Root compose entrypoint for Dokploy / one-command deploys.
 #
 #   docker compose up -d --build
 #
-# The server reads project/.env (copy from .env.example first). Compose only
-# overrides the two hosts that must point at sibling containers: Mongo and Redis.
-# MongoDB runs as a single-node replica set because the booking transaction
-# (findOneAndUpdate inside a session) requires one.
+# The real stack lives in project/docker-compose.yml; this file only fixes the
+# build context to the project/ workspace so paths resolve the same whether the
+# deploy platform points at the repo root or at project/.
+#
+# Env: platform writes .env next to THIS file (repo root). Copy from
+# project/.env.example and fill in keys. Every integration degrades gracefully
+# if a key is blank.
 
 services:
   mongo:
@@ -41,10 +44,11 @@ services:
 
   server:
     build:
-      context: .
+      context: ./project
       dockerfile: apps/server/Dockerfile
     image: kisanpool-server:latest
     env_file:
+      # Optional: only used if present. Platform-injected env vars still apply.
       - path: .env
         required: false
     environment:
