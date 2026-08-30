@@ -142,7 +142,12 @@ export function VoiceAssistantButton({ language = 'en' }: { language?: Language 
 
   return (
     <>
-      <Pressable style={s.fab} onPress={() => setOpen(true)}>
+      <Pressable
+        style={s.fab}
+        onPress={() => setOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel="Open Servo AI voice assistant"
+      >
         <MaterialIcons name="mic" size={28} color={colors.onPrimary} />
       </Pressable>
 
@@ -156,7 +161,12 @@ export function VoiceAssistantButton({ language = 'en' }: { language?: Language 
                   Speak in your own language
                 </Txt>
               </View>
-              <Pressable onPress={close} hitSlop={12}>
+              <Pressable
+                onPress={close}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Close voice assistant"
+              >
                 <MaterialIcons name="close" size={24} color={colors.onSurfaceVariant} />
               </Pressable>
             </View>
@@ -200,6 +210,14 @@ export function VoiceAssistantButton({ language = 'en' }: { language?: Language 
                     state === 'listening' ? void stopAndSend() : void startRecording()
                   }
                   disabled={state === 'transcribing' || state === 'thinking'}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    state === 'listening' ? 'Stop recording and process audio' : 'Start voice input'
+                  }
+                  accessibilityState={{
+                    disabled: state === 'transcribing' || state === 'thinking',
+                    busy: state === 'transcribing' || state === 'thinking',
+                  }}
                 >
                   <MaterialIcons
                     name={state === 'listening' ? 'stop' : 'mic'}
