@@ -81,17 +81,25 @@ function BottomNavImpl({
   }, [active, root, router]);
 
   return (
-    <View style={[s.bar, { paddingBottom: Math.max(insets.bottom, space.sm) }]}>
+    <View
+      accessibilityRole="tablist"
+      style={[s.bar, { paddingBottom: Math.max(insets.bottom, space.sm) }]}
+    >
       {items.map((item) => {
         const selected = item.key === active;
         const badge = badges?.[item.key] ?? 0;
+        const labelWithBadge =
+          badge > 0
+            ? `${item.label}, ${badge > 9 ? '10 or more unread' : `${badge} unread`}`
+            : item.label;
 
         return (
           <Pressable
             key={item.key}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
-            accessibilityLabel={item.label}
+            accessibilityLabel={labelWithBadge}
+            accessibilityHint={`Navigates to ${item.label} tab`}
             // replace, not push — tabs are siblings, so the back stack stays flat
             onPress={() => (selected ? null : router.replace(item.href as never))}
             style={({ pressed }) => [
