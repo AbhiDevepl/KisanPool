@@ -96,6 +96,20 @@ export async function poolForTransporter(transporterId: string) {
     .sort({ createdAt: -1 })
     .limit(60);
 
+  // Optimization: Pre-fetch the last pickup point once for the active forming trip
+  // to avoid executing `TripShipment.find` up to 60 times in the request prefiltering loop.
+  let lastPickupPoint: { lat: number; lng: number } | null = null;
+  if (trip) {
+    const existing = await TripShipment.find({
+      tripId: trip._id,
+      state: { $in: OCCUPIES_CAPACITY },
+    });
+    if (existing.length) {
+      const last = existing[existing.length - 1];
+      lastPickupPoint = { lat: last.pickup.lat as number, lng: last.pickup.lng as number };
+    }
+  }
+
   const scored = [];
   for (const request of open) {
     const pickup = { lat: request.pickup.lat as number, lng: request.pickup.lng as number };
@@ -115,7 +129,7 @@ export async function poolForTransporter(transporterId: string) {
 
     // cheap straight-line prefilter first — the engine is the authority, but it
     // costs route lookups, so obviously-wrong loads never reach it
-    if (trip && (await detourFor(trip, pickup)) > MAX_DETOUR_KM * 1.5) continue;
+    if (trip && detourFor(trip, lastPickupPoint, pickup) > MAX_DETOUR_KM * 1.5) continue;
 
     const { distanceKm } = await getDirections(pickup, destination);
     const quote = await quoteForJoining(
@@ -177,22 +191,20 @@ const sameDestination = (trip: { destination: { lat?: number | null; lng?: numbe
   ) < 5;
 
 /** Extra distance to collect one more pickup on the way. */
-async function detourFor(trip: { _id: unknown; destination: { lat?: number | null; lng?: number | null } }, pickup: { lat: number; lng: number }): Promise<number> {
-  const existing = await TripShipment.find({
-    tripId: trip._id,
-    state: { $in: OCCUPIES_CAPACITY },
-  });
-  if (!existing.length) return 0;
+function detourFor(
+  trip: { _id: unknown; destination: { lat?: number | null; lng?: number | null } },
+  lastPickupPoint: { lat: number; lng: number } | null,
+  pickup: { lat: number; lng: number },
+): number {
+  if (!lastPickupPoint) return 0;
 
-  const last = existing[existing.length - 1];
-  const lastPoint = { lat: last.pickup.lat as number, lng: last.pickup.lng as number };
   const destination = {
     lat: trip.destination.lat as number,
     lng: trip.destination.lng as number,
   };
 
-  const direct = haversineKm(lastPoint, destination);
-  const viaPickup = haversineKm(lastPoint, pickup) + haversineKm(pickup, destination);
+  const direct = haversineKm(lastPickupPoint, destination);
+  const viaPickup = haversineKm(lastPickupPoint, pickup) + haversineKm(pickup, destination);
   return Math.max(0, viaPickup - direct);
 }
 
