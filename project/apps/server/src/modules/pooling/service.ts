@@ -460,12 +460,23 @@ export async function offersForRequest(requestId: string, farmerId: string) {
   };
   const { distanceKm } = await getDirections(pickup, destination);
 
+  // Optimization: Pre-fetch all transporters and vehicles in batch queries to
+  // eliminate N+1 queries in the loop below.
+  const transporterIds = [...new Set(offers.map((o) => String(o.transporterId)))];
+  const vehicleIds = [...new Set(offers.map((o) => String(o.vehicleId)))];
+
+  const [transporters, vehicles] = await Promise.all([
+    User.find({ _id: { $in: transporterIds } }),
+    Vehicle.find({ _id: { $in: vehicleIds } }),
+  ]);
+
+  const transporterMap = new Map(transporters.map((u) => [String(u._id), u]));
+  const vehicleMap = new Map(vehicles.map((v) => [String(v._id), v]));
+
   return Promise.all(
     offers.map(async (offer) => {
-      const [transporter, vehicle] = await Promise.all([
-        User.findById(offer.transporterId),
-        Vehicle.findById(offer.vehicleId),
-      ]);
+      const transporter = transporterMap.get(String(offer.transporterId));
+      const vehicle = vehicleMap.get(String(offer.vehicleId));
 
       // A driver's open trip may have gained or lost farmers since they claimed,
       // which moves what this farmer would pay. Re-quoting here is what makes the
