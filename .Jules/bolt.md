@@ -5,3 +5,7 @@
 ## 2026-08-30 - [Pre-fetch Trip Last Pickup to Avoid N+1 Queries in Request Prefiltering]
 **Learning:** In `poolForTransporter`, `detourFor` executed `TripShipment.find` for every open request in the ranking loop (up to 60 queries). Since the active forming trip's shipments do not change during the request iteration, querying `TripShipment` inside `detourFor` was an N+1 query bottleneck.
 **Action:** Pre-fetch the last pickup point once before looping over open requests and pass it directly to `detourFor` as a synchronous calculation.
+
+## 2026-08-31 - [Parallelize Distance Lookups and DB Queries in Pooled Pricing]
+**Learning:** `priceTrip` sequentially awaited `closingKm` and `hopKm` in `for ... await` loops ($2N - 1$ sequential async steps for $N$ shipments), and `priceTripById` fetched `Vehicle` and `TripShipment` sequentially.
+**Action:** Combine independent async distance evaluations and Mongoose queries using `Promise.all` to reduce async batch turns to 1.
