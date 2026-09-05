@@ -163,13 +163,14 @@ export async function priceTrip(input: PriceTripInput): Promise<TripPricingDTO> 
   // closingKm[i] is the run from pickup i straight to the mandi; hopKm[i] is the
   // leg from pickup i to pickup i+1. Between them they describe every prefix of
   // the chain, which is what both the ride distances and the detours need.
-  const closingKm: number[] = [];
-  for (const shipment of pool) closingKm.push(await roadKm(shipment.pickup, destination));
-
-  const hopKm: number[] = [];
-  for (let i = 0; i < pool.length - 1; i += 1) {
-    hopKm.push(await roadKm(pool[i].pickup, pool[i + 1].pickup));
-  }
+  // Optimization: Pre-fetch all closing and hop distances concurrently using Promise.all
+  // to avoid sequential async roundtrips in hot pricing loops.
+  const [closingKm, hopKm] = await Promise.all([
+    Promise.all(pool.map((shipment) => roadKm(shipment.pickup, destination))),
+    Promise.all(
+      pool.slice(0, -1).map((shipment, i) => roadKm(shipment.pickup, pool[i + 1].pickup)),
+    ),
+  ]);
 
   /** The chain P₁ → … → P_k → mandi. routeTo(0) is the base route. */
   const routeTo = (k: number): number =>
