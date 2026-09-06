@@ -5,3 +5,7 @@
 ## 2026-08-30 - [Pre-fetch Trip Last Pickup to Avoid N+1 Queries in Request Prefiltering]
 **Learning:** In `poolForTransporter`, `detourFor` executed `TripShipment.find` for every open request in the ranking loop (up to 60 queries). Since the active forming trip's shipments do not change during the request iteration, querying `TripShipment` inside `detourFor` was an N+1 query bottleneck.
 **Action:** Pre-fetch the last pickup point once before looping over open requests and pass it directly to `detourFor` as a synchronous calculation.
+
+## 2026-08-31 - [Batch Pre-fetch Active Trips and TripShipments in Request Offer Comparison]
+**Learning:** In `offersForRequest`, evaluating each offer triggered N+1 database queries via `joinableTrip` (`Trip.findOne`), `capacityOf` (`TripShipment.find`), and `poolSize` (`TripShipment.countDocuments`).
+**Action:** Pre-fetch active forming trips and trip shipments in batch queries up front using `transporterId: { $in: transporterIds }` and `tripId: { $in: activeTripIds }`, then perform status, capacity, and poolSize evaluations synchronously in memory.

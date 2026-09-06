@@ -1,10 +1,12 @@
 import mongoose from 'mongoose';
 import {
+  LOADED_STATES,
   MIN_UTILISATION,
   OCCUPIES_CAPACITY,
   canTransitionShipment,
   canTransitionTrip,
   type ShipmentState,
+  type TripCapacity,
   type TripState,
 } from '@kisanpool/shared';
 import { ApiError } from '../../lib/envelope';
@@ -184,11 +186,17 @@ export async function poolForTransporter(transporterId: string) {
   };
 }
 
-const sameDestination = (trip: { destination: { lat?: number | null; lng?: number | null } }, dest: { lat: number; lng: number }): boolean =>
-  haversineKm(
-    { lat: trip.destination.lat as number, lng: trip.destination.lng as number },
-    dest,
-  ) < 5;
+function sameDestination(
+  trip: { destination: { lat?: number | null; lng?: number | null } },
+  dest: { lat: number; lng: number },
+): boolean {
+  return (
+    haversineKm(
+      { lat: trip.destination.lat as number, lng: trip.destination.lng as number },
+      dest,
+    ) < 5
+  );
+}
 
 /** Extra distance to collect one more pickup on the way. */
 function detourFor(
@@ -460,18 +468,41 @@ export async function offersForRequest(requestId: string, farmerId: string) {
   };
   const { distanceKm } = await getDirections(pickup, destination);
 
-  // Optimization: Pre-fetch all transporters and vehicles in batch queries to
-  // eliminate N+1 queries in the loop below.
+  // Optimization: Pre-fetch all transporters, vehicles, active trips, and trip
+  // shipments in batch queries to eliminate N+1 database queries in the loop below.
   const transporterIds = [...new Set(offers.map((o) => String(o.transporterId)))];
   const vehicleIds = [...new Set(offers.map((o) => String(o.vehicleId)))];
 
-  const [transporters, vehicles] = await Promise.all([
+  const [transporters, vehicles, activeTrips] = await Promise.all([
     User.find({ _id: { $in: transporterIds } }),
     Vehicle.find({ _id: { $in: vehicleIds } }),
+    Trip.find({
+      transporterId: { $in: transporterIds },
+      state: { $in: ['FORMING', 'EN_ROUTE'] },
+    }).sort({ createdAt: -1 }),
   ]);
+
+  const activeTripIds = activeTrips.map((t) => t._id);
+  const activeTripShipments = activeTripIds.length
+    ? await TripShipment.find({ tripId: { $in: activeTripIds } })
+    : [];
 
   const transporterMap = new Map(transporters.map((u) => [String(u._id), u]));
   const vehicleMap = new Map(vehicles.map((v) => [String(v._id), v]));
+
+  const activeTripMap = new Map<string, (typeof activeTrips)[0]>();
+  for (const trip of activeTrips) {
+    const tId = String(trip.transporterId);
+    if (!activeTripMap.has(tId)) activeTripMap.set(tId, trip);
+  }
+
+  const shipmentsByTripMap = new Map<string, typeof activeTripShipments>();
+  for (const shipment of activeTripShipments) {
+    const tId = String(shipment.tripId);
+    const list = shipmentsByTripMap.get(tId) || [];
+    list.push(shipment);
+    shipmentsByTripMap.set(tId, list);
+  }
 
   return Promise.all(
     offers.map(async (offer) => {
@@ -483,7 +514,11 @@ export async function offersForRequest(requestId: string, farmerId: string) {
       // comparison screen live rather than a snapshot of claim time — and it is
       // the same engine call that will allocate the load on confirmation, so the
       // price the farmer taps is the price they get (ADR-035).
-      const openTrip = await joinableTrip(String(offer.transporterId), destination);
+      // Optimization: look up the pre-fetched active trip in memory instead of running
+      // a separate database query per offer.
+      const activeTrip = activeTripMap.get(String(offer.transporterId));
+      const openTrip =
+        activeTrip && sameDestination(activeTrip, destination) ? activeTrip : null;
 
       const quote = await quoteForJoining(
         openTrip,
@@ -505,12 +540,30 @@ export async function offersForRequest(requestId: string, farmerId: string) {
         await offer.save();
       }
 
-      const capacity = openTrip ? await capacityOf(openTrip) : null;
+      // Optimization: compute capacity and pool size from pre-fetched shipments
+      // without additional DB calls per offer.
+      const tripShipments = openTrip ? shipmentsByTripMap.get(String(openTrip._id)) || [] : [];
+      const capacity: TripCapacity | null = openTrip
+        ? {
+            totalKg: openTrip.totalCapacityKg,
+            committedKg: tripShipments
+              .filter((s) => OCCUPIES_CAPACITY.includes(s.state))
+              .reduce((sum, s) => sum + s.quantityKg, 0),
+            loadedKg: tripShipments
+              .filter((s) => LOADED_STATES.includes(s.state))
+              .reduce((sum, s) => sum + s.quantityKg, 0),
+            availableKg: Math.max(
+              0,
+              openTrip.totalCapacityKg -
+                tripShipments
+                  .filter((s) => OCCUPIES_CAPACITY.includes(s.state))
+                  .reduce((sum, s) => sum + s.quantityKg, 0),
+            ),
+          }
+        : null;
+
       const poolSize = openTrip
-        ? await TripShipment.countDocuments({
-            tripId: openTrip._id,
-            state: { $in: OCCUPIES_CAPACITY },
-          })
+        ? tripShipments.filter((s) => OCCUPIES_CAPACITY.includes(s.state)).length
         : 0;
 
       return {
