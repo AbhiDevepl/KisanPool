@@ -287,6 +287,26 @@ const toInput = (shipment: TripShipmentDoc): PricedShipmentInput => ({
   frozenPrice: shipment.finalPrice ?? null,
 });
 
+/** Price a trip in-memory using already-fetched trip, vehicle, and shipment documents. */
+export async function priceTripDoc(
+  trip: TripDoc,
+  vehicle: { ratePerKm: number } | null,
+  shipments: TripShipmentDoc[],
+  extra?: Omit<PricedShipmentInput, 'sequence'>,
+): Promise<TripPricingDTO> {
+  const pool = shipments
+    .filter((s) => PRICED_STATES.includes(s.state))
+    .map(toInput);
+  if (extra) pool.push({ ...extra, sequence: pool.length });
+
+  return priceTrip({
+    ratePerKm: vehicle?.ratePerKm ?? 0,
+    destination: asPoint(trip.destination),
+    shipments: pool,
+    version: trip.pricingVersion,
+  });
+}
+
 /**
  * Price a trip as it stands in the database.
  *
@@ -301,27 +321,20 @@ export async function priceTripById(
   const trip = await Trip.findById(tripId);
   if (!trip) return null;
 
-  const vehicle = await Vehicle.findById(trip.vehicleId);
-  const shipments = await TripShipment.find({
-    tripId: trip._id,
-    state: { $in: PRICED_STATES },
-  }).sort({ pickupSequence: 1, createdAt: 1 });
+  // Optimization: Pre-fetch vehicle and shipments in parallel instead of sequentially.
+  const [vehicle, shipments] = await Promise.all([
+    Vehicle.findById(trip.vehicleId),
+    TripShipment.find({
+      tripId: trip._id,
+      state: { $in: PRICED_STATES },
+    }).sort({ pickupSequence: 1, createdAt: 1 }),
+  ]);
 
-  const pool = shipments.map(toInput);
-  if (extra) pool.push({ ...extra, sequence: pool.length });
-
-  return priceTrip({
-    ratePerKm: vehicle?.ratePerKm ?? 0,
-    destination: asPoint(trip.destination),
-    shipments: pool,
-    version: trip.pricingVersion,
-  });
+  return priceTripDoc(trip, vehicle, shipments, extra);
 }
 
-/** Capacity is derived from shipments, never from a stored counter that can drift. */
-export async function capacityOf(trip: TripDoc): Promise<TripCapacity> {
-  const shipments = await TripShipment.find({ tripId: trip._id });
-
+/** Calculate trip capacity in-memory from pre-fetched shipments to avoid redundant DB reads. */
+export function capacityFromShipments(totalCapacityKg: number, shipments: TripShipmentDoc[]): TripCapacity {
   const committedKg = shipments
     .filter((s) => OCCUPIES_CAPACITY.includes(s.state))
     .reduce((sum, s) => sum + s.quantityKg, 0);
@@ -331,11 +344,17 @@ export async function capacityOf(trip: TripDoc): Promise<TripCapacity> {
     .reduce((sum, s) => sum + s.quantityKg, 0);
 
   return {
-    totalKg: trip.totalCapacityKg,
+    totalKg: totalCapacityKg,
     committedKg,
     loadedKg,
-    availableKg: Math.max(0, trip.totalCapacityKg - committedKg),
+    availableKg: Math.max(0, totalCapacityKg - committedKg),
   };
+}
+
+/** Capacity is derived from shipments, never from a stored counter that can drift. */
+export async function capacityOf(trip: TripDoc): Promise<TripCapacity> {
+  const shipments = await TripShipment.find({ tripId: trip._id });
+  return capacityFromShipments(trip.totalCapacityKg, shipments);
 }
 
 /**

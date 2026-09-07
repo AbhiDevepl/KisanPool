@@ -5,3 +5,7 @@
 ## 2026-08-30 - [Pre-fetch Trip Last Pickup to Avoid N+1 Queries in Request Prefiltering]
 **Learning:** In `poolForTransporter`, `detourFor` executed `TripShipment.find` for every open request in the ranking loop (up to 60 queries). Since the active forming trip's shipments do not change during the request iteration, querying `TripShipment` inside `detourFor` was an N+1 query bottleneck.
 **Action:** Pre-fetch the last pickup point once before looping over open requests and pass it directly to `detourFor` as a synchronous calculation.
+
+## 2026-09-07 - [Batch-Fetch Shipments and Vehicles to Eliminate N+1 Queries in Transporter Trips Feed]
+**Learning:** In `/trips/mine`, fetching trip capacity, pool size, and pricing sequentially inside a `.map` loop executed 5 MongoDB queries per trip (`TripShipment.find`, `TripShipment.countDocuments`, `Trip.findById`, `Vehicle.findById`, `TripShipment.find`). For 30 trips, this resulted in 150+ database queries.
+**Action:** Batch-fetch all relevant `TripShipment` and `Vehicle` documents across the trip set in two parallel queries (`$in: tripIds`, `$in: vehicleIds`), build in-memory maps, and compute capacity and pricing synchronously with `capacityFromShipments` and `priceTripDoc`.
