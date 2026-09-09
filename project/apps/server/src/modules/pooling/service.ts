@@ -1052,8 +1052,9 @@ export async function tripDetail(tripId: string, viewerId: string) {
     })),
   }).catch(() => undefined);
 
+  // Optimization: Reuse capacityNow calculated above to eliminate duplicate capacityOf database calls.
   return {
-    trip: { ...trip.toJSON(), capacity: await capacityOf(trip) },
+    trip: { ...trip.toJSON(), capacity: capacityNow },
     pricing,
     vehicle,
     transporter: transporter && {
