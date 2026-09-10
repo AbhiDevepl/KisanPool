@@ -5,3 +5,7 @@
 ## 2026-08-30 - [Pre-fetch Trip Last Pickup to Avoid N+1 Queries in Request Prefiltering]
 **Learning:** In `poolForTransporter`, `detourFor` executed `TripShipment.find` for every open request in the ranking loop (up to 60 queries). Since the active forming trip's shipments do not change during the request iteration, querying `TripShipment` inside `detourFor` was an N+1 query bottleneck.
 **Action:** Pre-fetch the last pickup point once before looping over open requests and pass it directly to `detourFor` as a synchronous calculation.
+
+## 2026-08-31 - [Batch Pre-fetch Requesters in Backhaul Matching to Avoid N+1 Queries]
+**Learning:** In `backhaulMatchesFor`, `User.findById` was called inside the loop over open requests (up to 60 queries) to populate requester details. Pre-fetching all unique requester documents using `User.find({ _id: { $in: requesterIds } })` before the matching loop replaces N+1 database queries with a single O(1) Map lookup.
+**Action:** When matching or scoring open requests/offers, collect unique foreign key IDs and batch-fetch related user/vehicle models prior to iteration.
