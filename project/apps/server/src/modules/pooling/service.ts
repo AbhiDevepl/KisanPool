@@ -1017,13 +1017,15 @@ export async function tripDetail(tripId: string, viewerId: string) {
     throw new ApiError('AUTH_FORBIDDEN', "You don't have access to this trip.");
   }
 
-  const farmers = await User.find({ _id: { $in: shipments.map((s) => s.farmerId) } });
-  const vehicle = await Vehicle.findById(trip.vehicleId);
-  const transporter = await User.findById(trip.transporterId);
-
-  // one set of numbers for both sides of the trip — the farmer reads their own
-  // share out of `pricing.shares`, the driver reads totalCost / transporterEarning
-  const pricing = await priceTripById(tripId);
+  // Optimization: Fetch farmers, vehicle, transporter, pricing, and capacity concurrently
+  // with Promise.all to eliminate sequential DB calls and avoid a duplicate capacityOf query.
+  const [farmers, vehicle, transporter, pricing, capacityNow] = await Promise.all([
+    User.find({ _id: { $in: shipments.map((s) => s.farmerId) } }),
+    Vehicle.findById(trip.vehicleId),
+    User.findById(trip.transporterId),
+    priceTripById(tripId),
+    capacityOf(trip),
+  ]);
   const shareOf = new Map((pricing?.shares ?? []).map((share) => [share.shipmentId, share]));
 
   /*
@@ -1034,7 +1036,6 @@ export async function tripDetail(tripId: string, viewerId: string) {
    * is what lets the farmer still see their trip — clearly stamped with when it
    * was true, never presented as live.
    */
-  const capacityNow = await capacityOf(trip);
   void putTripSnapshot({
     tripId: String(trip._id),
     state: trip.state,
@@ -1053,7 +1054,7 @@ export async function tripDetail(tripId: string, viewerId: string) {
   }).catch(() => undefined);
 
   return {
-    trip: { ...trip.toJSON(), capacity: await capacityOf(trip) },
+    trip: { ...trip.toJSON(), capacity: capacityNow },
     pricing,
     vehicle,
     transporter: transporter && {

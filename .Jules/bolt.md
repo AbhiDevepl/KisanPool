@@ -5,3 +5,7 @@
 ## 2026-08-30 - [Pre-fetch Trip Last Pickup to Avoid N+1 Queries in Request Prefiltering]
 **Learning:** In `poolForTransporter`, `detourFor` executed `TripShipment.find` for every open request in the ranking loop (up to 60 queries). Since the active forming trip's shipments do not change during the request iteration, querying `TripShipment` inside `detourFor` was an N+1 query bottleneck.
 **Action:** Pre-fetch the last pickup point once before looping over open requests and pass it directly to `detourFor` as a synchronous calculation.
+
+## 2026-09-12 - [Parallelize Independent Route & Entity Lookups in Pricing Engine and Detail Queries]
+**Learning:** `priceTrip` executed closing and hop distance lookups sequentially in `for` loops, creating up to 2N-1 serial async operations for an N-shipment pool. Furthermore, endpoints like `tripDetail` executed DB queries sequentially and called `capacityOf(trip)` twice.
+**Action:** Use `Promise.all` to execute independent distance lookups and database queries concurrently, and reuse computed state to eliminate redundant sub-queries.
