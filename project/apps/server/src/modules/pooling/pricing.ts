@@ -163,13 +163,12 @@ export async function priceTrip(input: PriceTripInput): Promise<TripPricingDTO> 
   // closingKm[i] is the run from pickup i straight to the mandi; hopKm[i] is the
   // leg from pickup i to pickup i+1. Between them they describe every prefix of
   // the chain, which is what both the ride distances and the detours need.
-  const closingKm: number[] = [];
-  for (const shipment of pool) closingKm.push(await roadKm(shipment.pickup, destination));
-
-  const hopKm: number[] = [];
-  for (let i = 0; i < pool.length - 1; i += 1) {
-    hopKm.push(await roadKm(pool[i].pickup, pool[i + 1].pickup));
-  }
+  // Optimization: Fetch closingKm and hopKm concurrently with Promise.all to avoid
+  // executing 2N-1 distance lookups sequentially.
+  const [closingKm, hopKm] = await Promise.all([
+    Promise.all(pool.map((shipment) => roadKm(shipment.pickup, destination))),
+    Promise.all(pool.slice(0, -1).map((s, i) => roadKm(s.pickup, pool[i + 1].pickup))),
+  ]);
 
   /** The chain P₁ → … → P_k → mandi. routeTo(0) is the base route. */
   const routeTo = (k: number): number =>
@@ -301,11 +300,14 @@ export async function priceTripById(
   const trip = await Trip.findById(tripId);
   if (!trip) return null;
 
-  const vehicle = await Vehicle.findById(trip.vehicleId);
-  const shipments = await TripShipment.find({
-    tripId: trip._id,
-    state: { $in: PRICED_STATES },
-  }).sort({ pickupSequence: 1, createdAt: 1 });
+  // Optimization: Fetch vehicle and shipments concurrently with Promise.all
+  const [vehicle, shipments] = await Promise.all([
+    Vehicle.findById(trip.vehicleId),
+    TripShipment.find({
+      tripId: trip._id,
+      state: { $in: PRICED_STATES },
+    }).sort({ pickupSequence: 1, createdAt: 1 }),
+  ]);
 
   const pool = shipments.map(toInput);
   if (extra) pool.push({ ...extra, sequence: pool.length });

@@ -47,12 +47,14 @@ async function delaySignalsFor(
   trip: TripDoc,
   now: number,
 ): Promise<DelaySignals> {
-  const shipments = await TripShipment.find({
-    tripId: trip._id,
-    state: { $ne: 'CANCELLED' },
-  }).sort({ pickupSequence: 1 });
-
-  const vehicle = await Vehicle.findById(trip.vehicleId);
+  // Optimization: Fetch shipments and vehicle concurrently with Promise.all
+  const [shipments, vehicle] = await Promise.all([
+    TripShipment.find({
+      tripId: trip._id,
+      state: { $ne: 'CANCELLED' },
+    }).sort({ pickupSequence: 1 }),
+    Vehicle.findById(trip.vehicleId),
+  ]);
 
   const pickupsDone = shipments.filter((s) => COLLECTED_OR_LATER.includes(s.state)).length;
   const delivered = shipments.filter((s) => DELIVERED_OR_LATER.includes(s.state)).length;
@@ -154,16 +156,19 @@ export async function assessDemand(): Promise<DemandAssessment[]> {
   const since = new Date(now - DEMAND_WINDOW_DAYS * 86400000);
 
   // group requests by their destination mandi name
-  const recent = await TransportRequest.find({ createdAt: { $gte: since } }).select(
-    'destination state farmerId createdAt',
-  );
-  const openNow = await TransportRequest.find({
-    state: { $in: ['OPEN', 'TRANSPORTER_INTERESTED'] },
-  }).select('destination farmerId');
-  const activeTrips = await Trip.find({ state: { $in: ['FORMING', 'EN_ROUTE', 'IN_TRANSIT'] } }).select(
-    'destination',
-  );
-  const doneTrips = await Trip.find({ state: 'COMPLETED' }).select('destination');
+  // Optimization: Fetch demand statistics concurrently with Promise.all
+  const [recent, openNow, activeTrips, doneTrips] = await Promise.all([
+    TransportRequest.find({ createdAt: { $gte: since } }).select(
+      'destination state farmerId createdAt',
+    ),
+    TransportRequest.find({
+      state: { $in: ['OPEN', 'TRANSPORTER_INTERESTED'] },
+    }).select('destination farmerId'),
+    Trip.find({ state: { $in: ['FORMING', 'EN_ROUTE', 'IN_TRANSIT'] } }).select(
+      'destination',
+    ),
+    Trip.find({ state: 'COMPLETED' }).select('destination'),
+  ]);
 
   const byMandi = new Map<
     string,
