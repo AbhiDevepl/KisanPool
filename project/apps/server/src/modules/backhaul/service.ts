@@ -187,6 +187,15 @@ export async function backhaulMatchesFor(tripId: string, transporterId: string) 
     ratePerKm: vehicle.ratePerKm,
   };
 
+  // Optimization: Pre-fetch all requesters in a single batch query to
+  // eliminate N+1 queries inside the loop below.
+  const requesterIds = [...new Set(open.map((r) => String(r.requesterId)))];
+  const requesters = await User.find(
+    { _id: { $in: requesterIds } },
+    'name ratingAvg',
+  );
+  const requesterMap = new Map(requesters.map((u) => [String(u._id), u]));
+
   const matches = [];
   for (const request of open) {
     const candidate = {
@@ -206,7 +215,7 @@ export async function backhaulMatchesFor(tripId: string, transporterId: string) 
     if (quote.detourKm > MAX_BACKHAUL_DETOUR_KM) continue;
     if (quote.pickupDistanceKm > MAX_BACKHAUL_PICKUP_KM) continue;
 
-    const requester = await User.findById(request.requesterId);
+    const requester = requesterMap.get(String(request.requesterId));
     matches.push(
       toMatchDTO(
         {
