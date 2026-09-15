@@ -217,11 +217,20 @@ function detourFor(
  * offer screen and the trip screen disagree (ADR-035).
  */
 async function quoteForJoining(
-  trip: Awaited<ReturnType<typeof activeFormingTrip>>,
+  trip: { _id: unknown; pricingVersion?: number } | null,
   candidate: { requestId: string; farmerId: string; quantityKg: number; pickup: { lat: number; lng: number } },
   destination: { lat: number; lng: number },
   distanceKm: number,
   ratePerKm: number,
+  existingShipments?: Array<{
+    _id: unknown;
+    farmerId: unknown;
+    quantityKg: number;
+    pickup: { lat?: number | null; lng?: number | null };
+    pickupSequence: number;
+    finalPrice?: number | null;
+    state: string;
+  }>,
 ): Promise<{ quoted: number; solo: number; detourKm: number; rideKm: number; transporterEarning: number }> {
   const solo = soloPrice(distanceKm, ratePerKm);
 
@@ -251,12 +260,42 @@ async function quoteForJoining(
     };
   }
 
-  const pricing = await priceTripById(String(trip._id), {
-    id: candidate.requestId,
-    farmerId: candidate.farmerId,
-    quantityKg: candidate.quantityKg,
-    pickup: candidate.pickup,
-  });
+  let pricing;
+  if (existingShipments) {
+    const PRICED_STATES = OCCUPIES_CAPACITY.concat(['DELIVERED', 'PAYMENT_PENDING', 'PAID', 'COMPLETED']);
+    const pool = existingShipments
+      .filter((s) => PRICED_STATES.includes(s.state as any))
+      .map((s) => ({
+        id: String(s._id),
+        farmerId: String(s.farmerId),
+        quantityKg: s.quantityKg,
+        pickup: { lat: s.pickup.lat as number, lng: s.pickup.lng as number },
+        sequence: s.pickupSequence,
+        frozenPrice: s.finalPrice ?? null,
+      }));
+    pool.push({
+      id: candidate.requestId,
+      farmerId: candidate.farmerId,
+      quantityKg: candidate.quantityKg,
+      pickup: candidate.pickup,
+      sequence: pool.length,
+      frozenPrice: null,
+    });
+    pricing = await priceTrip({
+      ratePerKm,
+      destination,
+      shipments: pool,
+      version: trip.pricingVersion ?? 0,
+    });
+  } else {
+    pricing = await priceTripById(String(trip._id), {
+      id: candidate.requestId,
+      farmerId: candidate.farmerId,
+      quantityKg: candidate.quantityKg,
+      pickup: candidate.pickup,
+    });
+  }
+
   const share = pricing?.shares.find((s) => s.shipmentId === candidate.requestId);
   if (!share || !pricing) {
     return {
@@ -460,18 +499,41 @@ export async function offersForRequest(requestId: string, farmerId: string) {
   };
   const { distanceKm } = await getDirections(pickup, destination);
 
-  // Optimization: Pre-fetch all transporters and vehicles in batch queries to
-  // eliminate N+1 queries in the loop below.
+  // Optimization: Pre-fetch all transporters, vehicles, active trips, and trip shipments in batch queries
+  // to eliminate N+1 queries in the loop below.
   const transporterIds = [...new Set(offers.map((o) => String(o.transporterId)))];
   const vehicleIds = [...new Set(offers.map((o) => String(o.vehicleId)))];
 
-  const [transporters, vehicles] = await Promise.all([
+  const [transporters, vehicles, activeTrips] = await Promise.all([
     User.find({ _id: { $in: transporterIds } }),
     Vehicle.find({ _id: { $in: vehicleIds } }),
+    Trip.find({ transporterId: { $in: transporterIds }, state: { $in: ['FORMING', 'EN_ROUTE'] } }).sort({ createdAt: -1 }),
   ]);
 
   const transporterMap = new Map(transporters.map((u) => [String(u._id), u]));
   const vehicleMap = new Map(vehicles.map((v) => [String(v._id), v]));
+
+  // Index active forming/en-route trips by transporter
+  const activeTripsMap = new Map<string, typeof activeTrips>();
+  for (const t of activeTrips) {
+    const tid = String(t.transporterId);
+    const list = activeTripsMap.get(tid) || [];
+    list.push(t);
+    activeTripsMap.set(tid, list);
+  }
+
+  const tripIds = activeTrips.map((t) => String(t._id));
+  const tripShipments = tripIds.length
+    ? await TripShipment.find({ tripId: { $in: tripIds } }).sort({ pickupSequence: 1, createdAt: 1 })
+    : [];
+
+  const shipmentsByTripMap = new Map<string, typeof tripShipments>();
+  for (const s of tripShipments) {
+    const tid = String(s.tripId);
+    const list = shipmentsByTripMap.get(tid) || [];
+    list.push(s);
+    shipmentsByTripMap.set(tid, list);
+  }
 
   return Promise.all(
     offers.map(async (offer) => {
@@ -483,7 +545,9 @@ export async function offersForRequest(requestId: string, farmerId: string) {
       // comparison screen live rather than a snapshot of claim time — and it is
       // the same engine call that will allocate the load on confirmation, so the
       // price the farmer taps is the price they get (ADR-035).
-      const openTrip = await joinableTrip(String(offer.transporterId), destination);
+      const driverTrips = activeTripsMap.get(String(offer.transporterId)) ?? [];
+      const openTrip = driverTrips.find((t) => sameDestination(t, destination)) ?? null;
+      const existingShipments = openTrip ? shipmentsByTripMap.get(String(openTrip._id)) ?? [] : [];
 
       const quote = await quoteForJoining(
         openTrip,
@@ -496,6 +560,7 @@ export async function offersForRequest(requestId: string, farmerId: string) {
         destination,
         distanceKm,
         vehicle?.ratePerKm ?? 0,
+        existingShipments,
       );
 
       if (offer.quotedPrice !== quote.quoted || offer.soloPrice !== quote.solo) {
@@ -505,13 +570,16 @@ export async function offersForRequest(requestId: string, farmerId: string) {
         await offer.save();
       }
 
-      const capacity = openTrip ? await capacityOf(openTrip) : null;
-      const poolSize = openTrip
-        ? await TripShipment.countDocuments({
-            tripId: openTrip._id,
-            state: { $in: OCCUPIES_CAPACITY },
-          })
-        : 0;
+      let remainingCapacityKg = vehicle?.capacityKg ?? 0;
+      let poolSize = 0;
+
+      if (openTrip) {
+        const committedKg = existingShipments
+          .filter((s) => OCCUPIES_CAPACITY.includes(s.state))
+          .reduce((sum, s) => sum + s.quantityKg, 0);
+        remainingCapacityKg = Math.max(0, openTrip.totalCapacityKg - committedKg);
+        poolSize = existingShipments.filter((s) => OCCUPIES_CAPACITY.includes(s.state)).length;
+      }
 
       return {
         ...offer.toJSON(),
@@ -528,7 +596,7 @@ export async function offersForRequest(requestId: string, farmerId: string) {
           registrationNumber: vehicle.registrationNumber,
           vehicleType: vehicle.vehicleType,
           capacityKg: vehicle.capacityKg,
-          remainingCapacityKg: capacity ? capacity.availableKg : vehicle.capacityKg,
+          remainingCapacityKg,
         },
       };
     }),
