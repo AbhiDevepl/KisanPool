@@ -20,9 +20,10 @@ import {
   TransporterOffer,
   Trip,
   TripShipment,
+  User,
   Vehicle,
 } from '../../models';
-import type { TripDoc } from '../../models';
+import type { TripDoc, TripShipmentDoc, VehicleDoc } from '../../models';
 import {
   type CancellationSignals,
   type DelaySignals,
@@ -43,16 +44,45 @@ const DEMAND_WINDOW_DAYS = 7;
 // one trip: delay + cancellation
 // ---------------------------------------------------------------------------
 
+interface TransporterStats {
+  completedTrips: number;
+  cancelledTrips: number;
+  offersMade: number;
+  offersWithdrawn: number;
+}
+
+/** Fetch historical transporter activity stats once per transporter to avoid N+1 queries. */
+async function getTransporterStats(transporterId: unknown): Promise<TransporterStats> {
+  const [completedTrips, cancelledTrips, offersMade, offersWithdrawn] = await Promise.all([
+    Trip.countDocuments({ transporterId, state: 'COMPLETED' }),
+    Trip.countDocuments({ transporterId, state: 'CANCELLED' }),
+    TransporterOffer.countDocuments({ transporterId }),
+    TransporterOffer.countDocuments({ transporterId, state: 'WITHDRAWN' }),
+  ]);
+  return { completedTrips, cancelledTrips, offersMade, offersWithdrawn };
+}
+
+/**
+ * Gather delay signals.
+ * Accepts optional prefetched `vehicle` and `shipments` to avoid redundant database round-trips.
+ */
 async function delaySignalsFor(
   trip: TripDoc,
   now: number,
+  prefetchedVehicle?: VehicleDoc | null,
+  prefetchedShipments?: TripShipmentDoc[],
 ): Promise<DelaySignals> {
-  const shipments = await TripShipment.find({
-    tripId: trip._id,
-    state: { $ne: 'CANCELLED' },
-  }).sort({ pickupSequence: 1 });
+  const shipments =
+    prefetchedShipments ??
+    (await TripShipment.find({
+      tripId: trip._id,
+      state: { $ne: 'CANCELLED' },
+    }).sort({ pickupSequence: 1 }));
 
-  const vehicle = await Vehicle.findById(trip.vehicleId);
+  const vehicle =
+    prefetchedVehicle !== undefined
+      ? prefetchedVehicle
+      : await Vehicle.findById(trip.vehicleId);
 
   const pickupsDone = shipments.filter((s) => COLLECTED_OR_LATER.includes(s.state)).length;
   const delivered = shipments.filter((s) => DELIVERED_OR_LATER.includes(s.state)).length;
@@ -83,19 +113,37 @@ async function delaySignalsFor(
   };
 }
 
+/**
+ * Gather cancellation signals.
+ * Accepts optional prefetched `vehicle`, `firstShipment`, and `transporterStats`
+ * to eliminate duplicate queries in bulk/roll-up assessments.
+ */
 async function cancellationSignalsFor(
   trip: TripDoc,
   now: number,
+  prefetchedVehicle?: VehicleDoc | null,
+  prefetchedFirstShipment?: TripShipmentDoc | null,
+  prefetchedTransporterStats?: TransporterStats,
 ): Promise<CancellationSignals> {
-  const [completedTrips, cancelledTrips, offersMade, offersWithdrawn, firstShipment, vehicle] =
-    await Promise.all([
-      Trip.countDocuments({ transporterId: trip.transporterId, state: 'COMPLETED' }),
-      Trip.countDocuments({ transporterId: trip.transporterId, state: 'CANCELLED' }),
-      TransporterOffer.countDocuments({ transporterId: trip.transporterId }),
-      TransporterOffer.countDocuments({ transporterId: trip.transporterId, state: 'WITHDRAWN' }),
-      TripShipment.findOne({ tripId: trip._id, state: { $ne: 'CANCELLED' } }).sort({ createdAt: 1 }),
-      Vehicle.findById(trip.vehicleId),
-    ]);
+  const statsPromise = prefetchedTransporterStats
+    ? Promise.resolve(prefetchedTransporterStats)
+    : getTransporterStats(trip.transporterId);
+
+  const firstShipmentPromise =
+    prefetchedFirstShipment !== undefined
+      ? Promise.resolve(prefetchedFirstShipment)
+      : TripShipment.findOne({ tripId: trip._id, state: { $ne: 'CANCELLED' } }).sort({ createdAt: 1 });
+
+  const vehiclePromise =
+    prefetchedVehicle !== undefined
+      ? Promise.resolve(prefetchedVehicle)
+      : Vehicle.findById(trip.vehicleId);
+
+  const [stats, firstShipment, vehicle] = await Promise.all([
+    statsPromise,
+    firstShipmentPromise,
+    vehiclePromise,
+  ]);
 
   const minutesSinceLastPing =
     vehicle?.currentLocation && vehicle.updatedAt
@@ -104,10 +152,10 @@ async function cancellationSignalsFor(
 
   return {
     tripState: trip.state,
-    completedTrips,
-    cancelledTrips,
-    offersMade,
-    offersWithdrawn,
+    completedTrips: stats.completedTrips,
+    cancelledTrips: stats.cancelledTrips,
+    offersMade: stats.offersMade,
+    offersWithdrawn: stats.offersWithdrawn,
     minutesSinceFirstConfirm: firstShipment
       ? minutesSince(firstShipment.createdAt as unknown as Date, now)
       : 0,
@@ -135,11 +183,26 @@ export async function assessTrip(
   const now = Date.now();
   const computedAt = new Date(now).toISOString();
 
-  const delay = scoreDelayRisk(await delaySignalsFor(trip, now), computedAt);
+  // Fetch shared shipments & vehicle once to eliminate duplicate queries
+  const shipments = await TripShipment.find({
+    tripId: trip._id,
+    state: { $ne: 'CANCELLED' },
+  }).sort({ pickupSequence: 1 });
+  const vehicle = await Vehicle.findById(trip.vehicleId);
+
+  const delay = scoreDelayRisk(await delaySignalsFor(trip, now, vehicle, shipments), computedAt);
   const dto: TripPredictionDTO = { tripId: String(trip._id), tripState: trip.state, delay };
 
   if (opts.includeCancellation) {
-    dto.cancellation = scoreCancellationRisk(await cancellationSignalsFor(trip, now), computedAt);
+    const firstShipment = shipments.length
+      ? shipments.reduce((earliest, s) =>
+          new Date(s.createdAt).getTime() < new Date(earliest.createdAt).getTime() ? s : earliest,
+        )
+      : null;
+    dto.cancellation = scoreCancellationRisk(
+      await cancellationSignalsFor(trip, now, vehicle, firstShipment),
+      computedAt,
+    );
   }
   return dto;
 }
@@ -213,19 +276,53 @@ export async function assessOps(): Promise<OpsPredictionDTO> {
     .sort({ createdAt: -1 })
     .limit(40);
 
+  // Batch-fetch transporter names to avoid N+1 User queries
+  const transporterIds = [...new Set(trips.map((t) => String(t.transporterId)))];
+  const users = await User.find({ _id: { $in: transporterIds } }).select('name');
+  const transporterNameMap = new Map(users.map((u) => [String(u._id), u.name]));
+
+  // Pre-calculate transporter stats once per unique transporter ID across all active trips
+  const statsEntries = await Promise.all(
+    transporterIds.map(async (id) => [id, await getTransporterStats(id)] as const),
+  );
+  const statsMap = new Map(statsEntries);
+
   const rows = await Promise.all(
     trips.map(async (trip) => {
       const computedAt = new Date(now).toISOString();
-      const [delay, cancellation, transporter, poolSize] = await Promise.all([
-        scoreDelayRisk(await delaySignalsFor(trip, now), computedAt),
-        scoreCancellationRisk(await cancellationSignalsFor(trip, now), computedAt),
-        (await import('../../models')).User.findById(trip.transporterId).select('name'),
-        TripShipment.countDocuments({ tripId: trip._id, state: { $in: OCCUPIES_CAPACITY } }),
+
+      // Fetch active shipments and vehicle once per trip
+      const [shipments, vehicle] = await Promise.all([
+        TripShipment.find({
+          tripId: trip._id,
+          state: { $ne: 'CANCELLED' },
+        }).sort({ pickupSequence: 1 }),
+        Vehicle.findById(trip.vehicleId),
       ]);
+
+      const firstShipment = shipments.length
+        ? shipments.reduce((earliest, s) =>
+            new Date(s.createdAt).getTime() < new Date(earliest.createdAt).getTime() ? s : earliest,
+          )
+        : null;
+
+      const stats = statsMap.get(String(trip.transporterId));
+
+      const [delay, cancellation] = await Promise.all([
+        scoreDelayRisk(await delaySignalsFor(trip, now, vehicle, shipments), computedAt),
+        scoreCancellationRisk(
+          await cancellationSignalsFor(trip, now, vehicle, firstShipment, stats),
+          computedAt,
+        ),
+      ]);
+
+      // Calculate pool size directly from fetched shipments without extra countDocuments query
+      const poolSize = shipments.filter((s) => OCCUPIES_CAPACITY.includes(s.state)).length;
+
       return {
         tripId: String(trip._id),
         to: trip.destination?.name ?? 'mandi',
-        transporter: transporter?.name ?? 'Unknown',
+        transporter: transporterNameMap.get(String(trip.transporterId)) ?? 'Unknown',
         poolSize,
         delay,
         cancellation,
